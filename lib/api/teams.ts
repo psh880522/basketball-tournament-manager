@@ -37,6 +37,12 @@ export type TeamWithTournament = {
   tournaments: TournamentSummary | null;
 };
 
+export type CaptainTeam = {
+  id: string;
+  team_name: string;
+  status: TeamStatus;
+};
+
 type ApiResult<T> = {
   data: T | null;
   error: string | null;
@@ -164,3 +170,19 @@ export const getMyTeamsWithTournament = async (
     error: error ? error.message : null,
   };
 };
+
+export async function getCaptainTeams(
+  captainUserId: string
+): Promise<ApiResult<CaptainTeam[]>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from<CaptainTeam>("teams")
+    .select("id,team_name,status")
+    .eq("captain_user_id", captainUserId)
+    .order("created_at", { ascending: false });
+
+  return {
+    data,
+    error: error ? error.message : null,
+  };
+}
