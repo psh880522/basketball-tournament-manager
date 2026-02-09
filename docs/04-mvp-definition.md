@@ -252,9 +252,10 @@
 - T-0030 Player CRUD
 
 ### Phase 5 — 대진표 자동 생성
-- T-0040 Tournament Bracket Generator
-- T-0041 League RoundRobin Generator
-- T-0042 Bracket View
+- T-0040 Generate Bracket
+- T-0041 Court Management
+- T-0042 Match Court Assignment
+- T-0043 Match Scheduling
 
 ### Phase 6 — 경기 결과 & 순위
 - T-0050 Match Result Input
