@@ -25,6 +25,17 @@ export async function getUserWithRole(): Promise<UserWithRoleResult> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
   if (userError) {
+    if (
+      userError.code === "auth_session_missing" ||
+      userError.message === "Auth session missing!"
+    ) {
+      return {
+        status: "unauthenticated",
+        user: null,
+        role: null,
+        error: null,
+      };
+    }
     return {
       status: "error",
       user: null,

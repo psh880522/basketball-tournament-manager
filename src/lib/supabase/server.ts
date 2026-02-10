@@ -1,7 +1,8 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
-export async function createSupabaseServerClient() {
+export const createSupabaseServerClient = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -24,7 +25,7 @@ export async function createSupabaseServerClient() {
       },
     }
   );
-}
+});
 
 export type TournamentStatus = "draft" | "open" | "closed";
 

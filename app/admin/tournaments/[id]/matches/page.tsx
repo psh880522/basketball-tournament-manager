@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
-import { getCourtsByTournament } from "@/lib/api/courts";
 import { getMatchesByTournament } from "@/lib/api/matches";
-import MatchCourtForm from "./Form";
+import MatchResultForm from "./Form";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -30,16 +29,10 @@ export default async function TournamentMatchesPage({ params }: PageProps) {
     return <p style={{ color: "crimson" }}>{matches.error}</p>;
   }
 
-  const courts = await getCourtsByTournament(id);
-
-  if (courts.error) {
-    return <p style={{ color: "crimson" }}>{courts.error}</p>;
-  }
-
   return (
     <main style={{ padding: 24 }}>
-      <h1>Match Court Assignment</h1>
-      <MatchCourtForm matches={matches.data ?? []} courts={courts.data ?? []} />
+      <h1>Match Result Input</h1>
+      <MatchResultForm matches={matches.data ?? []} />
     </main>
   );
 }

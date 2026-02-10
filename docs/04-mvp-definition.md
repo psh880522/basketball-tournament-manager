@@ -233,9 +233,9 @@
 - T-0042 Match Court Assignment
 
 ### Phase 6 — 결과 & 순위 (남은 핵심)
-- T-0051 Match Result Input (조별 리그)
-- T-0052 Group Standing Calculation
-- T-0053 Group Standings View
+- T-0050 Match Result Input (조별 리그)
+- T-0051 Group Standing Calculation
+- T-0052 Group Standings View
 
 ### Phase 7 — 토너먼트 & 확장
 - T-0060 Generate Seeded Bracket (1–8, 2–7, 3–6, 4–5…)

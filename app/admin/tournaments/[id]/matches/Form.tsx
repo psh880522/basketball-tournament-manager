@@ -1,24 +1,20 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { assignCourtToMatch } from "./actions";
-
-type Court = {
-  id: string;
-  name: string;
-};
+import { submitMatchResult } from "./actions";
 
 type MatchRow = {
   id: string;
   division_id: string;
   group_id: string | null;
-  court_id: string | null;
   status: string;
+  score_a: number | null;
+  score_b: number | null;
+  winner_team_id: string | null;
   divisions: { name: string } | null;
   groups: { name: string; order: number } | null;
   team_a: { team_name: string } | null;
   team_b: { team_name: string } | null;
-  court: { id: string; name: string } | null;
 };
 
 type Message = {
@@ -28,7 +24,6 @@ type Message = {
 
 type Props = {
   matches: MatchRow[];
-  courts: Court[];
 };
 
 type GroupBlock = {
@@ -44,19 +39,22 @@ type DivisionBlock = {
   groups: GroupBlock[];
 };
 
-export default function MatchCourtForm({ matches, courts }: Props) {
+export default function MatchResultForm({ matches }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, Message | null>>({});
   const [isPending, startTransition] = useTransition();
-  const [selectionByMatch, setSelectionByMatch] = useState<Record<string, string>>(
-    () => {
-      const initial: Record<string, string> = {};
-      matches.forEach((match) => {
-        initial[match.id] = match.court_id ?? "";
-      });
-      return initial;
-    }
-  );
+  const [draftByMatch, setDraftByMatch] = useState<
+    Record<string, { scoreA: string; scoreB: string }>
+  >(() => {
+    const initial: Record<string, { scoreA: string; scoreB: string }> = {};
+    matches.forEach((match) => {
+      initial[match.id] = {
+        scoreA: match.score_a?.toString() ?? "",
+        scoreB: match.score_b?.toString() ?? "",
+      };
+    });
+    return initial;
+  });
 
   const divisions = useMemo<DivisionBlock[]>(() => {
     const divisionMap: Record<string, DivisionBlock> = {};
@@ -91,8 +89,15 @@ export default function MatchCourtForm({ matches, courts }: Props) {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [matches]);
 
-  const handleSelectChange = (matchId: string, value: string) => {
-    setSelectionByMatch((prev) => ({ ...prev, [matchId]: value }));
+  const handleScoreChange = (
+    matchId: string,
+    field: "scoreA" | "scoreB",
+    value: string
+  ) => {
+    setDraftByMatch((prev) => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], [field]: value },
+    }));
   };
 
   const handleSave = (matchId: string) => {
@@ -100,10 +105,11 @@ export default function MatchCourtForm({ matches, courts }: Props) {
     setMessages((prev) => ({ ...prev, [matchId]: null }));
 
     startTransition(async () => {
-      const selected = selectionByMatch[matchId] ?? "";
-      const result = await assignCourtToMatch({
+      const draft = draftByMatch[matchId];
+      const result = await submitMatchResult({
         matchId,
-        courtId: selected ? selected : null,
+        scoreA: draft?.scoreA ?? "",
+        scoreB: draft?.scoreB ?? "",
       });
 
       setMessages((prev) => ({
@@ -118,11 +124,14 @@ export default function MatchCourtForm({ matches, courts }: Props) {
   };
 
   if (matches.length === 0) {
-    return <p>아직 생성된 경기가 없습니다.</p>;
+    return <p>입력할 경기가 없습니다.</p>;
   }
+
+  const hasEditableMatch = matches.some((match) => match.status === "scheduled");
 
   return (
     <div style={{ marginTop: 16 }}>
+      {!hasEditableMatch ? <p>입력할 경기가 없습니다.</p> : null}
       {divisions.map((division) => (
         <section key={division.id} style={{ marginBottom: 24 }}>
           <h2>{division.name}</h2>
@@ -133,9 +142,13 @@ export default function MatchCourtForm({ matches, courts }: Props) {
                 {group.matches.map((match) => {
                   const teamA = match.team_a?.team_name ?? "TBD";
                   const teamB = match.team_b?.team_name ?? "TBD";
-                  const selected = selectionByMatch[match.id] ?? "";
+                  const draft = draftByMatch[match.id] ?? {
+                    scoreA: "",
+                    scoreB: "",
+                  };
                   const message = messages[match.id];
                   const isRowPending = isPending && pendingId === match.id;
+                  const isCompleted = match.status === "completed";
 
                   return (
                     <div
@@ -150,32 +163,48 @@ export default function MatchCourtForm({ matches, courts }: Props) {
                         <strong>
                           {teamA} vs {teamB}
                         </strong>
-                        <span>
-                          Current: {match.court?.name ?? "Unassigned"}
-                        </span>
+                        <span>Status: {match.status}</span>
                       </div>
-                      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                        <select
-                          value={selected}
+                      <div
+                        style={{
+                          marginTop: 8,
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          min={0}
+                          value={draft.scoreA}
                           onChange={(event) =>
-                            handleSelectChange(match.id, event.target.value)
+                            handleScoreChange(match.id, "scoreA", event.target.value)
                           }
-                        >
-                          <option value="">Unassigned</option>
-                          {courts.map((court) => (
-                            <option key={court.id} value={court.id}>
-                              {court.name}
-                            </option>
-                          ))}
-                        </select>
+                          disabled={isCompleted}
+                          style={{ width: 80 }}
+                        />
+                        <span>:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={draft.scoreB}
+                          onChange={(event) =>
+                            handleScoreChange(match.id, "scoreB", event.target.value)
+                          }
+                          disabled={isCompleted}
+                          style={{ width: 80 }}
+                        />
                         <button
                           type="button"
                           onClick={() => handleSave(match.id)}
-                          disabled={isRowPending}
+                          disabled={isRowPending || isCompleted}
                         >
-                          {isRowPending ? "Saving..." : "Save"}
+                          {isRowPending ? "Saving..." : "결과 저장"}
                         </button>
                       </div>
+                      {isCompleted ? (
+                        <p style={{ marginTop: 8 }}>Final score saved.</p>
+                      ) : null}
                       {message ? (
                         <p
                           style={{

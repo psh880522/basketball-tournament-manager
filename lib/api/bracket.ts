@@ -145,6 +145,7 @@ export async function createMatches(
     tournament_id: string;
     division_id: string;
     group_id: string | null;
+    round?: string | null;
     team_a_id: string;
     team_b_id: string;
     status: string;
