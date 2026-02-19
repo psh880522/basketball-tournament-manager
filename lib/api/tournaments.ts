@@ -8,6 +8,15 @@ export type TournamentAdminRow = {
   status: TournamentStatus;
 };
 
+export type PublicTournamentRow = {
+  id: string;
+  name: string;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: TournamentStatus;
+};
+
 type ApiResult<T> = {
   data: T | null;
   error: string | null;
@@ -31,6 +40,38 @@ export async function getAdminTournaments(): Promise<
     .from<TournamentAdminRow>("tournaments")
     .select("id,name,status")
     .order("name", { ascending: true });
+
+  return {
+    data,
+    error: error ? error.message : null,
+  };
+}
+
+export async function getOpenTournaments(): Promise<
+  ApiResult<PublicTournamentRow[]>
+> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from<PublicTournamentRow>("tournaments")
+    .select("id,name,location,start_date,end_date,status")
+    .eq("status", "open")
+    .order("start_date", { ascending: true });
+
+  return {
+    data,
+    error: error ? error.message : null,
+  };
+}
+
+export async function getPublicTournamentById(
+  tournamentId: string
+): Promise<ApiResult<PublicTournamentRow>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from<PublicTournamentRow>("tournaments")
+    .select("id,name,location,start_date,end_date,status")
+    .eq("id", tournamentId)
+    .maybeSingle();
 
   return {
     data,

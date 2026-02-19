@@ -43,6 +43,12 @@ export type CaptainTeam = {
   status: TeamStatus;
 };
 
+export type TeamApplicationSummary = {
+  id: string;
+  team_name: string;
+  status: TeamStatus;
+};
+
 type ApiResult<T> = {
   data: T | null;
   error: string | null;
@@ -129,6 +135,24 @@ export async function getTeamApplicationById(
     .from<PendingTeamRow>("teams")
     .select("id,tournament_id,status")
     .eq("id", teamId)
+    .maybeSingle();
+
+  return {
+    data,
+    error: error ? error.message : null,
+  };
+}
+
+export async function getTeamApplicationByTournamentAndCaptain(
+  tournamentId: string,
+  captainUserId: string
+): Promise<ApiResult<TeamApplicationSummary>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from<TeamApplicationSummary>("teams")
+    .select("id,team_name,status")
+    .eq("tournament_id", tournamentId)
+    .eq("captain_user_id", captainUserId)
     .maybeSingle();
 
   return {
