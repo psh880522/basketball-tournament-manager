@@ -1,7 +1,7 @@
 "use server";
 
-import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getMatchById, updateMatchResult } from "@/lib/api/matches";
+import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
 
 type SubmitInput = {
   matchId: string;
@@ -34,20 +34,6 @@ export async function submitMatchResult(
     return { ok: false, error: "Draws are not allowed." };
   }
 
-  const userResult = await getUserWithRole();
-
-  if (userResult.status === "unauthenticated") {
-    return { ok: false, error: "Login required." };
-  }
-
-  if (userResult.status === "error") {
-    return { ok: false, error: userResult.error ?? "Auth error." };
-  }
-
-  if (userResult.role !== "organizer") {
-    return { ok: false, error: "Forbidden." };
-  }
-
   const matchResult = await getMatchById(input.matchId);
 
   if (matchResult.error) {
@@ -56,6 +42,15 @@ export async function submitMatchResult(
 
   if (!matchResult.data) {
     return { ok: false, error: "Match not found." };
+  }
+
+  const guard = await assertTournamentStepAllowed({
+    tournamentId: matchResult.data.tournament_id,
+    stepKey: "SUBMIT_RESULT",
+  });
+
+  if (!guard.ok) {
+    return { ok: false, error: guard.error };
   }
 
   if (matchResult.data.status !== "scheduled") {

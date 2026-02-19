@@ -1,6 +1,6 @@
 "use server";
 
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
 import {
   countGroupsByDivision,
   countMatchesByDivision,
@@ -46,18 +46,14 @@ export async function generateGroupStage(
     return { ok: false, error: "Missing identifiers." };
   }
 
-  const userResult = await getUserWithRole();
+  const guard = await assertTournamentStepAllowed({
+    tournamentId: input.tournamentId,
+    divisionId: input.divisionId,
+    stepKey: "GENERATE_GROUP_STAGE",
+  });
 
-  if (userResult.status === "unauthenticated") {
-    return { ok: false, error: "Login required." };
-  }
-
-  if (userResult.status === "error") {
-    return { ok: false, error: userResult.error ?? "Auth error." };
-  }
-
-  if (userResult.role !== "organizer") {
-    return { ok: false, error: "Forbidden." };
+  if (!guard.ok) {
+    return { ok: false, error: guard.error };
   }
 
   const tournament = await getTournamentStatus(input.tournamentId);

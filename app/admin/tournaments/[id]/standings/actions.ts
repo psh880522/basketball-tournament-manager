@@ -2,13 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getCompletedMatchesByGroup } from "@/lib/api/matches";
 import {
   getGroupSummary,
   getGroupTeams,
   upsertStandings,
 } from "@/lib/api/standings";
+import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
 
 type ActionResult =
   | { ok: true }
@@ -38,33 +38,14 @@ export async function recalculateGroupStandings(
     return { ok: false, error: "Missing identifiers." };
   }
 
-  const userResult = await getUserWithRole();
+  const guard = await assertTournamentStepAllowed({
+    tournamentId,
+    divisionId,
+    stepKey: "RECALC_STANDINGS",
+  });
 
-  if (userResult.status === "unauthenticated") {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      "Login required."
-    );
-  }
-
-  if (userResult.status === "error") {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      userResult.error ?? "Auth error."
-    );
-  }
-
-  if (userResult.role !== "organizer") {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      "Forbidden."
-    );
+  if (!guard.ok) {
+    return redirectWithError(tournamentId, divisionId, groupId, guard.error);
   }
 
   const groupSummary = await getGroupSummary(groupId);

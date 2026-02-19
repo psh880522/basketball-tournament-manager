@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
 import { createMatches, getDivisionById, getTournamentStatus } from "@/lib/api/bracket";
 import { getTournamentMatchesByDivision, getTournamentMatchesByRound } from "@/lib/api/matches";
 import { getStandingsByDivision } from "@/lib/api/standings";
+import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
 
 type ActionResult =
   | { ok: true }
@@ -29,22 +29,14 @@ export async function generateSeededBracket(formData: FormData): Promise<ActionR
     return redirectWithError(tournamentId, divisionId, "Missing identifiers.");
   }
 
-  const userResult = await getUserWithRole();
+  const guard = await assertTournamentStepAllowed({
+    tournamentId,
+    divisionId,
+    stepKey: "GENERATE_BRACKET",
+  });
 
-  if (userResult.status === "unauthenticated") {
-    return redirectWithError(tournamentId, divisionId, "Login required.");
-  }
-
-  if (userResult.status === "error") {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      userResult.error ?? "Auth error."
-    );
-  }
-
-  if (userResult.role !== "organizer") {
-    return redirectWithError(tournamentId, divisionId, "Forbidden.");
+  if (!guard.ok) {
+    return redirectWithError(tournamentId, divisionId, guard.error);
   }
 
   const tournament = await getTournamentStatus(tournamentId);
@@ -165,22 +157,15 @@ export async function advanceTournamentRound(
     return redirectWithError(tournamentId, divisionId, "Invalid round.");
   }
 
-  const userResult = await getUserWithRole();
+  const guard = await assertTournamentStepAllowed({
+    tournamentId,
+    divisionId,
+    stepKey: "ADVANCE_ROUND",
+    currentRound,
+  });
 
-  if (userResult.status === "unauthenticated") {
-    return redirectWithError(tournamentId, divisionId, "Login required.");
-  }
-
-  if (userResult.status === "error") {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      userResult.error ?? "Auth error."
-    );
-  }
-
-  if (userResult.role !== "organizer") {
-    return redirectWithError(tournamentId, divisionId, "Forbidden.");
+  if (!guard.ok) {
+    return redirectWithError(tournamentId, divisionId, guard.error);
   }
 
   const currentMatches = await getTournamentMatchesByRound(
