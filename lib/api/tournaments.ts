@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
-export type TournamentStatus = "draft" | "open" | "closed";
+export type TournamentStatus = "draft" | "open" | "closed" | "finished";
 
 export type TournamentAdminRow = {
   id: string;
@@ -22,7 +22,12 @@ type ApiResult<T> = {
   error: string | null;
 };
 
-const tournamentStatuses: TournamentStatus[] = ["draft", "open", "closed"];
+const tournamentStatuses: TournamentStatus[] = [
+  "draft",
+  "open",
+  "closed",
+  "finished",
+];
 
 export function isTournamentStatus(value: string): value is TournamentStatus {
   return (tournamentStatuses as string[]).includes(value);
@@ -87,6 +92,23 @@ export async function updateTournamentStatus(
   const { data, error } = await supabase
     .from<TournamentAdminRow>("tournaments")
     .update({ status })
+    .eq("id", tournamentId)
+    .select("id,name,status")
+    .single();
+
+  return {
+    data,
+    error: error ? error.message : null,
+  };
+}
+
+export async function finishTournament(
+  tournamentId: string
+): Promise<ApiResult<TournamentAdminRow>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from<TournamentAdminRow>("tournaments")
+    .update({ status: "finished" })
     .eq("id", tournamentId)
     .select("id,name,status")
     .single();

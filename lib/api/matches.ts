@@ -156,6 +156,19 @@ type TournamentMatchRow = {
   created_at: string;
 };
 
+export type TournamentBracketMatchRow = {
+  id: string;
+  division_id: string;
+  round: string | null;
+  status: string;
+  score_a: number | null;
+  score_b: number | null;
+  winner_team_id: string | null;
+  team_a: { id: string; team_name: string } | null;
+  team_b: { id: string; team_name: string } | null;
+  created_at: string;
+};
+
 export async function updateMatchResult(
   matchId: string,
   update: MatchResultUpdate
@@ -211,6 +224,25 @@ export async function getTournamentMatchesByRound(
 
   return {
     data: data as TournamentMatchRow[] | null,
+    error: error ? error.message : null,
+  };
+}
+
+export async function getTournamentBracketMatches(
+  tournamentId: string
+): Promise<ApiResult<TournamentBracketMatchRow[]>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .select(
+      "id,division_id,round,status,score_a,score_b,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
+    )
+    .eq("tournament_id", tournamentId)
+    .is("group_id", null)
+    .order("created_at", { ascending: true });
+
+  return {
+    data: data as TournamentBracketMatchRow[] | null,
     error: error ? error.message : null,
   };
 }

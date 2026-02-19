@@ -45,6 +45,23 @@ export async function assertTournamentStepAllowed(
   }
 
   const supabase = await createSupabaseServerClient();
+  const tournamentResult = await supabase
+    .from("tournaments")
+    .select("id,status")
+    .eq("id", input.tournamentId)
+    .maybeSingle();
+
+  if (tournamentResult.error) {
+    return { ok: false, error: tournamentResult.error.message };
+  }
+
+  if (!tournamentResult.data) {
+    return { ok: false, error: "Tournament not found." };
+  }
+
+  if (tournamentResult.data.status === "finished") {
+    return { ok: false, error: "대회가 종료되었습니다." };
+  }
 
   if (input.stepKey === "GENERATE_GROUP_STAGE") {
     if (!input.divisionId) {
@@ -131,20 +148,6 @@ export async function assertTournamentStepAllowed(
   if (input.stepKey === "GENERATE_BRACKET") {
     if (!input.divisionId) {
       return { ok: false, error: "Missing division id." };
-    }
-
-    const tournamentResult = await supabase
-      .from("tournaments")
-      .select("id,status")
-      .eq("id", input.tournamentId)
-      .maybeSingle();
-
-    if (tournamentResult.error) {
-      return { ok: false, error: tournamentResult.error.message };
-    }
-
-    if (!tournamentResult.data) {
-      return { ok: false, error: "Tournament not found." };
     }
 
     if (tournamentResult.data.status !== "closed") {

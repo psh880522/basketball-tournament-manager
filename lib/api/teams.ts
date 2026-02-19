@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
 export type TeamStatus = "pending" | "approved" | "rejected";
 
-export type TournamentStatus = "draft" | "open" | "closed";
+export type TournamentStatus = "draft" | "open" | "closed" | "finished";
 
 export type TeamApplication = {
   id: string;
