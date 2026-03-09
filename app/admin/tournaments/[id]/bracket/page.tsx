@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
-import { getDivisionsByTournament } from "@/lib/api/bracket";
-import BracketGeneratorForm from "./Form";
+import { listDivisionsWithStats } from "@/lib/api/divisions";
+import BracketConsoleForm from "./Form";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -13,30 +13,51 @@ export default async function BracketPage({ params }: PageProps) {
   if (userResult.status === "unauthenticated") redirect("/login");
 
   if (userResult.status === "error") {
-    return <p style={{ color: "crimson" }}>{userResult.error}</p>;
+    return (
+      <main className="p-6">
+        <p className="text-red-600">{userResult.error}</p>
+      </main>
+    );
   }
 
   if (userResult.status === "empty") {
-    return <p>No profile found for this account.</p>;
+    return (
+      <main className="p-6">
+        <p className="text-gray-500">프로필 정보를 찾을 수 없습니다.</p>
+      </main>
+    );
   }
 
   if (userResult.role !== "organizer") redirect("/dashboard");
 
   const { id } = await params;
-  const divisions = await getDivisionsByTournament(id);
+  const result = await listDivisionsWithStats(id);
 
-  if (divisions.error) {
-    return <p style={{ color: "crimson" }}>{divisions.error}</p>;
+  if (result.error) {
+    return (
+      <main className="p-6">
+        <p className="text-red-600">{result.error}</p>
+      </main>
+    );
   }
 
-  if (!divisions.data || divisions.data.length === 0) {
-    return <p>No divisions found for this tournament.</p>;
-  }
+  const divisions = result.data ?? [];
+  const totalApproved = divisions.reduce((s, d) => s + d.approvedCount, 0);
+  const totalMatches = divisions.reduce((s, d) => s + d.matchCount, 0);
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Bracket Generator</h1>
-      <BracketGeneratorForm tournamentId={id} divisions={divisions.data} />
+    <main className="mx-auto max-w-3xl p-6">
+      <h1 className="mb-1 text-2xl font-bold">조/경기 생성 콘솔</h1>
+      <p className="mb-6 text-sm text-gray-500">
+        디비전 {divisions.length}개 · 승인 팀 {totalApproved} · 경기{" "}
+        {totalMatches}
+      </p>
+
+      {divisions.length === 0 ? (
+        <p className="text-gray-500">등록된 디비전이 없습니다.</p>
+      ) : (
+        <BracketConsoleForm tournamentId={id} divisions={divisions} />
+      )}
     </main>
   );
 }

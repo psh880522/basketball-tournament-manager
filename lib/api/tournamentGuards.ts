@@ -68,9 +68,10 @@ export async function assertTournamentStepAllowed(
       return { ok: false, error: "Missing division id." };
     }
 
+    // applications 기반: 해당 division의 승인 팀 수 조회
     const approvedTeamsResult = await supabase
-      .from("teams")
-      .select("id", { count: "exact", head: true })
+      .from("tournament_team_applications")
+      .select("team_id", { count: "exact", head: true })
       .eq("division_id", input.divisionId)
       .eq("status", "approved");
 

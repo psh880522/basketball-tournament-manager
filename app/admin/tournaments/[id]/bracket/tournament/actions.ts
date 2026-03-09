@@ -21,7 +21,7 @@ type SeedPair = {
 
 type RoundName = "quarterfinal" | "semifinal" | "final";
 
-export async function generateSeededBracket(formData: FormData): Promise<ActionResult> {
+export async function generateSeededBracket(formData: FormData): Promise<void> {
   const tournamentId = toText(formData.get("tournamentId"));
   const divisionId = toText(formData.get("divisionId"));
 
@@ -144,7 +144,7 @@ export async function generateSeededBracket(formData: FormData): Promise<ActionR
 
 export async function advanceTournamentRound(
   formData: FormData
-): Promise<ActionResult> {
+): Promise<void> {
   const tournamentId = toText(formData.get("tournamentId"));
   const divisionId = toText(formData.get("divisionId"));
   const currentRound = toText(formData.get("currentRound")) as RoundName;
@@ -302,18 +302,16 @@ const redirectWithError = (
   tournamentId: string,
   divisionId: string,
   message: string
-): ActionResult => {
+): never => {
   redirect(buildRedirectUrl(tournamentId, divisionId, message));
-  return { ok: false, error: message };
 };
 
 const redirectWithSuccess = (
   tournamentId: string,
   divisionId: string,
   nextRound?: string
-): ActionResult => {
+): never => {
   redirect(buildRedirectUrl(tournamentId, divisionId, undefined, nextRound));
-  return { ok: true };
 };
 
 const isRoundName = (value: string): value is RoundName =>

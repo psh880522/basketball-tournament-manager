@@ -1,8 +1,8 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
 import {
-  countGroupsByDivision,
   countMatchesByDivision,
   createGroupTeams,
   createGroups,
@@ -11,150 +11,145 @@ import {
   getDivisionById,
   getTournamentStatus,
 } from "@/lib/api/bracket";
+import { updateDivision } from "@/lib/api/divisions";
+import { deleteMatchesByDivision } from "@/lib/api/matches";
+import { deleteGroupsByDivision } from "@/lib/api/groups";
+import {
+  previewDivisionGeneration,
+  type PreviewResult,
+} from "@/lib/api/bracketPreview";
+
+type ActionResult = { ok: true } | { ok: false; error: string };
+
+/* ── 미리보기 ── */
+
+export async function previewDivisionAction(input: {
+  tournamentId: string;
+  divisionId: string;
+  groupSize?: number;
+}): Promise<PreviewResult> {
+  return previewDivisionGeneration(input);
+}
+
+/* ── group_size 저장 ── */
+
+export async function updateGroupSizeAction(
+  divisionId: string,
+  groupSize: number
+): Promise<ActionResult> {
+  return updateDivision(divisionId, { group_size: groupSize });
+}
+
+/* ── 경기 생성 / 덮어쓰기 ── */
 
 type GenerateInput = {
   tournamentId: string;
   divisionId: string;
-};
-
-type GenerateResult =
-  | { ok: true }
-  | {
-      ok: false;
-      error: string;
-    };
-
-const shuffle = <T,>(items: T[]) => {
-  const array = [...items];
-  for (let i = array.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
+  overwrite: boolean;
 };
 
 const groupName = (index: number) => {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  if (index < alphabet.length) return `${alphabet[index]} Group`;
-  return `Group ${index + 1}`;
+  return index < alphabet.length ? `${alphabet[index]}조` : `${index + 1}조`;
 };
 
-export async function generateGroupStage(
+export async function generateDivisionMatches(
   input: GenerateInput
-): Promise<GenerateResult> {
-  if (!input.tournamentId || !input.divisionId) {
-    return { ok: false, error: "Missing identifiers." };
+): Promise<ActionResult> {
+  const { tournamentId, divisionId, overwrite } = input;
+
+  if (!tournamentId || !divisionId) {
+    return { ok: false, error: "필수 식별자가 누락되었습니다." };
   }
 
+  /* guard: organizer + tournament owner
+     overwrite=true 시 guard의 "이미 조/경기 존재" 체크를 건너뛰기 위해
+     별도 stepKey("ASSIGN_COURT")로 organizer+tournament 유효성만 확인 */
   const guard = await assertTournamentStepAllowed({
-    tournamentId: input.tournamentId,
-    divisionId: input.divisionId,
-    stepKey: "GENERATE_GROUP_STAGE",
+    tournamentId,
+    divisionId,
+    stepKey: overwrite ? "ASSIGN_COURT" : "GENERATE_GROUP_STAGE",
   });
+  if (!guard.ok) return { ok: false, error: guard.error };
 
-  if (!guard.ok) {
-    return { ok: false, error: guard.error };
-  }
-
-  const tournament = await getTournamentStatus(input.tournamentId);
-
-  if (tournament.error) {
-    return { ok: false, error: tournament.error };
-  }
-
-  if (!tournament.data) {
-    return { ok: false, error: "Tournament not found." };
-  }
-
+  /* tournament status */
+  const tournament = await getTournamentStatus(tournamentId);
+  if (tournament.error) return { ok: false, error: tournament.error };
+  if (!tournament.data) return { ok: false, error: "대회를 찾을 수 없습니다." };
   if (tournament.data.status !== "closed") {
-    return { ok: false, error: "Tournament must be closed." };
+    return { ok: false, error: "대회가 마감(closed) 상태여야 합니다." };
   }
 
-  const division = await getDivisionById(input.divisionId);
-
-  if (division.error) {
-    return { ok: false, error: division.error };
+  /* division */
+  const div = await getDivisionById(divisionId);
+  if (div.error) return { ok: false, error: div.error };
+  if (!div.data) return { ok: false, error: "Division을 찾을 수 없습니다." };
+  if (div.data.tournament_id !== tournamentId) {
+    return { ok: false, error: "Division이 해당 대회에 속하지 않습니다." };
+  }
+  if (div.data.group_size < 2) {
+    return { ok: false, error: "그룹 크기는 2 이상이어야 합니다." };
   }
 
-  if (!division.data) {
-    return { ok: false, error: "Division not found." };
+  /* existing matches check */
+  const existing = await countMatchesByDivision(divisionId);
+  if (existing.error) return { ok: false, error: existing.error };
+
+  if (existing.count > 0 && !overwrite) {
+    return {
+      ok: false,
+      error: "이미 경기가 존재합니다. 덮어쓰기를 사용하세요.",
+    };
   }
 
-  if (division.data.tournament_id !== input.tournamentId) {
-    return { ok: false, error: "Division does not belong to tournament." };
+  /* overwrite: 기존 matches → groups(+ group_teams CASCADE) 삭제 */
+  if (overwrite) {
+    const delM = await deleteMatchesByDivision(divisionId);
+    if (delM.error) return { ok: false, error: delM.error };
+    const delG = await deleteGroupsByDivision(divisionId);
+    if (delG.error) return { ok: false, error: delG.error };
   }
 
-  if (division.data.group_size < 2) {
-    return { ok: false, error: "Group size must be at least 2." };
-  }
-
-  const existingGroups = await countGroupsByDivision(input.divisionId);
-
-  if (existingGroups.error) {
-    return { ok: false, error: existingGroups.error };
-  }
-
-  const existingMatches = await countMatchesByDivision(input.divisionId);
-
-  if (existingMatches.error) {
-    return { ok: false, error: existingMatches.error };
-  }
-
-  if (existingGroups.count > 0 || existingMatches.count > 0) {
-    return { ok: false, error: "Groups or matches already exist." };
-  }
-
-  const teamsResult = await getApprovedTeamsByDivision(input.divisionId);
-
-  if (teamsResult.error) {
-    return { ok: false, error: teamsResult.error };
-  }
-
+  /* approved teams */
+  const teamsResult = await getApprovedTeamsByDivision(divisionId, tournamentId);
+  if (teamsResult.error) return { ok: false, error: teamsResult.error };
   const teams = teamsResult.data ?? [];
-
   if (teams.length < 2) {
-    return { ok: false, error: "Not enough approved teams." };
+    return { ok: false, error: "승인된 팀이 2개 이상 필요합니다." };
   }
 
-  const groupCount = Math.ceil(teams.length / division.data.group_size);
-  const shuffled = shuffle(teams);
-  const groupDefinitions = Array.from({ length: groupCount }, (_, index) => ({
-    name: groupName(index),
-    order: index + 1,
+  /* create groups */
+  const groupSize = div.data.group_size;
+  const groupCount = Math.ceil(teams.length / groupSize);
+  const groupDefs = Array.from({ length: groupCount }, (_, i) => ({
+    name: groupName(i),
+    order: i + 1,
   }));
 
-  const groupsResult = await createGroups(input.divisionId, groupDefinitions);
-
-  if (groupsResult.error) {
-    return { ok: false, error: groupsResult.error };
-  }
-
+  const groupsResult = await createGroups(divisionId, groupDefs);
+  if (groupsResult.error) return { ok: false, error: groupsResult.error };
   const groups = (groupsResult.data ?? []).sort((a, b) => a.order - b.order);
-
   if (groups.length === 0) {
-    return { ok: false, error: "Failed to create groups." };
+    return { ok: false, error: "조 생성에 실패했습니다." };
   }
 
+  /* assign teams to groups (순서대로 group_size씩) */
   const groupTeams: { group_id: string; team_id: string }[] = [];
   const teamsByGroup: Record<string, string[]> = {};
 
-  shuffled.forEach((team, index) => {
-    const groupIndex = index % groupCount;
-    const group = groups[groupIndex];
+  teams.forEach((team, index) => {
+    const gi = Math.floor(index / groupSize);
+    const group = groups[Math.min(gi, groups.length - 1)];
     if (!group) return;
     groupTeams.push({ group_id: group.id, team_id: team.id });
-    if (!teamsByGroup[group.id]) {
-      teamsByGroup[group.id] = [];
-    }
+    if (!teamsByGroup[group.id]) teamsByGroup[group.id] = [];
     teamsByGroup[group.id].push(team.id);
   });
 
-  const groupTeamsResult = await createGroupTeams(groupTeams);
+  const gtResult = await createGroupTeams(groupTeams);
+  if (gtResult.error) return { ok: false, error: gtResult.error };
 
-  if (groupTeamsResult.error) {
-    return { ok: false, error: groupTeamsResult.error };
-  }
-
+  /* round-robin matches */
   const matches: {
     tournament_id: string;
     division_id: string;
@@ -165,12 +160,12 @@ export async function generateGroupStage(
     court_id: string | null;
   }[] = [];
 
-  Object.entries(teamsByGroup).forEach(([groupId, teamIds]) => {
+  for (const [groupId, teamIds] of Object.entries(teamsByGroup)) {
     for (let i = 0; i < teamIds.length; i += 1) {
       for (let j = i + 1; j < teamIds.length; j += 1) {
         matches.push({
-          tournament_id: input.tournamentId,
-          division_id: input.divisionId,
+          tournament_id: tournamentId,
+          division_id: divisionId,
           group_id: groupId,
           team_a_id: teamIds[i],
           team_b_id: teamIds[j],
@@ -179,17 +174,15 @@ export async function generateGroupStage(
         });
       }
     }
-  });
+  }
 
   if (matches.length === 0) {
-    return { ok: false, error: "No matches generated." };
+    return { ok: false, error: "생성된 경기가 없습니다." };
   }
 
-  const matchesResult = await createMatches(matches);
+  const matchResult = await createMatches(matches);
+  if (matchResult.error) return { ok: false, error: matchResult.error };
 
-  if (matchesResult.error) {
-    return { ok: false, error: matchesResult.error };
-  }
-
-  return { ok: true };
+  /* success → 운영 화면으로 이동 */
+  redirect(`/admin/tournaments/${tournamentId}`);
 }

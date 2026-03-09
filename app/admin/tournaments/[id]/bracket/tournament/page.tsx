@@ -30,6 +30,7 @@ async function TournamentBracketContent({
     divisionId?: string;
     error?: string;
     success?: string;
+    nextRound?: string;
   };
 }) {
   const divisionsResult = await getDivisionsByTournament(tournamentId);

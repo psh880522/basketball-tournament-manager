@@ -22,13 +22,19 @@ type NextAction = {
 
 type ProgressSummary = {
   approvedTeams: number;
+  totalTeams: number;
+  totalMatches: number;
+  completedMatches: number;
   groups: number;
   groupMatches: number;
   completedGroupMatches: number;
   standings: number;
   tournamentMatches: number;
+  finalExists: boolean;
   finalCompleted: boolean;
-  tournamentStatus: "draft" | "open" | "closed";
+  courtsCount: number;
+  scheduledMatches: number;
+  tournamentStatus: "draft" | "open" | "closed" | "finished";
 };
 
 type ProgressResult = {
@@ -69,13 +75,22 @@ export async function getTournamentProgressState(
   const divisionIds = (divisions ?? []).map((division) => division.id);
 
   const approvedTeamsResult = await supabase
-    .from("teams")
+    .from("tournament_team_applications")
     .select("id", { count: "exact", head: true })
     .eq("tournament_id", tournamentId)
     .eq("status", "approved");
 
   if (approvedTeamsResult.error) {
     return { data: null, error: approvedTeamsResult.error.message };
+  }
+
+  const totalTeamsResult = await supabase
+    .from("tournament_team_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId);
+
+  if (totalTeamsResult.error) {
+    return { data: null, error: totalTeamsResult.error.message };
   }
 
   const groupsCount = await countGroupsByDivisionIds(divisionIds);
@@ -114,6 +129,25 @@ export async function getTournamentProgressState(
     return { data: null, error: standingsResult.error.message };
   }
 
+  const totalMatchesResult = await supabase
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId);
+
+  if (totalMatchesResult.error) {
+    return { data: null, error: totalMatchesResult.error.message };
+  }
+
+  const completedMatchesResult = await supabase
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId)
+    .eq("status", "completed");
+
+  if (completedMatchesResult.error) {
+    return { data: null, error: completedMatchesResult.error.message };
+  }
+
   const tournamentMatchesResult = await supabase
     .from("matches")
     .select("id", { count: "exact", head: true })
@@ -136,14 +170,50 @@ export async function getTournamentProgressState(
     return { data: null, error: finalCompletedResult.error.message };
   }
 
+  const finalExistsResult = await supabase
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId)
+    .is("group_id", null)
+    .eq("round", "final");
+
+  if (finalExistsResult.error) {
+    return { data: null, error: finalExistsResult.error.message };
+  }
+
+  const courtsCountResult = await supabase
+    .from("courts")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId);
+
+  if (courtsCountResult.error) {
+    return { data: null, error: courtsCountResult.error.message };
+  }
+
+  const scheduledMatchesResult = await supabase
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId)
+    .not("scheduled_at", "is", null);
+
+  if (scheduledMatchesResult.error) {
+    return { data: null, error: scheduledMatchesResult.error.message };
+  }
+
   const summary: ProgressSummary = {
     approvedTeams: approvedTeamsResult.count ?? 0,
+    totalTeams: totalTeamsResult.count ?? 0,
+    totalMatches: totalMatchesResult.count ?? 0,
+    completedMatches: completedMatchesResult.count ?? 0,
     groups: groupsCount.count,
     groupMatches: groupMatchesResult.count ?? 0,
     completedGroupMatches: completedGroupMatchesResult.count ?? 0,
     standings: standingsResult.count ?? 0,
     tournamentMatches: tournamentMatchesResult.count ?? 0,
+    finalExists: (finalExistsResult.count ?? 0) > 0,
     finalCompleted: (finalCompletedResult.count ?? 0) > 0,
+    courtsCount: courtsCountResult.count ?? 0,
+    scheduledMatches: scheduledMatchesResult.count ?? 0,
     tournamentStatus: tournament.status,
   };
 
@@ -181,7 +251,7 @@ const resolveNextAction = (
   if (state === "TEAM_APPROVAL") {
     return {
       label: "팀 승인하기",
-      url: `/admin/tournaments/${tournamentId}/teams`,
+      url: `/admin/tournaments/${tournamentId}/applications`,
       disabled: false,
       reason: null,
     };

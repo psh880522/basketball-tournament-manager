@@ -2,20 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getCompletedMatchesByGroup } from "@/lib/api/matches";
-import {
-  getGroupSummary,
-  getGroupTeams,
-  upsertStandings,
-} from "@/lib/api/standings";
-import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
-
-type ActionResult =
-  | { ok: true }
-  | {
-      ok: false;
-      error: string;
-    };
+import { getUserWithRole } from "@/src/lib/auth/roles";
+import { listCompletedMatchesByDivision } from "@/lib/api/matches";
+import { replaceDivisionStandings } from "@/lib/api/standings";
+import { setDivisionStandingsDirty } from "@/lib/api/divisions";
 
 type TeamStats = {
   team_id: string;
@@ -27,130 +17,66 @@ type TeamStats = {
   points_diff: number;
 };
 
-export async function recalculateGroupStandings(
+export async function calculateDivisionStandings(
   formData: FormData
-): Promise<ActionResult> {
+): Promise<void> {
   const tournamentId = toText(formData.get("tournamentId"));
   const divisionId = toText(formData.get("divisionId"));
-  const groupId = toText(formData.get("groupId"));
 
-  if (!tournamentId || !divisionId || !groupId) {
-    return { ok: false, error: "Missing identifiers." };
+  if (!tournamentId || !divisionId) {
+    redirect("/admin");
   }
 
-  const guard = await assertTournamentStepAllowed({
-    tournamentId,
-    divisionId,
-    stepKey: "RECALC_STANDINGS",
-  });
+  const auth = await getUserWithRole();
+  if (auth.status === "unauthenticated") redirect("/login");
+  if (auth.status === "error" || auth.status === "empty") {
+    redirect(buildRedirectUrl(tournamentId, divisionId, "인증 오류가 발생했습니다."));
+  }
+  if (auth.role !== "organizer") redirect("/dashboard");
 
-  if (!guard.ok) {
-    return redirectWithError(tournamentId, divisionId, groupId, guard.error);
+  const matchesResult = await listCompletedMatchesByDivision(divisionId);
+  if (matchesResult.error) {
+    redirect(buildRedirectUrl(tournamentId, divisionId, matchesResult.error));
   }
 
-  const groupSummary = await getGroupSummary(groupId);
-
-  if (groupSummary.error) {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      groupSummary.error
-    );
-  }
-
-  if (!groupSummary.data) {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      "Group not found."
-    );
-  }
-
-  if (
-    groupSummary.data.division_id !== divisionId ||
-    groupSummary.data.divisions?.tournament_id !== tournamentId
-  ) {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      "Invalid group selection."
-    );
-  }
-
-  const groupTeams = await getGroupTeams(groupId);
-
-  if (groupTeams.error) {
-    return redirectWithError(tournamentId, divisionId, groupId, groupTeams.error);
-  }
-
-  if (!groupTeams.data || groupTeams.data.length === 0) {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      "조/팀 데이터가 없습니다."
-    );
-  }
-
-  const matches = await getCompletedMatchesByGroup(groupId);
-
-  if (matches.error) {
-    return redirectWithError(tournamentId, divisionId, groupId, matches.error);
-  }
-
-  if (!matches.data || matches.data.length === 0) {
-    return redirectWithError(
-      tournamentId,
-      divisionId,
-      groupId,
-      "완료된 경기가 없습니다."
-    );
+  const matches = matchesResult.data ?? [];
+  if (matches.length === 0) {
+    redirect(buildRedirectUrl(tournamentId, divisionId, "완료된 경기가 없습니다."));
   }
 
   const statsByTeam: Record<string, TeamStats> = {};
 
-  groupTeams.data.forEach((entry) => {
-    const team = entry.teams;
-    if (!team) return;
-    statsByTeam[entry.team_id] = {
-      team_id: entry.team_id,
-      team_name: team.team_name,
-      wins: 0,
-      losses: 0,
-      points_for: 0,
-      points_against: 0,
-      points_diff: 0,
-    };
-  });
+  for (const match of matches) {
+    if (match.score_a === null || match.score_b === null || !match.winner_team_id) {
+      redirect(buildRedirectUrl(tournamentId, divisionId, "완료 경기 점수가 없습니다."));
+    }
 
-  for (const match of matches.data) {
-    if (
-      match.score_a === null ||
-      match.score_b === null ||
-      !match.winner_team_id
-    ) {
-      return redirectWithError(
-        tournamentId,
-        divisionId,
-        groupId,
-        "완료 경기 점수가 없습니다."
-      );
+    if (!statsByTeam[match.team_a_id]) {
+      statsByTeam[match.team_a_id] = {
+        team_id: match.team_a_id,
+        team_name: match.team_a?.team_name ?? "-",
+        wins: 0,
+        losses: 0,
+        points_for: 0,
+        points_against: 0,
+        points_diff: 0,
+      };
+    }
+
+    if (!statsByTeam[match.team_b_id]) {
+      statsByTeam[match.team_b_id] = {
+        team_id: match.team_b_id,
+        team_name: match.team_b?.team_name ?? "-",
+        wins: 0,
+        losses: 0,
+        points_for: 0,
+        points_against: 0,
+        points_diff: 0,
+      };
     }
 
     const teamA = statsByTeam[match.team_a_id];
     const teamB = statsByTeam[match.team_b_id];
-
-    if (!teamA || !teamB) {
-      return redirectWithError(
-        tournamentId,
-        divisionId,
-        groupId,
-        "경기 팀 정보가 올바르지 않습니다."
-      );
-    }
 
     teamA.points_for += match.score_a;
     teamA.points_against += match.score_b;
@@ -164,12 +90,7 @@ export async function recalculateGroupStandings(
       teamB.wins += 1;
       teamA.losses += 1;
     } else {
-      return redirectWithError(
-        tournamentId,
-        divisionId,
-        groupId,
-        "승자 정보가 올바르지 않습니다."
-      );
+      redirect(buildRedirectUrl(tournamentId, divisionId, "승자 정보가 올바르지 않습니다."));
     }
   }
 
@@ -178,31 +99,25 @@ export async function recalculateGroupStandings(
     points_diff: team.points_for - team.points_against,
   }));
 
-  const matchesData = matches.data;
   const groupedByWins = groupByWins(teams);
   const sortedTeams: TeamStats[] = [];
 
   groupedByWins.forEach((group) => {
     const teamIds = group.map((item) => item.team_id);
-    const headToHeadWins = buildHeadToHeadWins(teamIds, matchesData);
+    const headToHeadWins = buildHeadToHeadWins(teamIds, matches);
 
     const sortedGroup = [...group].sort((a, b) => {
       const h2h = (headToHeadWins[b.team_id] ?? 0) - (headToHeadWins[a.team_id] ?? 0);
       if (h2h !== 0) return h2h;
       if (b.points_for !== a.points_for) return b.points_for - a.points_for;
-      if (a.points_against !== b.points_against) {
-        return a.points_against - b.points_against;
-      }
+      if (a.points_against !== b.points_against) return a.points_against - b.points_against;
       return a.team_name.localeCompare(b.team_name);
     });
 
     sortedTeams.push(...sortedGroup);
   });
 
-  const standingsInput = sortedTeams.map((team, index) => ({
-    tournament_id: tournamentId,
-    division_id: divisionId,
-    group_id: groupId,
+  const rows = sortedTeams.map((team, index) => ({
     team_id: team.team_id,
     wins: team.wins,
     losses: team.losses,
@@ -212,21 +127,22 @@ export async function recalculateGroupStandings(
     rank: index + 1,
   }));
 
-  const upserted = await upsertStandings(standingsInput);
+  const saved = await replaceDivisionStandings(tournamentId, divisionId, rows);
+  if (saved.error) {
+    redirect(buildRedirectUrl(tournamentId, divisionId, saved.error));
+  }
 
-  if (upserted.error) {
-    return redirectWithError(tournamentId, divisionId, groupId, upserted.error);
+  const dirtyResult = await setDivisionStandingsDirty(divisionId, false);
+  if (!dirtyResult.ok) {
+    redirect(buildRedirectUrl(tournamentId, divisionId, dirtyResult.error));
   }
 
   revalidatePath(`/admin/tournaments/${tournamentId}/standings`);
-
-  return redirectWithSuccess(tournamentId, divisionId, groupId);
+  redirect(buildRedirectUrl(tournamentId, divisionId, undefined, true));
 }
 
-const toText = (value: FormDataEntryValue | null) => {
-  if (typeof value !== "string") return "";
-  return value.trim();
-};
+const toText = (value: FormDataEntryValue | null) =>
+  typeof value === "string" ? value.trim() : "";
 
 const groupByWins = (teams: TeamStats[]) => {
   const map = new Map<number, TeamStats[]>();
@@ -259,10 +175,7 @@ const buildHeadToHeadWins = (
   matches.forEach((match) => {
     if (!match.winner_team_id) return;
     if (!idSet.has(match.team_a_id) || !idSet.has(match.team_b_id)) return;
-    if (!winsByTeam[match.winner_team_id]) {
-      winsByTeam[match.winner_team_id] = 0;
-    }
-    winsByTeam[match.winner_team_id] += 1;
+    winsByTeam[match.winner_team_id] = (winsByTeam[match.winner_team_id] ?? 0) + 1;
   });
 
   return winsByTeam;
@@ -271,32 +184,12 @@ const buildHeadToHeadWins = (
 const buildRedirectUrl = (
   tournamentId: string,
   divisionId: string,
-  groupId: string,
-  extra?: { error?: string; success?: boolean }
+  error?: string,
+  success?: boolean
 ) => {
   const params = new URLSearchParams();
   params.set("divisionId", divisionId);
-  params.set("groupId", groupId);
-  if (extra?.error) params.set("error", extra.error);
-  if (extra?.success) params.set("success", "1");
+  if (error) params.set("error", error);
+  if (success) params.set("success", "1");
   return `/admin/tournaments/${tournamentId}/standings?${params.toString()}`;
-};
-
-const redirectWithError = (
-  tournamentId: string,
-  divisionId: string,
-  groupId: string,
-  message: string
-): ActionResult => {
-  redirect(buildRedirectUrl(tournamentId, divisionId, groupId, { error: message }));
-  return { ok: false, error: message };
-};
-
-const redirectWithSuccess = (
-  tournamentId: string,
-  divisionId: string,
-  groupId: string
-): ActionResult => {
-  redirect(buildRedirectUrl(tournamentId, divisionId, groupId, { success: true }));
-  return { ok: true };
 };

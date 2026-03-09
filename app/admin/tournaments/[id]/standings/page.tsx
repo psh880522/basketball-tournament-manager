@@ -1,28 +1,23 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
-import { getCompletedMatchesByGroup } from "@/lib/api/matches";
-import {
-  getDivisionsWithGroups,
-  getGroupTeams,
-  getStandingsByGroup,
-} from "@/lib/api/standings";
-import { recalculateGroupStandings } from "./actions";
+import { listStandingsPageData } from "@/lib/api/standings";
+import StandingsForm from "./Form";
 
 type PageProps = {
   params: Promise<{ id: string }>;
   searchParams?: Promise<{
     divisionId?: string;
-    groupId?: string;
     error?: string;
     success?: string;
   }>;
 };
 
-type DivisionOption = {
+type DivisionSection = {
   id: string;
   name: string;
-  groups: { id: string; name: string; order: number }[];
+  sort_order: number;
+  standings_dirty: boolean;
 };
 
 async function StandingsContent({
@@ -32,147 +27,114 @@ async function StandingsContent({
   tournamentId: string;
   searchParams?: {
     divisionId?: string;
-    groupId?: string;
     error?: string;
     success?: string;
   };
 }) {
-  const divisionsResult = await getDivisionsWithGroups(tournamentId);
-
-  if (divisionsResult.error) {
-    return <p style={{ color: "crimson" }}>{divisionsResult.error}</p>;
+  const standingsResult = await listStandingsPageData(tournamentId);
+  if (standingsResult.error) {
+    return <p className="text-red-600">{standingsResult.error}</p>;
   }
 
-  const divisions: DivisionOption[] = (divisionsResult.data ?? [])
-    .map((division) => ({
-      id: division.id,
-      name: division.name,
-      groups: (division.groups ?? []).sort((a, b) => {
-        if (a.order !== b.order) return a.order - b.order;
-        return a.name.localeCompare(b.name);
-      }),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const divisions = (standingsResult.data?.divisions ?? []) as DivisionSection[];
+  const standings = standingsResult.data?.standings ?? [];
 
   if (divisions.length === 0) {
-    return <p>조/팀 데이터가 없습니다.</p>;
+    return <p className="text-gray-500">디비전이 없습니다.</p>;
   }
 
-  const selectedDivision =
-    divisions.find((division) => division.id === searchParams?.divisionId) ??
-    divisions[0];
-  const groups = selectedDivision.groups;
-
-  if (groups.length === 0) {
-    return <p>조/팀 데이터가 없습니다.</p>;
-  }
-
-  const selectedGroup =
-    groups.find((group) => group.id === searchParams?.groupId) ?? groups[0];
-
-  const [groupTeams, matches, standings] = await Promise.all([
-    getGroupTeams(selectedGroup.id),
-    getCompletedMatchesByGroup(selectedGroup.id),
-    getStandingsByGroup(selectedGroup.id),
-  ]);
-
-  if (groupTeams.error) {
-    return <p style={{ color: "crimson" }}>{groupTeams.error}</p>;
-  }
-
-  if (matches.error) {
-    return <p style={{ color: "crimson" }}>{matches.error}</p>;
-  }
-
-  if (standings.error) {
-    return <p style={{ color: "crimson" }}>{standings.error}</p>;
-  }
-
-  const message = searchParams?.error
-    ? { tone: "error", text: searchParams.error }
-    : searchParams?.success
-    ? { tone: "success", text: "순위 계산이 완료되었습니다." }
+  const message = searchParams?.divisionId
+    ? {
+        divisionId: searchParams.divisionId,
+        tone: searchParams.error ? "error" : searchParams.success ? "success" : null,
+        text: searchParams.error
+          ? searchParams.error
+          : searchParams.success
+          ? "순위 계산이 완료되었습니다."
+          : "",
+      }
     : null;
 
-  const teamsEmpty = !groupTeams.data || groupTeams.data.length === 0;
-  const matchesEmpty = !matches.data || matches.data.length === 0;
-  const standingsRows = standings.data ?? [];
-
   return (
-    <div style={{ marginTop: 16 }}>
-      <form method="get" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <label>
-          Division
-          <select name="divisionId" defaultValue={selectedDivision.id}>
-            {divisions.map((division) => (
-              <option key={division.id} value={division.id}>
-                {division.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Group
-          <select name="groupId" defaultValue={selectedGroup.id}>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">조회</button>
-      </form>
+    <div className="space-y-6">
+      {divisions.map((division) => {
+        const rows = standings.filter(
+          (row) => row.division_id === division.id
+        );
+        const showMessage =
+          message && message.divisionId === division.id && message.tone;
 
-      <form action={recalculateGroupStandings} style={{ marginTop: 12 }}>
-        <input type="hidden" name="tournamentId" value={tournamentId} />
-        <input type="hidden" name="divisionId" value={selectedDivision.id} />
-        <input type="hidden" name="groupId" value={selectedGroup.id} />
-        <button type="submit">순위 계산</button>
-      </form>
+        return (
+          <section key={division.id} className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">{division.name}</h2>
+                {division.standings_dirty ? (
+                  <span className="text-xs rounded bg-amber-100 text-amber-700 px-2 py-0.5">
+                    ⚠ 순위 계산 필요
+                  </span>
+                ) : null}
+              </div>
+              <StandingsForm
+                tournamentId={tournamentId}
+                divisionId={division.id}
+                disabled={false}
+              />
+            </div>
 
-      {message ? (
-        <p style={{ marginTop: 12, color: message.tone === "error" ? "crimson" : "green" }}>
-          {message.text}
-        </p>
-      ) : null}
+            {showMessage ? (
+              <p
+                className={
+                  message?.tone === "error"
+                    ? "text-sm text-red-600"
+                    : "text-sm text-emerald-600"
+                }
+              >
+                {message?.text}
+              </p>
+            ) : null}
 
-      {teamsEmpty ? (
-        <p style={{ marginTop: 16 }}>조/팀 데이터가 없습니다.</p>
-      ) : matchesEmpty ? (
-        <p style={{ marginTop: 16 }}>완료된 경기가 없습니다.</p>
-      ) : standingsRows.length === 0 ? (
-        <p style={{ marginTop: 16 }}>순위 데이터가 없습니다.</p>
-      ) : (
-        <table style={{ marginTop: 16, borderCollapse: "collapse", width: "100%" }}>
-          <thead>
-            <tr>
-              <th style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>Rank</th>
-              <th style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>Team</th>
-              <th style={{ borderBottom: "1px solid #ddd" }}>W</th>
-              <th style={{ borderBottom: "1px solid #ddd" }}>L</th>
-              <th style={{ borderBottom: "1px solid #ddd" }}>PF</th>
-              <th style={{ borderBottom: "1px solid #ddd" }}>PA</th>
-              <th style={{ borderBottom: "1px solid #ddd" }}>Diff</th>
-            </tr>
-          </thead>
-          <tbody>
-            {standingsRows.map((row) => (
-              <tr key={row.id}>
-                <td style={{ padding: "6px 4px" }}>{row.rank}</td>
-                <td style={{ padding: "6px 4px" }}>{row.teams?.team_name ?? "-"}</td>
-                <td style={{ padding: "6px 4px", textAlign: "center" }}>{row.wins}</td>
-                <td style={{ padding: "6px 4px", textAlign: "center" }}>{row.losses}</td>
-                <td style={{ padding: "6px 4px", textAlign: "center" }}>{row.points_for}</td>
-                <td style={{ padding: "6px 4px", textAlign: "center" }}>
-                  {row.points_against}
-                </td>
-                <td style={{ padding: "6px 4px", textAlign: "center" }}>{row.points_diff}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            {rows.length === 0 ? (
+              <p className="text-sm text-gray-500">완료된 경기가 없습니다.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border bg-white">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
+                    <tr>
+                      <th className="px-3 py-2">순위</th>
+                      <th className="px-3 py-2">팀</th>
+                      <th className="px-3 py-2 text-center">승</th>
+                      <th className="px-3 py-2 text-center">패</th>
+                      <th className="px-3 py-2 text-center">득점</th>
+                      <th className="px-3 py-2 text-center">실점</th>
+                      <th className="px-3 py-2 text-center">득실</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {rows.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2">{row.rank}</td>
+                        <td className="px-3 py-2">
+                          {row.teams?.team_name ?? "-"}
+                        </td>
+                        <td className="px-3 py-2 text-center">{row.wins}</td>
+                        <td className="px-3 py-2 text-center">{row.losses}</td>
+                        <td className="px-3 py-2 text-center">{row.points_for}</td>
+                        <td className="px-3 py-2 text-center">
+                          {row.points_against}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {row.points_diff}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -184,25 +146,47 @@ export default async function TournamentStandingsPage({
   const userResult = await getUserWithRole();
 
   if (userResult.status === "unauthenticated") redirect("/login");
-
   if (userResult.status === "error") {
-    return <p style={{ color: "crimson" }}>{userResult.error}</p>;
+    return (
+      <main className="p-6">
+        <p className="text-red-600">
+          {userResult.error ?? "사용자 정보를 불러오지 못했습니다."}
+        </p>
+      </main>
+    );
   }
-
   if (userResult.status === "empty") {
-    return <p>No profile found for this account.</p>;
+    return (
+      <main className="p-6">
+        <p className="text-gray-600">프로필이 없습니다.</p>
+      </main>
+    );
   }
-
   if (userResult.role !== "organizer") redirect("/dashboard");
 
-  const { id } = await params;
-  const resolvedSearchParams = await searchParams;
+  const { id: tournamentId } = await params;
+  const sp = await searchParams;
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Group Standings</h1>
-      <Suspense fallback={<p>Loading standings...</p>}>
-        <StandingsContent tournamentId={id} searchParams={resolvedSearchParams} />
+    <main className="p-6 space-y-6">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <a
+          href={`/admin/tournaments/${tournamentId}`}
+          className="text-blue-600 hover:underline"
+        >
+          운영 홈
+        </a>
+        <span className="text-gray-300">|</span>
+        <a
+          href={`/admin/tournaments/${tournamentId}/results`}
+          className="text-blue-600 hover:underline"
+        >
+          경기 결과 입력
+        </a>
+      </div>
+      <h1 className="text-2xl font-bold">대회 순위</h1>
+      <Suspense fallback={<p className="text-sm text-gray-500">순위 불러오는 중...</p>}>
+        <StandingsContent tournamentId={tournamentId} searchParams={sp} />
       </Suspense>
     </main>
   );

@@ -37,7 +37,7 @@ export default function TournamentsForm({ tournaments }: Props) {
 
   const handleStatusChange = (id: string, value: string) => {
     if (!statusOptions.includes(value as TournamentStatus)) return;
-    setStatusById((prev) => ({ ...prev, [id]: value }));
+    setStatusById((prev) => ({ ...prev, [id]: value as TournamentStatus }));
   };
 
   const handleSave = (id: string) => {

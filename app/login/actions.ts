@@ -1,6 +1,7 @@
 "use server";
 
-import { signInWithPassword as signIn } from "@/lib/api/auth";
+import { redirect } from "next/navigation";
+import { getCurrentUserRole, signInWithPassword as signIn } from "@/lib/api/auth";
 
 type ActionResult =
   | { ok: true }
@@ -27,5 +28,13 @@ export async function signInWithPassword(
     return { ok: false, error: result.error };
   }
 
+  const roleResult = await getCurrentUserRole();
+
+  if (roleResult.error) {
+    return { ok: false, error: roleResult.error };
+  }
+
+  const nextPath = roleResult.role === "organizer" ? "/admin" : "/dashboard";
+  redirect(nextPath);
   return { ok: true };
 }

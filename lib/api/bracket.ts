@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import { listApprovedTeamsByDivision } from "@/lib/api/applications";
 
 export type Division = {
   id: string;
@@ -37,7 +38,7 @@ export async function getDivisionById(
 ): Promise<ApiResult<Division>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Division>("divisions")
+    .from("divisions")
     .select("id,tournament_id,name,group_size")
     .eq("id", divisionId)
     .maybeSingle();
@@ -50,7 +51,7 @@ export async function getDivisionsByTournament(
 ): Promise<ApiResult<Division[]>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Division>("divisions")
+    .from("divisions")
     .select("id,tournament_id,name,group_size")
     .eq("tournament_id", tournamentId)
     .order("name", { ascending: true });
@@ -72,17 +73,42 @@ export async function getTournamentStatus(
 }
 
 export async function getApprovedTeamsByDivision(
-  divisionId: string
+  divisionId: string,
+  tournamentId?: string
 ): Promise<ApiResult<TeamRow[]>> {
+  if (tournamentId) {
+    const { data, error } = await listApprovedTeamsByDivision(tournamentId, divisionId);
+    if (error) return { data: null, error };
+
+    const rows: TeamRow[] = (data ?? []).map((r) => ({
+      id: r.team_id,
+      team_name: r.team_name,
+      division_id: divisionId,
+    })).sort((a, b) => a.team_name.localeCompare(b.team_name));
+
+    return { data: rows, error: null };
+  }
+
+  // tournamentId ?占쎌씠 ?占쎌텧 ??吏곸젒 荑쇰━ (?占쎌쐞 ?占쏀솚)
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<TeamRow>("teams")
-    .select("id,team_name,division_id")
+    .from("tournament_team_applications")
+    .select("team_id, teams(id, team_name)")
     .eq("division_id", divisionId)
-    .eq("status", "approved")
-    .order("team_name", { ascending: true });
+    .eq("status", "approved");
 
-  return { data, error: error ? error.message : null };
+  if (error) return { data: null, error: error.message };
+
+  const rows: TeamRow[] = ((data ?? []) as Record<string, unknown>[])
+    .map((row) => {
+      const team = row.teams as { id: string; team_name: string } | null;
+      if (!team) return null;
+      return { id: team.id, team_name: team.team_name, division_id: divisionId };
+    })
+    .filter((team): team is NonNullable<typeof team> => team !== null)
+    .sort((a, b) => a.team_name.localeCompare(b.team_name));
+
+  return { data: rows, error: null };
 }
 
 export async function countGroupsByDivision(
@@ -115,7 +141,7 @@ export async function createGroups(
 ): Promise<ApiResult<GroupRow[]>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<GroupRow>("groups")
+    .from("groups")
     .insert(
       groups.map((group) => ({
         division_id: divisionId,

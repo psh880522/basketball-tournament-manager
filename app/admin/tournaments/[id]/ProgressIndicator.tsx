@@ -1,87 +1,183 @@
-type ProgressProps = {
-  state:
-    | "TEAM_APPROVAL"
-    | "GROUP_STAGE_GENERATED"
-    | "MATCH_IN_PROGRESS"
-    | "STANDINGS_READY"
-    | "BRACKET_READY"
-    | "TOURNAMENT_FINISHED";
-};
+"use client";
 
-type Step = {
-  key: ProgressProps["state"];
+import Link from "next/link";
+import { useTransition } from "react";
+import Button from "@/components/ui/Button";
+import { finishTournamentAction } from "./actions";
+
+export type StepStatus = "done" | "active" | "pending";
+
+export type StepAction = {
   label: string;
+  href: string;
+  enabled: boolean;
+  reason?: string;
+  variant: "primary" | "secondary";
+  isFinishAction?: boolean;
 };
 
-type StepStatus = "done" | "active" | "pending";
+export type StepWithActions = {
+  label: string;
+  status: StepStatus;
+  actions: StepAction[];
+};
 
-const steps: Step[] = [
-  { key: "TEAM_APPROVAL", label: "팀 승인" },
-  { key: "GROUP_STAGE_GENERATED", label: "조 생성" },
-  { key: "MATCH_IN_PROGRESS", label: "경기 진행" },
-  { key: "STANDINGS_READY", label: "순위 계산" },
-  { key: "BRACKET_READY", label: "토너먼트" },
-  { key: "TOURNAMENT_FINISHED", label: "종료" },
-];
+type ProgressProps = {
+  steps: StepWithActions[];
+  tournamentId: string;
+  finishMessages?: {
+    finishError?: string;
+    finishSuccess?: string;
+  };
+};
 
-export default function ProgressIndicator({ state }: ProgressProps) {
-  const statusMap = getStatusMap(state);
-
+export default function ProgressIndicator({
+  steps,
+  tournamentId,
+  finishMessages,
+}: ProgressProps) {
   return (
-    <ol
-      style={{
-        display: "flex",
-        gap: 12,
-        flexWrap: "wrap",
-        padding: 0,
-        listStyle: "none",
-      }}
-    >
-      {steps.map((step, index) => {
-        const status = statusMap[index] ?? "pending";
-        const color =
-          status === "active"
-            ? "#1f2937"
-            : status === "done"
-            ? "#16a34a"
-            : "#9ca3af";
-        const weight = status === "active" ? 700 : 500;
-        return (
-          <li key={step.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 999,
-                backgroundColor: color,
-                display: "inline-block",
-              }}
-            />
-            <span style={{ color, fontWeight: weight }}>{step.label}</span>
-            <span style={{ color: "#6b7280", fontSize: 12 }}>{status}</span>
-            {index < steps.length - 1 ? <span style={{ color: "#d1d5db" }}>→</span> : null}
-          </li>
-        );
-      })}
+    <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="list">
+      {steps.map((step, index) => (
+        <StepCard
+          key={`${step.label}-${index}`}
+          step={step}
+          tournamentId={tournamentId}
+          finishMessages={
+            step.actions.some((a) => a.isFinishAction)
+              ? finishMessages
+              : undefined
+          }
+        />
+      ))}
     </ol>
   );
 }
 
-const getStatusMap = (state: ProgressProps["state"]): StepStatus[] => {
-  switch (state) {
-    case "TEAM_APPROVAL":
-      return ["active", "pending", "pending", "pending", "pending", "pending"];
-    case "GROUP_STAGE_GENERATED":
-      return ["done", "active", "pending", "pending", "pending", "pending"];
-    case "MATCH_IN_PROGRESS":
-      return ["done", "done", "active", "pending", "pending", "pending"];
-    case "STANDINGS_READY":
-      return ["done", "done", "done", "active", "pending", "pending"];
-    case "BRACKET_READY":
-      return ["done", "done", "done", "done", "active", "pending"];
-    case "TOURNAMENT_FINISHED":
-      return ["done", "done", "done", "done", "done", "done"];
-    default:
-      return ["pending", "pending", "pending", "pending", "pending", "pending"];
+function StepCard({
+  step,
+  tournamentId,
+  finishMessages,
+}: {
+  step: StepWithActions;
+  tournamentId: string;
+  finishMessages?: { finishError?: string; finishSuccess?: string };
+}) {
+  const dotClass =
+    step.status === "active"
+      ? "bg-gray-900"
+      : step.status === "done"
+      ? "bg-emerald-500"
+      : "bg-gray-300";
+  const colorClass =
+    step.status === "active"
+      ? "text-gray-900"
+      : step.status === "done"
+      ? "text-emerald-700"
+      : "text-gray-400";
+  const weightClass =
+    step.status === "active" ? "font-semibold" : "font-medium";
+
+  return (
+    <li className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`}
+          aria-hidden="true"
+        />
+        <div className="flex flex-col">
+          <span className={`text-sm ${weightClass} ${colorClass}`}>
+            {step.label}
+          </span>
+          <span className="text-xs uppercase text-gray-400">
+            {step.status}
+          </span>
+        </div>
+      </div>
+      {step.actions.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {step.actions.map((action) =>
+            action.isFinishAction ? (
+              <FinishButton
+                key={action.label}
+                action={action}
+                tournamentId={tournamentId}
+                messages={finishMessages}
+              />
+            ) : (
+              <ActionLink key={action.label} action={action} />
+            )
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ActionLink({ action }: { action: StepAction }) {
+  if (!action.enabled) {
+    return (
+      <div>
+        <Button variant={action.variant} disabled>
+          {action.label}
+        </Button>
+        {action.reason && (
+          <p className="mt-1 text-xs text-gray-400">{action.reason}</p>
+        )}
+      </div>
+    );
   }
-};
+
+  return (
+    <Link href={action.href}>
+      <Button variant={action.variant}>{action.label}</Button>
+    </Link>
+  );
+}
+
+function FinishButton({
+  action,
+  tournamentId,
+  messages,
+}: {
+  action: StepAction;
+  tournamentId: string;
+  messages?: { finishError?: string; finishSuccess?: string };
+}) {
+  const [isPending, startTransition] = useTransition();
+
+  const handleFinish = () => {
+    if (!action.enabled) return;
+    if (!window.confirm("대회를 종료하시겠습니까?")) return;
+
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("tournamentId", tournamentId);
+      formData.set("confirm", "yes");
+      await finishTournamentAction(formData);
+    });
+  };
+
+  return (
+    <div>
+      <Button
+        variant={action.variant}
+        disabled={!action.enabled || isPending}
+        onClick={handleFinish}
+      >
+        {isPending ? "처리중..." : action.label}
+      </Button>
+      {!action.enabled && action.reason && (
+        <p className="mt-1 text-xs text-gray-400">{action.reason}</p>
+      )}
+      {messages?.finishError && (
+        <p className="mt-1 text-xs text-red-600">{messages.finishError}</p>
+      )}
+      {messages?.finishSuccess && (
+        <p className="mt-1 text-xs text-emerald-600">
+          대회가 종료되었습니다.
+        </p>
+      )}
+    </div>
+  );
+}

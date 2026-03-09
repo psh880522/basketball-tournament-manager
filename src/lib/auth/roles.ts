@@ -4,7 +4,7 @@ export type Role = "organizer" | "team_manager" | "player" | "spectator";
 
 type AuthUser = {
   id: string;
-  email: string | null;
+  email: string | null | undefined;
 };
 
 type UserRoleStatus = "unauthenticated" | "error" | "empty" | "ready";
@@ -54,7 +54,7 @@ export async function getUserWithRole(): Promise<UserWithRoleResult> {
   }
 
   const { data: profile, error: profileError } = await supabase
-    .from<ProfileRow>("profiles")
+    .from("profiles")
     .select("role")
     .eq("id", userData.user.id)
     .single();
@@ -62,7 +62,7 @@ export async function getUserWithRole(): Promise<UserWithRoleResult> {
   if (profileError) {
     return {
       status: "error",
-      user: userData.user,
+      user: userData.user as unknown as AuthUser,
       role: null,
       error: profileError.message,
     };
@@ -71,7 +71,7 @@ export async function getUserWithRole(): Promise<UserWithRoleResult> {
   if (!profile) {
     return {
       status: "empty",
-      user: userData.user,
+      user: userData.user as unknown as AuthUser,
       role: null,
       error: null,
     };
@@ -79,7 +79,7 @@ export async function getUserWithRole(): Promise<UserWithRoleResult> {
 
   return {
     status: "ready",
-    user: userData.user,
+    user: userData.user as unknown as AuthUser,
     role: profile.role,
     error: null,
   };

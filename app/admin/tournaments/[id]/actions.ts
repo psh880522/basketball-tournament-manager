@@ -13,12 +13,12 @@ type ActionResult =
 
 export async function finishTournamentAction(
   formData: FormData
-): Promise<ActionResult> {
+): Promise<void> {
   const tournamentId = toText(formData.get("tournamentId"));
   const confirm = toText(formData.get("confirm"));
 
   if (!tournamentId) {
-    return { ok: false, error: "Missing tournament id." };
+    redirect("/admin");
   }
 
   if (confirm !== "yes") {
@@ -69,12 +69,10 @@ const buildRedirectUrl = (
 const redirectWithError = (
   tournamentId: string,
   message: string
-): ActionResult => {
+): never => {
   redirect(buildRedirectUrl(tournamentId, { error: message }));
-  return { ok: false, error: message };
 };
 
-const redirectWithSuccess = (tournamentId: string): ActionResult => {
+const redirectWithSuccess = (tournamentId: string): never => {
   redirect(buildRedirectUrl(tournamentId, { success: true }));
-  return { ok: true };
 };

@@ -4,6 +4,153 @@ export type TeamStatus = "pending" | "approved" | "rejected";
 
 export type TournamentStatus = "draft" | "open" | "closed" | "finished";
 
+/* ?占?占?My Teams (team_members 湲곕컲) ?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?*/
+
+export type MyTeamRow = {
+  team_id: string;
+  team_name: string;
+  role_in_team: string;
+};
+
+export async function listMyTeams(): Promise<{
+  data: MyTeamRow[] | null;
+  error: string | null;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { data: null, error: "濡쒓렇?占쎌씠 ?占쎌슂?占쎈땲??" };
+
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("team_id, role_in_team, teams(team_name)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: null, error: error.message };
+
+  const rows: MyTeamRow[] = (data ?? []).map((row: Record<string, unknown>) => {
+    const teams = row.teams as { team_name: string } | null;
+    return {
+      team_id: row.team_id as string,
+      team_name: teams?.team_name ?? "",
+      role_in_team: row.role_in_team as string,
+    };
+  });
+
+  return { data: rows, error: null };
+}
+
+/* ?占?占?My Managed Teams (manager占? ?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?*/
+
+export type ManagedTeamRow = {
+  team_id: string;
+  team_name: string;
+};
+
+export async function listMyManagedTeams(): Promise<{
+  data: ManagedTeamRow[] | null;
+  error: string | null;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { data: null, error: "濡쒓렇?占쎌씠 ?占쎌슂?占쎈땲??" };
+
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("team_id, teams(team_name)")
+    .eq("user_id", user.id)
+    .eq("role_in_team", "manager")
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: null, error: error.message };
+
+  const rows: ManagedTeamRow[] = (data ?? []).map(
+    (row: Record<string, unknown>) => {
+      const teams = row.teams as { team_name: string } | null;
+      return {
+        team_id: row.team_id as string,
+        team_name: teams?.team_name ?? "",
+      };
+    }
+  );
+
+  return { data: rows, error: null };
+}
+
+/* ?占?占?Create Team + manager 硫ㅻ쾭???占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?*/
+
+export async function createTeam(input: {
+  name: string;
+  contact?: string;
+}): Promise<{ ok: true; teamId: string } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "濡쒓렇?占쎌씠 ?占쎌슂?占쎈땲??" };
+
+  const { data, error } = await supabase.rpc("create_team_with_manager", {
+    p_team_name: input.name,
+    p_contact: input.contact ?? "",
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true, teamId: data as string };
+}
+
+/* ?占?占?Team Detail (team_members 湲곕컲) ?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?*/
+
+export type TeamDetail = {
+  id: string;
+  team_name: string;
+  contact: string;
+  created_by: string;
+};
+
+export async function getTeam(
+  teamId: string
+): Promise<{ data: TeamDetail | null; error: string | null }> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("teams")
+    .select("id, team_name, contact, created_by")
+    .eq("id", teamId)
+    .maybeSingle();
+
+  return { data, error: error ? error.message : null };
+}
+
+export async function getMyRoleInTeam(
+  teamId: string
+): Promise<{ role: string | null; error: string | null }> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { role: null, error: "濡쒓렇?占쎌씠 ?占쎌슂?占쎈땲??" };
+
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("role_in_team")
+    .eq("team_id", teamId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) return { role: null, error: error.message };
+  return { role: data?.role_in_team ?? null, error: null };
+}
+
 export type TeamApplication = {
   id: string;
   tournament_id: string;
@@ -60,7 +207,7 @@ export async function getExistingTeamApplication(
 ): Promise<ApiResult<Pick<TeamApplication, "id" | "status">>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<TeamApplication>("teams")
+    .from("teams")
     .select("id,status")
     .eq("tournament_id", tournamentId)
     .eq("captain_user_id", captainUserId)
@@ -77,7 +224,7 @@ export async function createTeamApplication(
 ): Promise<ApiResult<Pick<TeamApplication, "id">>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<TeamApplication>("teams")
+    .from("teams")
     .insert({
       tournament_id: input.tournament_id,
       team_name: input.team_name,
@@ -99,7 +246,7 @@ export async function getTournamentSummary(
 ): Promise<ApiResult<TournamentSummary>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<TournamentSummary>("tournaments")
+    .from("tournaments")
     .select("id,name,status")
     .eq("id", tournamentId)
     .maybeSingle();
@@ -115,7 +262,7 @@ export async function getPendingTeams(
 ): Promise<ApiResult<PendingTeamRow[]>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<PendingTeamRow>("teams")
+    .from("teams")
     .select("id,tournament_id,team_name,captain_user_id,contact,status")
     .eq("tournament_id", tournamentId)
     .eq("status", "pending")
@@ -132,7 +279,7 @@ export async function getTeamApplicationById(
 ): Promise<ApiResult<Pick<PendingTeamRow, "id" | "tournament_id" | "status">>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<PendingTeamRow>("teams")
+    .from("teams")
     .select("id,tournament_id,status")
     .eq("id", teamId)
     .maybeSingle();
@@ -149,7 +296,7 @@ export async function getTeamApplicationByTournamentAndCaptain(
 ): Promise<ApiResult<TeamApplicationSummary>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<TeamApplicationSummary>("teams")
+    .from("teams")
     .select("id,team_name,status")
     .eq("tournament_id", tournamentId)
     .eq("captain_user_id", captainUserId)
@@ -167,7 +314,7 @@ export async function updateTeamStatus(
 ): Promise<ApiResult<Pick<PendingTeamRow, "id" | "status">>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<PendingTeamRow>("teams")
+    .from("teams")
     .update({ status })
     .eq("id", teamId)
     .select("id,status")
@@ -184,13 +331,13 @@ export const getMyTeamsWithTournament = async (
 ): Promise<ApiResult<TeamWithTournament[]>> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<TeamWithTournament>("teams")
+    .from("teams")
     .select("id,team_name,contact,status,tournaments(id,name,status)")
     .eq("captain_user_id", captainUserId)
     .order("created_at", { ascending: false });
 
   return {
-    data,
+    data: data as TeamWithTournament[] | null,
     error: error ? error.message : null,
   };
 };
@@ -200,7 +347,7 @@ export async function getCaptainTeams(
 ): Promise<ApiResult<CaptainTeam[]>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<CaptainTeam>("teams")
+    .from("teams")
     .select("id,team_name,status")
     .eq("captain_user_id", captainUserId)
     .order("created_at", { ascending: false });

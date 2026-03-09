@@ -19,7 +19,7 @@ export const createSupabaseServerClient = cache(async () => {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Server Components에서 setAll이 막힐 수 있어 무시(권장 패턴)
+            // Server Components??좎럩苑?setAll??筌띾맪??????좎럩堉??얜똻??亦낅슣????좎?苑?
           }
         },
       },
@@ -65,7 +65,7 @@ type OrganizerTournamentResult = {
 export async function getPublicTournaments(): Promise<PublicTournamentResult> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Tournament>("tournaments")
+    .from("tournaments")
     .select("id,name,location,start_date,end_date,status")
     .in("status", ["open", "closed"])
     .order("start_date", { ascending: true });
@@ -81,7 +81,7 @@ export async function getPublicTournamentById(
 ): Promise<PublicTournamentDetailResult> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Tournament>("tournaments")
+    .from("tournaments")
     .select("id,name,location,start_date,end_date,status")
     .eq("id", id)
     .in("status", ["open", "closed"])
@@ -98,7 +98,7 @@ export async function getOrganizerTournaments(
 ): Promise<OrganizerTournamentResult> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<OrganizerTournament>("tournaments")
+    .from("tournaments")
     .select("id,name,status,created_by,start_date,end_date")
     .eq("created_by", organizerId)
     .order("start_date", { ascending: true });

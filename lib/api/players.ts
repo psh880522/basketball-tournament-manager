@@ -18,7 +18,7 @@ export async function getPlayersByTeam(
 ): Promise<ApiResult<Player[]>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Player>("players")
+    .from("players")
     .select("id,team_id,name,number,position")
     .eq("team_id", teamId)
     .order("name", { ascending: true });
@@ -34,7 +34,7 @@ export async function getPlayerById(
 ): Promise<ApiResult<Player>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Player>("players")
+    .from("players")
     .select("id,team_id,name,number,position")
     .eq("id", playerId)
     .maybeSingle();
@@ -51,7 +51,7 @@ export async function createPlayer(
 ): Promise<ApiResult<Player>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Player>("players")
+    .from("players")
     .insert({
       team_id: teamId,
       name: input.name,
@@ -73,7 +73,7 @@ export async function updatePlayer(
 ): Promise<ApiResult<Player>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Player>("players")
+    .from("players")
     .update({
       name: input.name,
       number: input.number,
@@ -94,7 +94,7 @@ export async function deletePlayer(
 ): Promise<ApiResult<Pick<Player, "id">>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from<Player>("players")
+    .from("players")
     .delete()
     .eq("id", playerId)
     .select("id")

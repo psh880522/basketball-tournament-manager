@@ -1,148 +1,559 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getTournamentProgressState } from "@/lib/api/tournamentProgress";
-import { getPublicTournamentById } from "@/lib/api/tournaments";
-import ProgressIndicator from "./ProgressIndicator";
+import {
+  changeTournamentStatus,
+  getTournamentForEdit,
+  isTournamentStatus,
+  softDeleteTournament,
+  type TournamentStatus,
+} from "@/lib/api/tournaments";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import ProgressIndicator, {
+  type StepWithActions,
+} from "./ProgressIndicator";
 import { finishTournamentAction } from "./actions";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ finishError?: string; finishSuccess?: string }>;
+  searchParams: Promise<{
+    finishError?: string;
+    finishSuccess?: string;
+    statusError?: string;
+    statusSuccess?: string;
+    deleteError?: string;
+    deleteSuccess?: string;
+  }>;
 };
 
-type StateCopy = {
-  label: string;
-  description: string;
+const statusLabels: Record<TournamentStatus, string> = {
+  draft: "준비중",
+  open: "모집중",
+  closed: "진행중",
+  finished: "완료",
 };
 
-const stateCopy: Record<string, StateCopy> = {
-  TEAM_APPROVAL: {
-    label: "팀 승인 대기",
-    description: "팀 신청을 확인하고 승인하세요.",
-  },
-  GROUP_STAGE_GENERATED: {
-    label: "조별 리그 준비 완료",
-    description: "경기 결과를 입력할 수 있습니다.",
-  },
-  MATCH_IN_PROGRESS: {
-    label: "조별 리그 진행 중",
-    description: "완료된 경기 기반으로 순위를 계산하세요.",
-  },
-  STANDINGS_READY: {
-    label: "순위 계산 완료",
-    description: "토너먼트를 생성할 준비가 되었습니다.",
-  },
-  BRACKET_READY: {
-    label: "토너먼트 진행 중",
-    description: "다음 라운드를 생성하세요.",
-  },
-  TOURNAMENT_FINISHED: {
-    label: "토너먼트 종료",
-    description: "모든 라운드가 완료되었습니다.",
-  },
+const statusBadgeClasses: Record<TournamentStatus, string> = {
+  draft: "bg-gray-100 text-gray-700",
+  open: "bg-emerald-100 text-emerald-700",
+  closed: "bg-blue-100 text-blue-700",
+  finished: "bg-amber-100 text-amber-700",
+};
+
+const statusOptions: TournamentStatus[] = [
+  "draft",
+  "open",
+  "closed",
+  "finished",
+];
+
+const buildRedirectUrl = (
+  tournamentId: string,
+  params: Record<string, string>
+) => {
+  const searchParams = new URLSearchParams(params);
+  return `/admin/tournaments/${tournamentId}?${searchParams.toString()}`;
+};
+
+const toText = (value: FormDataEntryValue | null) =>
+  typeof value === "string" ? value.trim() : "";
+
+const requiresStatusConfirm = (
+  currentStatus: TournamentStatus,
+  nextStatus: TournamentStatus
+) => {
+  if (nextStatus === "finished") return true;
+  if (currentStatus === "closed" && nextStatus === "open") return true;
+  if (currentStatus === "open" && nextStatus === "draft") return true;
+  if (currentStatus === "closed" && nextStatus === "draft") return true;
+  return false;
+};
+
+async function changeStatusAction(formData: FormData) {
+  "use server";
+
+  const tournamentId = toText(formData.get("tournamentId"));
+  const nextStatusRaw = toText(formData.get("nextStatus"));
+  const confirm = toText(formData.get("confirm"));
+
+  if (!tournamentId) {
+    redirect("/admin");
+  }
+
+  if (!isTournamentStatus(nextStatusRaw)) {
+    redirect(buildRedirectUrl(tournamentId, { statusError: "잘못된 상태 값입니다." }));
+  }
+
+  const nextStatus = nextStatusRaw as TournamentStatus;
+  const currentResult = await getTournamentForEdit(tournamentId);
+
+  if (currentResult.error || !currentResult.data) {
+    redirect(
+      buildRedirectUrl(tournamentId, {
+        statusError: currentResult.error ?? "대회 정보를 불러오지 못했습니다.",
+      })
+    );
+  }
+
+  const currentStatus = currentResult.data.status;
+  if (requiresStatusConfirm(currentStatus, nextStatus) && confirm !== "yes") {
+    redirect(
+      buildRedirectUrl(tournamentId, {
+        statusError: "변경 확인이 필요합니다.",
+      })
+    );
+  }
+
+  const result = await changeTournamentStatus(tournamentId, nextStatus);
+
+  if (!result.ok) {
+    redirect(buildRedirectUrl(tournamentId, { statusError: result.error }));
+  }
+
+  redirect(buildRedirectUrl(tournamentId, { statusSuccess: "1" }));
+}
+
+async function softDeleteAction(formData: FormData) {
+  "use server";
+
+  const tournamentId = toText(formData.get("tournamentId"));
+  const confirm = toText(formData.get("confirm"));
+
+  if (!tournamentId) {
+    redirect("/admin");
+  }
+
+  if (confirm !== "yes") {
+    redirect(buildRedirectUrl(tournamentId, { deleteError: "삭제 확인이 필요합니다." }));
+  }
+
+  const result = await softDeleteTournament(tournamentId);
+
+  if (!result.ok) {
+    redirect(buildRedirectUrl(tournamentId, { deleteError: result.error }));
+  }
+
+  redirect(buildRedirectUrl(tournamentId, { deleteSuccess: "1" }));
+}
+
+const buildSteps = (
+  tournamentId: string,
+  summary: {
+    approvedTeams: number;
+    totalTeams: number;
+    totalMatches: number;
+    completedMatches: number;
+    standings: number;
+    finalExists: boolean;
+    courtsCount: number;
+    scheduledMatches: number;
+    tournamentStatus: TournamentStatus;
+  }
+): StepWithActions[] => {
+  const {
+    approvedTeams,
+    totalTeams,
+    totalMatches,
+    completedMatches,
+    standings,
+    finalExists,
+    courtsCount,
+    scheduledMatches,
+    tournamentStatus,
+  } = summary;
+
+  const isFinished = tournamentStatus === "finished";
+  const steps: StepWithActions[] = [];
+
+  // 1. 팀 승인
+  const approvalDone = approvedTeams > 0 && approvedTeams === totalTeams;
+  const approvalActive = approvedTeams === 0 && totalTeams > 0;
+  steps.push({
+    label: "팀 승인",
+    status: approvalDone ? "done" : approvalActive ? "active" : "pending",
+    actions: [
+      {
+        label: "신청 관리",
+        href: `/admin/tournaments/${tournamentId}/applications`,
+        enabled: true,
+        variant: "primary",
+      },
+      {
+        label: "승인팀 보기",
+        href: `/admin/tournaments/${tournamentId}/applications?status=approved`,
+        enabled: true,
+        variant: "secondary",
+      },
+    ],
+  });
+
+  // 2. 조/경기 생성
+  const matchCreatedDone = totalMatches > 0;
+  const matchCreatedActive = totalMatches === 0 && approvedTeams > 1;
+  steps.push({
+    label: "조/경기 생성",
+    status: matchCreatedDone ? "done" : matchCreatedActive ? "active" : "pending",
+    actions: [
+      {
+        label: "조/경기 생성",
+        href: `/admin/tournaments/${tournamentId}/bracket`,
+        enabled: !isFinished && approvedTeams >= 2,
+        reason: isFinished
+          ? "종료된 대회"
+          : approvedTeams < 2
+          ? "승인 팀 2팀 이상 필요"
+          : undefined,
+        variant: "primary",
+      },
+      {
+        label: "경기 목록 보기",
+        href: `/admin/tournaments/${tournamentId}/matches`,
+        enabled: totalMatches > 0,
+        reason: totalMatches === 0 ? "생성된 경기가 없습니다" : undefined,
+        variant: "secondary",
+      },
+    ],
+  });
+
+  // 3. 스케줄 생성
+  const scheduleDone = totalMatches > 0 && scheduledMatches === totalMatches;
+  const scheduleActive = !scheduleDone && totalMatches > 0 && courtsCount > 0;
+  const scheduleEnabled = !isFinished && totalMatches > 0 && courtsCount > 0;
+  const scheduleReason = isFinished
+    ? "종료된 대회"
+    : totalMatches === 0
+    ? "먼저 조/경기 생성을 완료하세요"
+    : courtsCount === 0
+    ? "코트를 먼저 추가하세요"
+    : undefined;
+  steps.push({
+    label: "스케줄 생성",
+    status: scheduleDone ? "done" : scheduleActive ? "active" : "pending",
+    actions: [
+      {
+        label: "스케줄 생성",
+        href: `/admin/tournaments/${tournamentId}/schedule`,
+        enabled: scheduleEnabled,
+        reason: scheduleReason,
+        variant: "primary",
+      },
+      {
+        label: "코트 설정",
+        href: `/admin/tournaments/${tournamentId}/edit`,
+        enabled: !isFinished,
+        reason: isFinished ? "종료된 대회" : undefined,
+        variant: "secondary",
+      },
+    ],
+  });
+
+  // 4. 경기 결과 입력
+  const resultsDone = totalMatches > 0 && completedMatches === totalMatches;
+  const resultsActive = totalMatches > 0 && completedMatches < totalMatches;
+  steps.push({
+    label: "경기 결과 입력",
+    status: resultsDone ? "done" : resultsActive ? "active" : "pending",
+    actions: [
+      {
+        label: "결과 입력",
+        href: `/admin/tournaments/${tournamentId}/results`,
+        enabled: !isFinished && totalMatches > 0,
+        reason: isFinished
+          ? "종료된 대회"
+          : totalMatches === 0
+          ? "경기가 없습니다"
+          : undefined,
+        variant: "primary",
+      },
+    ],
+  });
+
+  // 5. 순위 확정
+  const standingsDone = finalExists;
+  const standingsActive = standings > 0 && !finalExists;
+  const allMatchesDone = totalMatches > 0 && completedMatches === totalMatches;
+  steps.push({
+    label: "순위 확정",
+    status: standingsDone ? "done" : standingsActive ? "active" : "pending",
+    actions: [
+      {
+        label: "순위 계산",
+        href: `/admin/tournaments/${tournamentId}/standings`,
+        enabled: !isFinished && allMatchesDone,
+        reason: isFinished
+          ? "종료된 대회"
+          : !allMatchesDone
+          ? "모든 경기 완료 필요"
+          : undefined,
+        variant: "primary",
+      },
+    ],
+  });
+
+  // 6. 토너먼트 생성
+  const bracketDone = finalExists;
+  const bracketActive = standings > 0 && !finalExists;
+  steps.push({
+    label: "토너먼트 생성",
+    status: bracketDone ? "done" : bracketActive ? "active" : "pending",
+    actions: [
+      {
+        label: "토너먼트 생성",
+        href: `/admin/tournaments/${tournamentId}/bracket/tournament`,
+        enabled: !isFinished && standings > 0,
+        reason: isFinished
+          ? "종료된 대회"
+          : standings === 0
+          ? "순위 확정 필요"
+          : undefined,
+        variant: "primary",
+      },
+      {
+        label: "브라켓 보기",
+        href: `/tournament/${tournamentId}`,
+        enabled: finalExists,
+        reason: !finalExists ? "토너먼트 미생성" : undefined,
+        variant: "secondary",
+      },
+    ],
+  });
+
+  // 7. 종료
+  steps.push({
+    label: "종료",
+    status: tournamentStatus === "finished" ? "done" : "pending",
+    actions: [
+      {
+        label: "대회 종료",
+        href: "",
+        enabled: !isFinished,
+        reason: isFinished ? "이미 종료됨" : undefined,
+        variant: "primary",
+        isFinishAction: true,
+      },
+      {
+        label: "결과 보기",
+        href: `/tournament/${tournamentId}`,
+        enabled: isFinished,
+        reason: !isFinished ? "대회 진행 중" : undefined,
+        variant: "secondary",
+      },
+    ],
+  });
+
+  return steps;
+};
+
+const resolveCurrentStage = (steps: StepWithActions[]) => {
+  const activeStep = steps.find((step) => step.status === "active");
+  if (activeStep) return activeStep.label;
+
+  const lastDone = [...steps].reverse().find((step) => step.status === "done");
+  return lastDone?.label ?? "대기";
 };
 
 async function TournamentDashboardContent({
   tournamentId,
+  messages,
 }: {
   tournamentId: string;
+  messages: {
+    finishError?: string;
+    finishSuccess?: string;
+    statusError?: string;
+    statusSuccess?: string;
+    deleteError?: string;
+    deleteSuccess?: string;
+  };
 }) {
-  const [progress, tournamentResult] = await Promise.all([
-    getTournamentProgressState(tournamentId),
-    getPublicTournamentById(tournamentId),
-  ]);
+  const progress = await getTournamentProgressState(tournamentId);
 
   if (progress.error) {
-    return <p style={{ color: "crimson" }}>{progress.error}</p>;
-  }
-
-  if (tournamentResult.error) {
-    return <p style={{ color: "crimson" }}>대회 정보를 불러오지 못했습니다.</p>;
+    return (
+      <Card className="text-sm text-red-600">
+        {progress.error}
+      </Card>
+    );
   }
 
   if (!progress.data) {
-    return <p>대회 정보를 찾을 수 없습니다.</p>;
+    return (
+      <Card className="text-sm text-gray-600">
+        대회 정보를 찾을 수 없습니다.
+      </Card>
+    );
   }
 
-  if (!tournamentResult.data) {
-    return <p>대회 정보를 찾을 수 없습니다.</p>;
-  }
+  const summary = progress.data.summary;
+  const steps = buildSteps(tournamentId, {
+    approvedTeams: summary.approvedTeams,
+    totalTeams: summary.totalTeams,
+    totalMatches: summary.totalMatches,
+    completedMatches: summary.completedMatches,
+    standings: summary.standings,
+    finalExists: summary.finalExists,
+    courtsCount: summary.courtsCount,
+    scheduledMatches: summary.scheduledMatches,
+    tournamentStatus: summary.tournamentStatus,
+  });
+  const currentStage = resolveCurrentStage(steps);
+  const isFinished = summary.tournamentStatus === "finished";
 
-  const copy = stateCopy[progress.data.state];
-  const isFinished = tournamentResult.data.status === "finished";
-  const action = isFinished
-    ? {
-        label: "대회 종료",
-        url: "",
-        disabled: true,
-        reason: "대회가 종료되었습니다.",
-      }
-    : progress.data.nextAction;
+  const kpis = [
+    {
+      label: "승인 팀",
+      value: `${summary.approvedTeams}/${summary.totalTeams}`,
+      subtext: "승인/전체",
+    },
+    {
+      label: "완료 경기",
+      value: `${summary.completedMatches}/${summary.totalMatches}`,
+      subtext: "완료/전체",
+    },
+    {
+      label: "토너먼트",
+      value: summary.finalExists ? "생성됨" : "미생성",
+      subtext: "final 기준",
+    },
+    {
+      label: "전체 경기",
+      value: `${summary.totalMatches}`,
+      subtext: "총 경기 수",
+    },
+    {
+      label: "승인 대기",
+      value: `${Math.max(summary.totalTeams - summary.approvedTeams, 0)}`,
+      subtext: "대기 팀",
+    },
+  ];
 
   return (
-    <div style={{ display: "grid", gap: 24, marginTop: 16 }}>
-      <section
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 8,
-          padding: 16,
-          background: "#f9fafb",
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>{progress.data.tournamentName}</h2>
-        <p style={{ marginBottom: 4 }}>현재 상태: {copy.label}</p>
-        <p style={{ marginTop: 0, color: "#6b7280" }}>{copy.description}</p>
-        {isFinished ? (
-          <p style={{ marginTop: 12, color: "#b45309" }}>
-            대회가 종료되었습니다. 결과 페이지로 이동하세요.
-          </p>
-        ) : null}
-      </section>
-
-      <section
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 8,
-          padding: 16,
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>다음 할 일</h3>
-        {action.disabled ? (
-          <button type="button" disabled style={{ padding: "10px 16px" }}>
-            {action.label}
-          </button>
-        ) : (
-          <Link href={action.url}>
-            <button type="button" style={{ padding: "10px 16px" }}>
-              {action.label}
-            </button>
-          </Link>
-        )}
-        {action.reason ? (
-          <p style={{ marginTop: 8, color: "#9ca3af" }}>{action.reason}</p>
-        ) : null}
-        {isFinished ? (
-          <div style={{ marginTop: 12 }}>
-            <Link href={`/tournament/${tournamentId}/result`}>
-              <button type="button" style={{ padding: "10px 16px" }}>
-                결과 보기
-              </button>
-            </Link>
+    <div className="space-y-6">
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">
+              {progress.data.tournamentName}
+            </h1>
+            <p className="text-sm text-gray-600">현재 단계: {currentStage}</p>
           </div>
-        ) : null}
+          <Badge className={statusBadgeClasses[summary.tournamentStatus]}>
+            {statusLabels[summary.tournamentStatus]}
+          </Badge>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {kpis.map((item) => (
+            <Card key={item.label} className="space-y-1">
+              <p className="text-xs text-gray-500">{item.label}</p>
+              <p className="text-xl font-semibold text-gray-900">{item.value}</p>
+              <p className="text-xs text-gray-400">{item.subtext}</p>
+            </Card>
+          ))}
+        </div>
       </section>
 
-      <section
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 8,
-          padding: 16,
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>진행 단계</h3>
-        <ProgressIndicator state={progress.data.state} />
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">진행 단계</h2>
+        <ProgressIndicator
+          steps={steps}
+          tournamentId={tournamentId}
+          finishMessages={{
+            finishError: messages.finishError,
+            finishSuccess: messages.finishSuccess,
+          }}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">⚠ 운영 위험 작업</h2>
+        <Card className="space-y-4 border-amber-200 bg-amber-50">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">상태 변경</p>
+            <form action={changeStatusAction} className="space-y-2">
+              <input type="hidden" name="tournamentId" value={tournamentId} />
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="rounded-md border border-amber-200 bg-white px-2 py-2 text-sm"
+                  name="nextStatus"
+                  defaultValue={summary.tournamentStatus}
+                  disabled={isFinished}
+                >
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabels[status]}
+                    </option>
+                  ))}
+                </select>
+                <Button type="submit" variant="secondary" disabled={isFinished}>
+                  상태 적용
+                </Button>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input type="checkbox" name="confirm" value="yes" />
+                위험 전이 시 확인이 필요합니다.
+              </label>
+              {isFinished ? (
+                <p className="text-xs text-gray-600">
+                  종료된 대회는 변경할 수 없습니다.
+                </p>
+              ) : null}
+              {messages.statusError ? (
+                <p className="text-sm text-red-600">{messages.statusError}</p>
+              ) : null}
+              {messages.statusSuccess ? (
+                <p className="text-sm text-emerald-600">상태 변경이 완료되었습니다.</p>
+              ) : null}
+            </form>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">대회 종료</p>
+            {messages.finishError ? (
+              <p className="text-sm text-red-600">{messages.finishError}</p>
+            ) : null}
+            {messages.finishSuccess ? (
+              <p className="text-sm text-emerald-600">대회 종료가 완료되었습니다.</p>
+            ) : null}
+            {isFinished ? (
+              <p className="text-xs text-gray-600">이미 종료된 대회입니다.</p>
+            ) : (
+              <form action={finishTournamentAction} className="space-y-2">
+                <input type="hidden" name="tournamentId" value={tournamentId} />
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  <input type="checkbox" name="confirm" value="yes" />
+                  종료 내용을 확인했습니다.
+                </label>
+                <Button type="submit" variant="secondary">
+                  대회 종료
+                </Button>
+              </form>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">대회 삭제</p>
+            <form action={softDeleteAction} className="space-y-2">
+              <input type="hidden" name="tournamentId" value={tournamentId} />
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input type="checkbox" name="confirm" value="yes" />
+                삭제 확인이 필요합니다.
+              </label>
+              <Button type="submit" variant="secondary">
+                삭제
+              </Button>
+              {messages.deleteError ? (
+                <p className="text-sm text-red-600">{messages.deleteError}</p>
+              ) : null}
+              {messages.deleteSuccess ? (
+                <p className="text-sm text-emerald-600">대회가 삭제되었습니다.</p>
+              ) : null}
+            </form>
+          </div>
+        </Card>
       </section>
     </div>
   );
@@ -157,84 +568,44 @@ export default async function TournamentDashboardPage({
   if (userResult.status === "unauthenticated") redirect("/login");
 
   if (userResult.status === "error") {
-    return <p style={{ color: "crimson" }}>{userResult.error}</p>;
+    return (
+      <main className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <Card className="text-sm text-red-600">
+            {userResult.error ?? "사용자 정보를 불러오지 못했습니다."}
+          </Card>
+        </div>
+      </main>
+    );
   }
 
   if (userResult.status === "empty") {
-    return <p>No profile found for this account.</p>;
+    return (
+      <main className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <Card className="text-sm text-gray-600">
+            프로필이 없습니다.
+          </Card>
+        </div>
+      </main>
+    );
   }
 
   if (userResult.role !== "organizer") redirect("/dashboard");
 
   const { id } = await params;
-  const resolvedSearchParams = await searchParams;
+  const messages = await searchParams;
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Admin Dashboard</h1>
-      <FinishSection tournamentId={id} messages={resolvedSearchParams} />
-      <Suspense fallback={<p>Loading dashboard...</p>}>
-        <TournamentDashboardContent tournamentId={id} />
-      </Suspense>
+    <main className="min-h-screen bg-gray-50 px-4 py-8">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="flex items-center justify-between">
+          <Link href="/admin" className="text-sm text-gray-500">
+            ← 목록으로
+          </Link>
+        </div>
+        <TournamentDashboardContent tournamentId={id} messages={messages} />
+      </div>
     </main>
-  );
-}
-
-async function FinishSection({
-  tournamentId,
-  messages,
-}: {
-  tournamentId: string;
-  messages: { finishError?: string; finishSuccess?: string };
-}) {
-  const tournamentResult = await getPublicTournamentById(tournamentId);
-
-  if (tournamentResult.error) {
-    return <p style={{ color: "crimson" }}>대회 정보를 불러오지 못했습니다.</p>;
-  }
-
-  if (!tournamentResult.data) {
-    return <p>대회 정보를 찾을 수 없습니다.</p>;
-  }
-
-  const isFinished = tournamentResult.data.status === "finished";
-
-  return (
-    <section
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 8,
-        padding: 16,
-        marginTop: 16,
-        background: "#fff7ed",
-      }}
-    >
-      <h2 style={{ marginTop: 0 }}>대회 종료</h2>
-      {messages.finishError ? (
-        <p style={{ marginTop: 0, color: "crimson" }}>{messages.finishError}</p>
-      ) : null}
-      {messages.finishSuccess ? (
-        <p style={{ marginTop: 0, color: "#166534" }}>
-          대회 종료가 완료되었습니다.
-        </p>
-      ) : null}
-      {isFinished ? (
-        <p style={{ marginTop: 0 }}>이미 종료된 대회입니다.</p>
-      ) : (
-        <form action={finishTournamentAction}>
-          <input type="hidden" name="tournamentId" value={tournamentId} />
-          <p style={{ marginTop: 0 }}>
-            종료하면 운영 기능이 잠기고 결과 화면으로 전환됩니다.
-          </p>
-          <label style={{ display: "block", marginTop: 8 }}>
-            <input type="checkbox" name="confirm" value="yes" /> 종료 내용을
-            확인했습니다.
-          </label>
-          <button type="submit" style={{ marginTop: 12, padding: "8px 12px" }}>
-            대회 종료
-          </button>
-        </form>
-      )}
-    </section>
   );
 }
