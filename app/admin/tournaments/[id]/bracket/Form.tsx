@@ -7,6 +7,8 @@ import {
   updateGroupSizeAction,
   generateDivisionMatches,
   previewDivisionAction,
+  seedGroupSlotsFromBracketAction,
+  seedTournamentSlotsFromBracketAction,
 } from "./actions";
 import type { PreviewResult } from "@/lib/api/bracketPreview";
 
@@ -119,6 +121,9 @@ export default function BracketConsoleForm({
   const [confirmOverwrite, setConfirmOverwrite] = useState<
     Record<string, boolean>
   >({});
+  const [assignTournament, setAssignTournament] = useState<
+    Record<string, boolean>
+  >({});
   const [previews, setPreviews] = useState<Record<string, PreviewData | null>>(
     {}
   );
@@ -166,6 +171,38 @@ export default function BracketConsoleForm({
       }
       setGeneratingId(null);
       setConfirmOverwrite((prev) => ({ ...prev, [divisionId]: false }));
+    });
+  };
+
+  const handleSeedGroupSlots = (divisionId: string) => {
+    clearMsg(divisionId);
+    startTransition(async () => {
+      const result = await seedGroupSlotsFromBracketAction({
+        tournamentId,
+        divisionId,
+      });
+      if (result.ok) {
+        setMsg(divisionId, "success", "리그 슬롯이 반영되었습니다.");
+      } else {
+        setMsg(divisionId, "error", result.error);
+      }
+    });
+  };
+
+  const handleSeedTournamentSlots = (divisionId: string) => {
+    clearMsg(divisionId);
+    const assignToTournament = assignTournament[divisionId] ?? true;
+    startTransition(async () => {
+      const result = await seedTournamentSlotsFromBracketAction({
+        tournamentId,
+        divisionId,
+        assignToTournament,
+      });
+      if (result.ok) {
+        setMsg(divisionId, "success", "토너먼트 슬롯이 반영되었습니다.");
+      } else {
+        setMsg(divisionId, "error", result.error);
+      }
     });
   };
 
@@ -300,6 +337,36 @@ export default function BracketConsoleForm({
                   </Button>
                 </div>
               )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => handleSeedGroupSlots(div.id)}
+                  disabled={isBusy}
+                >
+                  리그 슬롯 반영
+                </Button>
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    checked={assignTournament[div.id] ?? true}
+                    onChange={(event) =>
+                      setAssignTournament((prev) => ({
+                        ...prev,
+                        [div.id]: event.target.checked,
+                      }))
+                    }
+                  />
+                  토너먼트 매치 연결
+                </label>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleSeedTournamentSlots(div.id)}
+                  disabled={isBusy}
+                >
+                  토너먼트 슬롯 반영
+                </Button>
+              </div>
             </div>
 
             {/* Preview Panel */}

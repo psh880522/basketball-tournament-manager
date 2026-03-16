@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
-import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getCourtsByTournament } from "@/lib/api/courts";
-import { getScheduleMatches } from "@/lib/api/schedule";
+import { getScheduleSlots, getDivisionGroupsByTournament } from "@/lib/api/schedule-slots";
+import { getDivisionsByTournament } from "@/lib/api/divisions";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import ScheduleForm from "./Form";
+import ScheduleSlotsBoard from "./components/ScheduleSlotsBoard";
+import ScheduleTimeActions from "./components/ScheduleTimeActions";
+import ScheduleBreakActions from "./components/ScheduleBreakActions";
+import ScheduleSyncActions from "./components/ScheduleSyncActions";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -41,28 +44,49 @@ export default async function SchedulePage({ params }: PageProps) {
     );
   }
 
-  if (userResult.role !== "organizer") redirect("/dashboard");
-
   const { id } = await params;
 
-  const [matchesResult, divisionsResult, courtsResult] = await Promise.all([
-    getScheduleMatches(id),
-    getDivisionsByTournament(id),
-    getCourtsByTournament(id),
-  ]);
+  if (userResult.role !== "organizer") {
+    const [courtsResult, slotBoard] = await Promise.all([
+      getCourtsByTournament(id),
+      getScheduleSlots(id),
+    ]);
 
-  if (matchesResult.error) {
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-8">
-        <div className="mx-auto max-w-5xl space-y-4">
-          <h1 className="text-2xl font-semibold">스케줄 관리</h1>
-          <Card className="text-sm text-red-600">
-            데이터를 불러오지 못했습니다: {matchesResult.error}
-          </Card>
+        <div className="mx-auto max-w-5xl space-y-6">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold">스케줄 관리</h1>
+              <p className="text-sm text-gray-600">스케줄 슬롯을 확인하세요.</p>
+            </div>
+          </header>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">스케줄 슬롯 조회</h2>
+              <span className="text-xs text-gray-400">읽기 전용</span>
+            </div>
+            <ScheduleSlotsBoard
+              slots={slotBoard.data}
+              error={slotBoard.error}
+              courts={courtsResult.data ?? []}
+              tournamentId={id}
+              isEditable={false}
+            />
+          </section>
         </div>
       </main>
     );
   }
+
+  const [courtsResult, slotBoard, divisionsResult, groupsResult] =
+    await Promise.all([
+      getCourtsByTournament(id),
+      getScheduleSlots(id),
+      getDivisionsByTournament(id),
+      getDivisionGroupsByTournament(id),
+    ]);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -70,21 +94,48 @@ export default async function SchedulePage({ params }: PageProps) {
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold">스케줄 관리</h1>
-            <p className="text-sm text-gray-600">
-              경기 시간과 코트를 배정하세요.
-            </p>
+            <p className="text-sm text-gray-600">스케줄 슬롯을 확인하세요.</p>
           </div>
           <Link href={`/admin/tournaments/${id}/edit`}>
             <Button variant="secondary">대회 수정</Button>
           </Link>
         </header>
 
-        <ScheduleForm
-          tournamentId={id}
-          initialMatches={matchesResult.data ?? []}
-          divisions={divisionsResult.data ?? []}
-          courts={courtsResult.data ?? []}
-        />
+        <section className="space-y-3">
+          <ScheduleSyncActions tournamentId={id} />
+        </section>
+
+        <section className="space-y-3">
+          {divisionsResult.error || groupsResult.error ? (
+            <Card className="text-sm text-red-600">
+              {divisionsResult.error ?? groupsResult.error}
+            </Card>
+          ) : (
+            <ScheduleBreakActions
+              tournamentId={id}
+              divisions={divisionsResult.data ?? []}
+              groups={groupsResult.data ?? []}
+            />
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <ScheduleTimeActions tournamentId={id} />
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">스케줄 슬롯 조회</h2>
+            <span className="text-xs text-gray-400">편집 가능</span>
+          </div>
+          <ScheduleSlotsBoard
+            slots={slotBoard.data}
+            error={slotBoard.error}
+            courts={courtsResult.data ?? []}
+            tournamentId={id}
+            isEditable
+          />
+        </section>
       </div>
     </main>
   );

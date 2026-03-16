@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import { setApplicationStatusAction } from "./actions";
+import { setApplicationStatusAction, createDummyTeamAction } from "./actions";
 import type { TournamentApplicationRow, ApplicationStatus } from "@/lib/api/applications";
 
 const statusLabel: Record<ApplicationStatus, string> = {
@@ -35,20 +36,28 @@ export default function ApplicationList({
   tournamentId: string;
   divisions: DivisionOption[];
 }) {
+  const router = useRouter();
   const [applications, setApplications] = useState(initialApplications);
   const [error, setError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [filterDivisionId, setFilterDivisionId] = useState("");
+  const [dummyName, setDummyName] = useState("");
+  const [isCreating, startCreateTransition] = useTransition();
 
   const filtered = useMemo(() => {
     if (!filterDivisionId) return applications;
     return applications.filter((a) => a.division_id === filterDivisionId);
   }, [applications, filterDivisionId]);
 
+  useEffect(() => {
+    setApplications(initialApplications);
+  }, [initialApplications]);
+
   return (
     <div className="space-y-4">
       {/* Division 필터 */}
       {divisions.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <label
             htmlFor="division-filter"
             className="text-sm font-medium text-gray-700"
@@ -58,7 +67,10 @@ export default function ApplicationList({
           <select
             id="division-filter"
             value={filterDivisionId}
-            onChange={(e) => setFilterDivisionId(e.target.value)}
+            onChange={(e) => {
+              setFilterDivisionId(e.target.value);
+              setCreateError(null);
+            }}
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
           >
             <option value="">전체</option>
@@ -68,7 +80,48 @@ export default function ApplicationList({
               </option>
             ))}
           </select>
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-gray-600">
+              더미팀 이름(선택)
+            </label>
+            <input
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+              value={dummyName}
+              onChange={(e) => setDummyName(e.target.value)}
+              placeholder="예: DUMMY-TEST"
+            />
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              if (!filterDivisionId) {
+                setCreateError("더미팀을 추가할 참가 구분을 선택하세요.");
+                return;
+              }
+              setCreateError(null);
+              startCreateTransition(async () => {
+                const result = await createDummyTeamAction(
+                  tournamentId,
+                  filterDivisionId,
+                  dummyName.trim() || undefined
+                );
+                if (!result.ok) {
+                  setCreateError(result.error);
+                  return;
+                }
+                setDummyName("");
+                router.refresh();
+              });
+            }}
+            disabled={!filterDivisionId || isCreating}
+          >
+            {isCreating ? "추가 중..." : "+ 더미팀 추가"}
+          </Button>
         </div>
+      )}
+
+      {createError && (
+        <p className="text-sm text-red-600">{createError}</p>
       )}
 
       {error && (
@@ -141,6 +194,9 @@ function ApplicationItem({
             <Badge className="bg-blue-100 text-blue-700">
               {application.division_name}
             </Badge>
+          )}
+          {application.team_is_dummy && (
+            <Badge className="bg-gray-200 text-gray-700">DUMMY</Badge>
           )}
           <p className="text-sm font-semibold">{application.team_name}</p>
         </div>

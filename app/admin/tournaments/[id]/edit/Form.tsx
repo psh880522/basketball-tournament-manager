@@ -255,16 +255,34 @@ function AddDivisionForm({
 }) {
   const [name, setName] = useState("");
   const [groupSize, setGroupSize] = useState<number>(4);
+  const [tournamentSize, setTournamentSize] = useState<string>("");
+  const [includeTournamentSlots, setIncludeTournamentSlots] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const isGroupSizeValid = typeof groupSize === "number" && groupSize >= 2;
+  const tournamentSizeValue = tournamentSize.trim()
+    ? Number(tournamentSize)
+    : null;
+  const isTournamentSizeValid =
+    tournamentSizeValue === null ||
+    (Number.isInteger(tournamentSizeValue) && tournamentSizeValue >= 2);
+  const isTournamentSizePowerOfTwo =
+    tournamentSizeValue !== null &&
+    Number.isInteger(tournamentSizeValue) &&
+    (tournamentSizeValue & (tournamentSizeValue - 1)) === 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !isGroupSizeValid) return;
+    if (!name.trim() || !isGroupSizeValid || !isTournamentSizeValid) return;
 
     startTransition(async () => {
-      const result = await createDivisionAction(tournamentId, name.trim(), groupSize);
+      const result = await createDivisionAction(
+        tournamentId,
+        name.trim(),
+        groupSize,
+        isTournamentSizeValid ? tournamentSizeValue : null,
+        includeTournamentSlots
+      );
       if (!result.ok) {
         onError(result.error);
         return;
@@ -275,7 +293,10 @@ function AddDivisionForm({
         tournament_id: tournamentId,
         name: name.trim(),
         group_size: groupSize,
+        tournament_size: isTournamentSizeValid ? tournamentSizeValue : null,
+        include_tournament_slots: includeTournamentSlots,
         sort_order: 9999,
+        standings_dirty: false,
       });
     });
   };
@@ -309,10 +330,50 @@ function AddDivisionForm({
           required
         />
       </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-600">
+          토너먼트 크기
+        </label>
+        <input
+          type="number"
+          className={`w-24 rounded-md border px-2 py-2 text-sm ${
+            !isTournamentSizeValid ? "border-red-400" : "border-gray-300"
+          }`}
+          value={tournamentSize}
+          onChange={(e) => setTournamentSize(e.target.value)}
+          min={2}
+          placeholder="예: 8"
+        />
+        <p className="text-[11px] text-gray-400">2의 거듭제곱 권장</p>
+      </div>
+      <label className="flex items-center gap-2 text-xs text-gray-600">
+        <input
+          type="checkbox"
+          className="rounded border-gray-300"
+          checked={includeTournamentSlots}
+          onChange={(e) => setIncludeTournamentSlots(e.target.checked)}
+        />
+        토너먼트 슬롯 포함
+      </label>
       {!isGroupSizeValid && (
         <span className="text-xs text-red-500 self-center">2 이상 입력</span>
       )}
-      <Button type="submit" disabled={isPending || !isGroupSizeValid}>
+      {!isTournamentSizeValid && (
+        <span className="text-xs text-red-500 self-center">
+          토너먼트 크기는 2 이상의 정수
+        </span>
+      )}
+      {isTournamentSizeValid &&
+        tournamentSizeValue !== null &&
+        !isTournamentSizePowerOfTwo && (
+          <span className="text-xs text-amber-600 self-center">
+            2의 거듭제곱 권장
+          </span>
+        )}
+      <Button
+        type="submit"
+        disabled={isPending || !isGroupSizeValid || !isTournamentSizeValid}
+      >
         {isPending ? "저장 중..." : "저장"}
       </Button>
       <Button type="button" variant="secondary" onClick={onCancel}>
@@ -340,26 +401,52 @@ function DivisionItem({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(division.name);
   const [groupSize, setGroupSize] = useState<number>(division.group_size ?? 4);
+  const [tournamentSize, setTournamentSize] = useState<string>(
+    division.tournament_size !== null && division.tournament_size !== undefined
+      ? String(division.tournament_size)
+      : ""
+  );
+  const [includeTournamentSlots, setIncludeTournamentSlots] = useState(
+    division.include_tournament_slots ?? false
+  );
   const [isPending, startTransition] = useTransition();
 
   const isGroupSizeValid = typeof groupSize === "number" && groupSize >= 2;
+  const tournamentSizeValue = tournamentSize.trim()
+    ? Number(tournamentSize)
+    : null;
+  const isTournamentSizeValid =
+    tournamentSizeValue === null ||
+    (Number.isInteger(tournamentSizeValue) && tournamentSizeValue >= 2);
+  const isTournamentSizePowerOfTwo =
+    tournamentSizeValue !== null &&
+    Number.isInteger(tournamentSizeValue) &&
+    (tournamentSizeValue & (tournamentSizeValue - 1)) === 0;
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !isGroupSizeValid) return;
+    if (!name.trim() || !isGroupSizeValid || !isTournamentSizeValid) return;
 
     startTransition(async () => {
       const result = await updateDivisionAction(
         tournamentId,
         division.id,
         name.trim(),
-        groupSize
+        groupSize,
+        isTournamentSizeValid ? tournamentSizeValue : null,
+        includeTournamentSlots
       );
       if (!result.ok) {
         onError(result.error);
         return;
       }
-      onUpdated({ ...division, name: name.trim(), group_size: groupSize });
+      onUpdated({
+        ...division,
+        name: name.trim(),
+        group_size: groupSize,
+        tournament_size: isTournamentSizeValid ? tournamentSizeValue : null,
+        include_tournament_slots: includeTournamentSlots,
+      });
       setEditing(false);
     });
   };
@@ -404,10 +491,49 @@ function DivisionItem({
               required
             />
           </label>
+          <label className="flex items-center gap-1 text-sm text-gray-600">
+            토너먼트 크기
+            <input
+              type="number"
+              className={`w-24 rounded-md border px-2 py-1.5 text-sm ${
+                !isTournamentSizeValid ? "border-red-400" : "border-gray-300"
+              }`}
+              value={tournamentSize}
+              onChange={(e) => setTournamentSize(e.target.value)}
+              min={2}
+              placeholder="예: 8"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              className="rounded border-gray-300"
+              checked={includeTournamentSlots}
+              onChange={(e) => setIncludeTournamentSlots(e.target.checked)}
+            />
+            토너먼트 슬롯 포함
+          </label>
           {!isGroupSizeValid && (
             <span className="text-xs text-red-500">2 이상 입력</span>
           )}
-          <Button type="submit" disabled={isPending || !isGroupSizeValid}>
+          {!isTournamentSizeValid && (
+            <span className="text-xs text-red-500">
+              토너먼트 크기는 2 이상의 정수
+            </span>
+          )}
+          {isTournamentSizeValid &&
+            tournamentSizeValue !== null &&
+            !isTournamentSizePowerOfTwo && (
+              <span className="text-xs text-amber-600">
+                2의 거듭제곱 권장
+              </span>
+            )}
+          <Button
+            type="submit"
+            disabled={
+              isPending || !isGroupSizeValid || !isTournamentSizeValid
+            }
+          >
             {isPending ? "저장 중..." : "저장"}
           </Button>
           <Button
@@ -416,6 +542,15 @@ function DivisionItem({
             onClick={() => {
               setName(division.name);
               setGroupSize(division.group_size ?? 4);
+              setTournamentSize(
+                division.tournament_size !== null &&
+                  division.tournament_size !== undefined
+                  ? String(division.tournament_size)
+                  : ""
+              );
+              setIncludeTournamentSlots(
+                division.include_tournament_slots ?? false
+              );
               setEditing(false);
             }}
           >
@@ -431,7 +566,10 @@ function DivisionItem({
       <div className="space-y-0.5">
         <p className="text-sm font-medium">{division.name}</p>
         <p className="text-xs text-gray-400">
-          그룹 크기: {division.group_size ?? "-"} · 정렬: {division.sort_order}
+          그룹 크기: {division.group_size ?? "-"} · 토너먼트 크기:{" "}
+          {division.tournament_size ?? "-"} · 토너먼트 슬롯:{" "}
+          {division.include_tournament_slots ? "포함" : "미포함"} · 정렬:{" "}
+          {division.sort_order}
         </p>
       </div>
       <div className="flex gap-2">

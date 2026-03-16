@@ -6,7 +6,7 @@ import {
 } from "@/lib/api/tournaments";
 import {
   createDivision,
-  updateDivision,
+  updateDivisionConfig,
   deleteDivision,
 } from "@/lib/api/divisions";
 import {
@@ -51,7 +51,9 @@ export async function updateTournamentAction(
 export async function createDivisionAction(
   tournamentId: string,
   name: string,
-  groupSize?: number
+  groupSize?: number,
+  tournamentSize?: number | null,
+  includeTournamentSlots?: boolean
 ): Promise<ActionResult> {
   if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
   if (!name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
@@ -59,6 +61,10 @@ export async function createDivisionAction(
   const result = await createDivision(tournamentId, {
     name,
     ...(groupSize !== undefined ? { group_size: groupSize } : {}),
+    ...(tournamentSize !== undefined ? { tournament_size: tournamentSize } : {}),
+    ...(includeTournamentSlots !== undefined
+      ? { include_tournament_slots: includeTournamentSlots }
+      : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
@@ -70,14 +76,20 @@ export async function updateDivisionAction(
   tournamentId: string,
   divisionId: string,
   name: string,
-  groupSize?: number
+  groupSize?: number,
+  tournamentSize?: number | null,
+  includeTournamentSlots?: boolean
 ): Promise<ActionResult> {
   if (!divisionId) return { ok: false, error: "Division 정보가 없습니다." };
   if (!name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
 
-  const result = await updateDivision(divisionId, {
+  const result = await updateDivisionConfig(divisionId, {
     name,
     ...(groupSize !== undefined ? { group_size: groupSize } : {}),
+    ...(tournamentSize !== undefined ? { tournament_size: tournamentSize } : {}),
+    ...(includeTournamentSlots !== undefined
+      ? { include_tournament_slots: includeTournamentSlots }
+      : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);

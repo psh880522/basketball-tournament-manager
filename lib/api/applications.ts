@@ -15,6 +15,7 @@ export type TournamentApplicationRow = {
   id: string;
   team_id: string;
   team_name: string;
+  team_is_dummy: boolean;
   division_id: string;
   division_name: string;
   status: ApplicationStatus;
@@ -167,7 +168,9 @@ export async function listTournamentApplications(
 
   let query = supabase
     .from("tournament_team_applications")
-    .select("id, team_id, division_id, status, applied_by, created_at, teams(team_name), divisions(name)")
+    .select(
+      "id, team_id, division_id, status, applied_by, created_at, teams(team_name,is_dummy), divisions(name)"
+    )
     .eq("tournament_id", tournamentId)
     .order("created_at", { ascending: true });
 
@@ -181,12 +184,13 @@ export async function listTournamentApplications(
 
   const rows: TournamentApplicationRow[] = ((data ?? []) as Record<string, unknown>[]).map(
     (row) => {
-      const teams = row.teams as { team_name: string } | null;
+      const teams = row.teams as { team_name: string; is_dummy: boolean } | null;
       const divisions = row.divisions as { name: string } | null;
       return {
         id: row.id as string,
         team_id: row.team_id as string,
         team_name: teams?.team_name ?? "",
+        team_is_dummy: teams?.is_dummy ?? false,
         division_id: (row.division_id as string) ?? "",
         division_name: divisions?.name ?? "",
         status: row.status as ApplicationStatus,

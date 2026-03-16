@@ -22,6 +22,19 @@ export type ScheduleMatchRow = {
   court: { id: string; name: string } | null;
 };
 
+export type ScheduleSlotReadRow = {
+  id: string;
+  slot_type: string;
+  stage_type: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  court_id: string | null;
+  division_id: string | null;
+  match_id: string | null;
+  label: string | null;
+  sort_order: number;
+};
+
 export async function getScheduleMatches(
   tournamentId: string,
   filters?: { divisionId?: string; courtId?: string }

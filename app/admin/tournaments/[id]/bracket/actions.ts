@@ -18,6 +18,11 @@ import {
   previewDivisionGeneration,
   type PreviewResult,
 } from "@/lib/api/bracketPreview";
+import {
+  seedGroupMatchSlotsFromBracket,
+  seedTournamentMatchSlotsFromBracket,
+} from "@/lib/api/schedule-slots";
+import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -185,4 +190,31 @@ export async function generateDivisionMatches(
 
   /* success → 운영 화면으로 이동 */
   redirect(`/admin/tournaments/${tournamentId}`);
+}
+
+export async function seedGroupSlotsFromBracketAction(input: {
+  tournamentId: string;
+  divisionId: string;
+}): Promise<ActionResult> {
+  const result = await seedGroupMatchSlotsFromBracket(input);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${input.tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function seedTournamentSlotsFromBracketAction(input: {
+  tournamentId: string;
+  divisionId: string;
+  assignToTournament: boolean;
+}): Promise<ActionResult> {
+  const result = await seedTournamentMatchSlotsFromBracket(input);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${input.tournamentId}/schedule`);
+  }
+
+  return result;
 }

@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import { getUserWithRole } from "@/src/lib/auth/roles";
 
 export type TeamStatus = "pending" | "approved" | "rejected";
 
@@ -106,6 +107,73 @@ export async function createTeam(input: {
   }
 
   return { ok: true, teamId: data as string };
+}
+
+export async function createDummyTeam(input: {
+  tournamentId: string;
+  divisionId: string;
+  name?: string;
+}): Promise<
+  { ok: true; teamId: string; teamName: string } | { ok: false; error: string }
+> {
+  const auth = await getUserWithRole();
+  if (auth.status !== "ready" || auth.role !== "organizer" || !auth.user) {
+    return { ok: false, error: "권한이 없습니다." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: division, error: divisionError } = await supabase
+    .from("divisions")
+    .select("id")
+    .eq("id", input.divisionId)
+    .eq("tournament_id", input.tournamentId)
+    .maybeSingle();
+
+  if (divisionError) return { ok: false, error: divisionError.message };
+  if (!division) return { ok: false, error: "유효하지 않은 division입니다." };
+
+  let teamName = input.name?.trim() ?? "";
+
+  if (!teamName) {
+    const { count, error: countError } = await supabase
+      .from("tournament_team_applications")
+      .select("id, teams!inner(is_dummy)", { count: "exact", head: true })
+      .eq("tournament_id", input.tournamentId)
+      .eq("teams.is_dummy", true);
+
+    if (countError) return { ok: false, error: countError.message };
+
+    const nextIndex = (count ?? 0) + 1;
+    teamName = `DUMMY-${nextIndex}`;
+  }
+
+  const { data: team, error: teamError } = await supabase
+    .from("teams")
+    .insert({
+      team_name: teamName,
+      contact: "",
+      created_by: auth.user.id,
+      is_dummy: true,
+    })
+    .select("id, team_name")
+    .single();
+
+  if (teamError) return { ok: false, error: teamError.message };
+
+  const { error: applicationError } = await supabase
+    .from("tournament_team_applications")
+    .insert({
+      tournament_id: input.tournamentId,
+      division_id: input.divisionId,
+      team_id: team.id,
+      applied_by: auth.user.id,
+      status: "approved",
+    });
+
+  if (applicationError) return { ok: false, error: applicationError.message };
+
+  return { ok: true, teamId: team.id, teamName: team.team_name };
 }
 
 /* ?占?占?Team Detail (team_members 湲곕컲) ?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?*/

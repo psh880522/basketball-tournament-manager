@@ -1,11 +1,3 @@
-# Active Vertical Slice Ticket
-
-⚠️ 이 파일에는 반드시 **하나의 티켓만** 존재해야 한다.
-⚠️ 실행 후에는 다른 티켓으로 교체한다.
-⚠️ 티켓 본문은 원본(T-xxxx 파일)과 동일해야 한다.
-
----
-
 # Vertical Slice Ticket
 
 ## 목표
