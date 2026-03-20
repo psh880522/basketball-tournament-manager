@@ -123,7 +123,7 @@ export default function ResultEntryForm({
   function navigate(overrides: Record<string, string>) {
     startTransition(() => {
       router.push(
-        `/admin/tournaments/${tournamentId}/results?${buildParams(overrides)}`
+        `/admin/tournaments/${tournamentId}/result?${buildParams(overrides)}`
       );
     });
   }

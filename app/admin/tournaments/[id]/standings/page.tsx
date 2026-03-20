@@ -178,7 +178,7 @@ export default async function TournamentStandingsPage({
         </a>
         <span className="text-gray-300">|</span>
         <a
-          href={`/admin/tournaments/${tournamentId}/results`}
+          href={`/admin/tournaments/${tournamentId}/result`}
           className="text-blue-600 hover:underline"
         >
           경기 결과 입력

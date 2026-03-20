@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTransition } from "react";
 import Button from "@/components/ui/Button";
 import { finishTournamentAction } from "./actions";
+import { STEP_DESCRIPTIONS } from "./StepDescriptions";
 
 export type StepStatus = "done" | "active" | "pending";
 
@@ -63,6 +64,11 @@ function StepCard({
   tournamentId: string;
   finishMessages?: { finishError?: string; finishSuccess?: string };
 }) {
+  const statusLabel: Record<StepStatus, string> = {
+    done: "완료",
+    active: "진행중",
+    pending: "대기",
+  };
   const dotClass =
     step.status === "active"
       ? "bg-gray-900"
@@ -89,11 +95,16 @@ function StepCard({
           <span className={`text-sm ${weightClass} ${colorClass}`}>
             {step.label}
           </span>
-          <span className="text-xs uppercase text-gray-400">
-            {step.status}
+          <span className="text-xs text-gray-400">
+            {statusLabel[step.status]}
           </span>
         </div>
       </div>
+      {STEP_DESCRIPTIONS[step.label] ? (
+        <p className="text-xs text-gray-500">
+          {STEP_DESCRIPTIONS[step.label]}
+        </p>
+      ) : null}
       {step.actions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {step.actions.map((action) =>

@@ -7,10 +7,9 @@ type ApiResult<T> = {
 
 export type TournamentProgressState =
   | "TEAM_APPROVAL"
-  | "GROUP_STAGE_GENERATED"
-  | "MATCH_IN_PROGRESS"
-  | "STANDINGS_READY"
-  | "BRACKET_READY"
+  | "MATCH_GENERATION"
+  | "SCHEDULE"
+  | "RESULT"
   | "TOURNAMENT_FINISHED";
 
 type NextAction = {
@@ -233,14 +232,23 @@ export async function getTournamentProgressState(
 }
 
 const resolveState = (summary: ProgressSummary): TournamentProgressState => {
-  if (summary.finalCompleted) return "TOURNAMENT_FINISHED";
-  if (summary.tournamentMatches > 0) return "BRACKET_READY";
-  if (summary.standings > 0) return "STANDINGS_READY";
-  if (summary.completedGroupMatches > 0) return "MATCH_IN_PROGRESS";
-  if (summary.groups > 0 && summary.groupMatches > 0) {
-    return "GROUP_STAGE_GENERATED";
+  if (summary.tournamentStatus === "finished" || summary.finalCompleted) {
+    return "TOURNAMENT_FINISHED";
   }
-  return "TEAM_APPROVAL";
+
+  if (summary.totalTeams > 0 && summary.approvedTeams < summary.totalTeams) {
+    return "TEAM_APPROVAL";
+  }
+
+  if (summary.totalMatches === 0) {
+    return "MATCH_GENERATION";
+  }
+
+  if (summary.scheduledMatches < summary.totalMatches) {
+    return "SCHEDULE";
+  }
+
+  return "RESULT";
 };
 
 const resolveNextAction = (
@@ -257,54 +265,48 @@ const resolveNextAction = (
     };
   }
 
-  if (state === "GROUP_STAGE_GENERATED") {
+  if (state === "MATCH_GENERATION") {
+    const disabled = summary.approvedTeams < 2;
     return {
-      label: "경기 결과 입력하기",
-      url: `/admin/tournaments/${tournamentId}/matches`,
-      disabled: false,
-      reason: null,
+      label: "조/경기 생성하기",
+      url: `/admin/tournaments/${tournamentId}/bracket`,
+      disabled,
+      reason: disabled ? "승인 팀 2팀 이상 필요" : null,
     };
   }
 
-  if (state === "MATCH_IN_PROGRESS") {
+  if (state === "SCHEDULE") {
+    const disabled = summary.totalMatches === 0 || summary.courtsCount === 0;
     return {
-      label: "순위 계산하기",
-      url: `/admin/tournaments/${tournamentId}/standings`,
-      disabled: false,
-      reason: null,
+      label: "스케줄 생성하기",
+      url: `/admin/tournaments/${tournamentId}/schedule`,
+      disabled,
+      reason: summary.totalMatches === 0
+        ? "먼저 조/경기 생성을 완료하세요"
+        : summary.courtsCount === 0
+        ? "코트를 먼저 추가하세요"
+        : null,
     };
   }
 
-  if (state === "STANDINGS_READY") {
-    const isClosed = summary.tournamentStatus === "closed";
-    const hasMinimumTeams = summary.standings >= 8;
-    const isDisabled = !isClosed || !hasMinimumTeams;
+  if (state === "RESULT") {
+    const disabled = summary.totalMatches === 0;
+    const preferStandings = summary.completedMatches === summary.totalMatches;
     return {
-      label: "토너먼트 생성하기",
-      url: `/admin/tournaments/${tournamentId}/bracket/tournament`,
-      disabled: isDisabled,
-      reason: !isClosed
-        ? "대회 상태가 closed여야 합니다."
-        : hasMinimumTeams
-        ? null
-        : "토너먼트는 8팀 이상 필요합니다.",
-    };
-  }
-
-  if (state === "BRACKET_READY") {
-    return {
-      label: "다음 라운드 생성하기",
-      url: `/admin/tournaments/${tournamentId}/bracket/tournament`,
-      disabled: false,
-      reason: null,
+      label: preferStandings ? "순위 계산하기" : "결과 입력하기",
+      url: preferStandings
+        ? `/admin/tournaments/${tournamentId}/standings`
+        : `/admin/tournaments/${tournamentId}/result`,
+      disabled,
+      reason: disabled ? "경기가 없습니다" : null,
     };
   }
 
   return {
-    label: "토너먼트 종료",
+    label: "대회 종료",
     url: "",
     disabled: true,
-    reason: "토너먼트가 종료되었습니다.",
+    reason: "대회가 종료되었습니다.",
   };
 };
 

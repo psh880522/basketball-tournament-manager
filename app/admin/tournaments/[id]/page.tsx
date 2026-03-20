@@ -190,11 +190,11 @@ const buildSteps = (
     ],
   });
 
-  // 2. 조/경기 생성
+  // 2. 경기 생성
   const matchCreatedDone = totalMatches > 0;
   const matchCreatedActive = totalMatches === 0 && approvedTeams > 1;
   steps.push({
-    label: "조/경기 생성",
+    label: "경기 생성",
     status: matchCreatedDone ? "done" : matchCreatedActive ? "active" : "pending",
     actions: [
       {
@@ -209,7 +209,7 @@ const buildSteps = (
         variant: "primary",
       },
       {
-        label: "경기 목록 보기",
+        label: "경기 목록",
         href: `/admin/tournaments/${tournamentId}/matches`,
         enabled: totalMatches > 0,
         reason: totalMatches === 0 ? "생성된 경기가 없습니다" : undefined,
@@ -218,7 +218,7 @@ const buildSteps = (
     ],
   });
 
-  // 3. 스케줄 생성
+  // 3. 스케줄
   const scheduleDone = totalMatches > 0 && scheduledMatches === totalMatches;
   const scheduleActive = !scheduleDone && totalMatches > 0 && courtsCount > 0;
   const scheduleEnabled = !isFinished && totalMatches > 0 && courtsCount > 0;
@@ -230,7 +230,7 @@ const buildSteps = (
     ? "코트를 먼저 추가하세요"
     : undefined;
   steps.push({
-    label: "스케줄 생성",
+    label: "스케줄",
     status: scheduleDone ? "done" : scheduleActive ? "active" : "pending",
     actions: [
       {
@@ -250,15 +250,16 @@ const buildSteps = (
     ],
   });
 
-  // 4. 경기 결과 입력
+  // 4. 결과
   const resultsDone = totalMatches > 0 && completedMatches === totalMatches;
   const resultsActive = totalMatches > 0 && completedMatches < totalMatches;
+  const allMatchesDone = totalMatches > 0 && completedMatches === totalMatches;
   steps.push({
-    label: "경기 결과 입력",
+    label: "결과",
     status: resultsDone ? "done" : resultsActive ? "active" : "pending",
     actions: [
       {
-        label: "결과 입력",
+        label: "결과 관리",
         href: `/admin/tournaments/${tournamentId}/result`,
         enabled: !isFinished && totalMatches > 0,
         reason: isFinished
@@ -271,57 +272,7 @@ const buildSteps = (
     ],
   });
 
-  // 5. 순위 확정
-  const standingsDone = finalExists;
-  const standingsActive = standings > 0 && !finalExists;
-  const allMatchesDone = totalMatches > 0 && completedMatches === totalMatches;
-  steps.push({
-    label: "순위 확정",
-    status: standingsDone ? "done" : standingsActive ? "active" : "pending",
-    actions: [
-      {
-        label: "순위 계산",
-        href: `/admin/tournaments/${tournamentId}/standings`,
-        enabled: !isFinished && allMatchesDone,
-        reason: isFinished
-          ? "종료된 대회"
-          : !allMatchesDone
-          ? "모든 경기 완료 필요"
-          : undefined,
-        variant: "primary",
-      },
-    ],
-  });
-
-  // 6. 토너먼트 생성
-  const bracketDone = finalExists;
-  const bracketActive = standings > 0 && !finalExists;
-  steps.push({
-    label: "토너먼트 생성",
-    status: bracketDone ? "done" : bracketActive ? "active" : "pending",
-    actions: [
-      {
-        label: "토너먼트 생성",
-        href: `/admin/tournaments/${tournamentId}/bracket/tournament`,
-        enabled: !isFinished && standings > 0,
-        reason: isFinished
-          ? "종료된 대회"
-          : standings === 0
-          ? "순위 확정 필요"
-          : undefined,
-        variant: "primary",
-      },
-      {
-        label: "브라켓 보기",
-        href: `/tournament/${tournamentId}`,
-        enabled: finalExists,
-        reason: !finalExists ? "토너먼트 미생성" : undefined,
-        variant: "secondary",
-      },
-    ],
-  });
-
-  // 7. 종료
+  // 5. 종료
   steps.push({
     label: "종료",
     status: tournamentStatus === "finished" ? "done" : "pending",
@@ -401,58 +352,125 @@ async function TournamentDashboardContent({
   });
   const currentStage = resolveCurrentStage(steps);
   const isFinished = summary.tournamentStatus === "finished";
+  const completedTournamentMatches = Math.max(
+    summary.completedMatches - summary.completedGroupMatches,
+    0
+  );
 
-  const kpis = [
+  const readinessKpis = [
     {
       label: "승인 팀",
       value: `${summary.approvedTeams}/${summary.totalTeams}`,
       subtext: "승인/전체",
     },
     {
-      label: "완료 경기",
-      value: `${summary.completedMatches}/${summary.totalMatches}`,
-      subtext: "완료/전체",
-    },
-    {
-      label: "토너먼트",
-      value: summary.finalExists ? "생성됨" : "미생성",
-      subtext: "final 기준",
-    },
-    {
-      label: "전체 경기",
-      value: `${summary.totalMatches}`,
-      subtext: "총 경기 수",
-    },
-    {
       label: "승인 대기",
       value: `${Math.max(summary.totalTeams - summary.approvedTeams, 0)}`,
       subtext: "대기 팀",
+    },
+    {
+      label: "코트 수",
+      value: `${summary.courtsCount}`,
+      subtext: "등록된 코트",
+    },
+    {
+      label: "스케줄 배정",
+      value: `${summary.scheduledMatches}/${summary.totalMatches}`,
+      subtext: "배정/전체",
+    },
+  ];
+
+  const progressKpis = [
+    {
+      label: "리그 경기",
+      value: `${summary.completedGroupMatches}/${summary.groupMatches}`,
+      subtext: "완료/전체",
+    },
+    {
+      label: "토너먼트 경기",
+      value: `${completedTournamentMatches}/${summary.tournamentMatches}`,
+      subtext: "완료/전체",
+    },
+    {
+      label: "진행/전체",
+      value: `${summary.completedMatches}/${summary.totalMatches}`,
+      subtext: "완료/전체",
     },
   ];
 
   return (
     <div className="space-y-6">
       <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              {progress.data.tournamentName}
-            </h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold">
+                {progress.data.tournamentName}
+              </h1>
+              <Badge className={statusBadgeClasses[summary.tournamentStatus]}>
+                {statusLabels[summary.tournamentStatus]}
+              </Badge>
+            </div>
             <p className="text-sm text-gray-600">현재 단계: {currentStage}</p>
           </div>
-          <Badge className={statusBadgeClasses[summary.tournamentStatus]}>
-            {statusLabels[summary.tournamentStatus]}
-          </Badge>
+          <Card variant="highlight" className="min-w-[240px] space-y-2">
+            <p className="text-xs font-semibold text-amber-800">다음 행동</p>
+            <p className="text-base font-semibold text-gray-900">
+              {progress.data.nextAction.label}
+            </p>
+            {progress.data.nextAction.disabled || !progress.data.nextAction.url ? (
+              <Button variant="secondary" disabled>
+                이동
+              </Button>
+            ) : (
+              <Link href={progress.data.nextAction.url}>
+                <Button>이동</Button>
+              </Link>
+            )}
+            {progress.data.nextAction.reason ? (
+              <p className="text-xs text-gray-500">
+                {progress.data.nextAction.reason}
+              </p>
+            ) : null}
+          </Card>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {kpis.map((item) => (
-            <Card key={item.label} className="space-y-1">
-              <p className="text-xs text-gray-500">{item.label}</p>
-              <p className="text-xl font-semibold text-gray-900">{item.value}</p>
-              <p className="text-xs text-gray-400">{item.subtext}</p>
-            </Card>
-          ))}
+        <div className="grid gap-3 md:grid-cols-2">
+          <Card className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">운영 준비도</p>
+              <p className="text-xs text-gray-500">운영을 시작하기 위한 기준</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {readinessKpis.map((item) => (
+                <Card key={item.label} variant="muted" className="space-y-1">
+                  <p className="text-xs text-gray-500">{item.label}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {item.value}
+                  </p>
+                  <p className="text-xs text-gray-400">{item.subtext}</p>
+                </Card>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">진행 현황</p>
+              <p className="text-xs text-gray-500">경기 진행 및 토너먼트 상태</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {progressKpis.map((item) => (
+                <Card key={item.label} variant="muted" className="space-y-1">
+                  <p className="text-xs text-gray-500">{item.label}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {item.value}
+                  </p>
+                  <p className="text-xs text-gray-400">{item.subtext}</p>
+                </Card>
+              ))}
+            </div>
+          </Card>
         </div>
       </section>
 
@@ -469,10 +487,16 @@ async function TournamentDashboardContent({
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">⚠ 운영 위험 작업</h2>
-        <Card className="space-y-4 border-amber-200 bg-amber-50">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">운영 위험 작업</h2>
+          <Badge variant="warning">주의</Badge>
+        </div>
+        <Card variant="muted" className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-semibold">상태 변경</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold">상태 변경</p>
+              <Badge variant="warning">중요</Badge>
+            </div>
             <form action={changeStatusAction} className="space-y-2">
               <input type="hidden" name="tournamentId" value={tournamentId} />
               <div className="flex flex-wrap items-center gap-2">
@@ -511,7 +535,10 @@ async function TournamentDashboardContent({
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-semibold">대회 종료</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold">대회 종료</p>
+              <Badge variant="danger">위험</Badge>
+            </div>
             {messages.finishError ? (
               <p className="text-sm text-red-600">{messages.finishError}</p>
             ) : null}
@@ -535,7 +562,10 @@ async function TournamentDashboardContent({
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-semibold">대회 삭제</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold">대회 삭제</p>
+              <Badge variant="danger">위험</Badge>
+            </div>
             <form action={softDeleteAction} className="space-y-2">
               <input type="hidden" name="tournamentId" value={tournamentId} />
               <label className="flex items-center gap-2 text-xs text-gray-600">

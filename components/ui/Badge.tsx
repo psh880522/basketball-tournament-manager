@@ -1,10 +1,23 @@
 import type { HTMLAttributes } from "react";
 
-type BadgeProps = HTMLAttributes<HTMLSpanElement>;
+type BadgeVariant = "default" | "success" | "warning" | "danger" | "info";
 
-export default function Badge({ className, ...props }: BadgeProps) {
+type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
+  variant?: BadgeVariant;
+};
+
+const variantClasses: Record<BadgeVariant, string> = {
+  default: "bg-slate-100 text-slate-700",
+  success: "bg-emerald-100 text-emerald-700",
+  warning: "bg-amber-100 text-amber-800",
+  danger: "bg-rose-100 text-rose-700",
+  info: "bg-sky-100 text-sky-700",
+};
+
+export default function Badge({ className, variant = "default", ...props }: BadgeProps) {
   const classes = [
-    "inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700",
+    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+    variantClasses[variant],
     className,
   ]
     .filter(Boolean)

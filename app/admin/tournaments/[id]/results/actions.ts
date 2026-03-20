@@ -36,7 +36,7 @@ export async function saveMatchScoreAction(
   });
   if (!result.ok) return result;
 
-  revalidatePath(`/admin/tournaments/${tournamentId}/results`);
+  revalidatePath(`/admin/tournaments/${tournamentId}/result`);
   return { ok: true };
 }
 
@@ -70,6 +70,6 @@ export async function completeMatchAction(
   });
   if (!result.ok) return result;
 
-  revalidatePath(`/admin/tournaments/${tournamentId}/results`);
+  revalidatePath(`/admin/tournaments/${tournamentId}/result`);
   return { ok: true };
 }
