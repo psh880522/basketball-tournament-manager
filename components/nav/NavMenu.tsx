@@ -21,7 +21,7 @@ export default function NavMenu({ items, isLoggedIn }: NavMenuProps) {
 
   const linkClass = (href: string) => {
     const active = pathname === href || pathname.startsWith(href + "/");
-    return `text-sm ${active ? "font-semibold underline underline-offset-4" : "text-gray-600 hover:text-gray-900"}`;
+    return `text-sm ${active ? "font-semibold text-slate-900 underline underline-offset-4" : "text-slate-600 hover:text-slate-900"}`;
   };
 
   return (
@@ -40,7 +40,7 @@ export default function NavMenu({ items, isLoggedIn }: NavMenuProps) {
           <form action={logoutAction}>
             <button
               type="submit"
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
             >
               로그아웃
             </button>

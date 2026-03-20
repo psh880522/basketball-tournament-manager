@@ -259,7 +259,7 @@ const buildSteps = (
     actions: [
       {
         label: "결과 입력",
-        href: `/admin/tournaments/${tournamentId}/results`,
+        href: `/admin/tournaments/${tournamentId}/result`,
         enabled: !isFinished && totalMatches > 0,
         reason: isFinished
           ? "종료된 대회"

@@ -4,14 +4,24 @@ import { generateSchedule, bulkSaveSchedule } from "@/lib/api/schedule";
 import { createScheduleSlot } from "@/lib/api/scheduleSlots";
 import {
   clearSchedule,
+  clearScheduleSync,
   generateScheduleTimes,
+  regenerateScheduleBoard,
+  resetScheduleBoard,
   saveSchedule,
+  syncScheduleToMatches,
+  validateScheduleBeforeSync,
   seedBreakSlots,
   seedGroupMatchSlots,
   seedTournamentMatchSlots,
   reorderGroupSlots,
   reorderTournamentSlots,
   updateSlotCourt,
+  generateScheduleSlots,
+  clearGeneratedScheduleSlots,
+  swapSlotMatchAssignments,
+  assignMatchToEmptySlot,
+  unassignMatchFromSlot,
 } from "@/lib/api/schedule-slots";
 import { revalidatePath } from "next/cache";
 
@@ -198,6 +208,7 @@ export async function updateSlotCourtAction(
   if (!slotId) return { ok: false, error: "슬롯 정보가 없습니다." };
 
   const result = await updateSlotCourt({
+    tournamentId,
     slotId,
     courtId,
   });
@@ -233,6 +244,96 @@ export async function generateScheduleTimesAction(
   return result;
 }
 
+export async function generateScheduleSlotsAction(
+  tournamentId: string,
+  input: {
+    startTime: string;
+    matchDurationMinutes: number;
+    breakDurationMinutes: number;
+  }
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+  if (!input.startTime) return { ok: false, error: "시작 시간을 입력하세요." };
+  if (!input.matchDurationMinutes || input.matchDurationMinutes <= 0) {
+    return { ok: false, error: "경기 시간은 1분 이상이어야 합니다." };
+  }
+  if (input.breakDurationMinutes < 0) {
+    return { ok: false, error: "휴식 시간은 0분 이상이어야 합니다." };
+  }
+
+  const result = await generateScheduleSlots({
+    tournamentId,
+    startTime: input.startTime,
+    matchDurationMinutes: input.matchDurationMinutes,
+    breakDurationMinutes: input.breakDurationMinutes,
+  });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function regenerateScheduleBoardAction(
+  tournamentId: string,
+  input: {
+    startTime: string;
+    matchDurationMinutes: number;
+    breakDurationMinutes: number;
+  }
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+  if (!input.startTime) return { ok: false, error: "시작 시간을 입력하세요." };
+  if (!input.matchDurationMinutes || input.matchDurationMinutes <= 0) {
+    return { ok: false, error: "경기 시간은 1분 이상이어야 합니다." };
+  }
+  if (input.breakDurationMinutes < 0) {
+    return { ok: false, error: "휴식 시간은 0분 이상이어야 합니다." };
+  }
+
+  const result = await regenerateScheduleBoard({
+    tournamentId,
+    startTime: input.startTime,
+    matchDurationMinutes: input.matchDurationMinutes,
+    breakDurationMinutes: input.breakDurationMinutes,
+  });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function clearGeneratedScheduleSlotsAction(
+  tournamentId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await clearGeneratedScheduleSlots({ tournamentId });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function resetScheduleBoardAction(
+  tournamentId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await resetScheduleBoard(tournamentId);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
 export async function saveScheduleAction(
   tournamentId: string
 ): Promise<ActionResult> {
@@ -247,12 +348,97 @@ export async function saveScheduleAction(
   return result;
 }
 
+export async function syncScheduleToMatchesAction(
+  tournamentId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await syncScheduleToMatches(tournamentId);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function validateScheduleBeforeSyncAction(tournamentId: string) {
+  return validateScheduleBeforeSync(tournamentId);
+}
+
 export async function clearScheduleAction(
   tournamentId: string
 ): Promise<ActionResult> {
   if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
 
   const result = await clearSchedule(tournamentId);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function clearScheduleSyncAction(
+  tournamentId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await clearScheduleSync(tournamentId);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function swapSlotMatchAssignmentsAction(
+  tournamentId: string,
+  sourceSlotId: string,
+  targetSlotId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await swapSlotMatchAssignments({
+    sourceSlotId,
+    targetSlotId,
+  });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function assignMatchToEmptySlotAction(
+  tournamentId: string,
+  slotId: string,
+  matchId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await assignMatchToEmptySlot({
+    slotId,
+    matchId,
+  });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function unassignMatchFromSlotAction(
+  tournamentId: string,
+  slotId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await unassignMatchFromSlot({ slotId });
 
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);

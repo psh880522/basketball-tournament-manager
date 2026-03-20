@@ -2,13 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getCourtsByTournament } from "@/lib/api/courts";
-import { getScheduleSlots, getDivisionGroupsByTournament } from "@/lib/api/schedule-slots";
-import { getDivisionsByTournament } from "@/lib/api/divisions";
+import { getScheduleSlots } from "@/lib/api/schedule-slots";
+import { getStandingsByDivision } from "@/lib/api/standings";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import ScheduleSlotsBoard from "./components/ScheduleSlotsBoard";
-import ScheduleTimeActions from "./components/ScheduleTimeActions";
-import ScheduleBreakActions from "./components/ScheduleBreakActions";
+import ScheduleGenerateActions from "./components/ScheduleGenerateActions";
 import ScheduleSyncActions from "./components/ScheduleSyncActions";
 
 type PageProps = {
@@ -46,11 +45,46 @@ export default async function SchedulePage({ params }: PageProps) {
 
   const { id } = await params;
 
+  const buildDivisionRanks = async (
+    slotBoard: Awaited<ReturnType<typeof getScheduleSlots>>
+  ) => {
+    const divisionIds = new Set<string>();
+    (slotBoard.data ?? []).forEach((courtGroup) => {
+      courtGroup.divisions.forEach((divisionGroup) => {
+        if (divisionGroup.division?.id) {
+          divisionIds.add(divisionGroup.division.id);
+        }
+      });
+    });
+
+    const standingsResults = await Promise.all(
+      [...divisionIds].map(async (divisionId) => ({
+        divisionId,
+        result: await getStandingsByDivision(divisionId),
+      }))
+    );
+
+    const ranks: Record<string, Record<string, number>> = {};
+    standingsResults.forEach(({ divisionId, result }) => {
+      if (!result.data) return;
+      const map: Record<string, number> = {};
+      result.data.forEach((row) => {
+        if (row.team_id && row.rank) {
+          map[row.team_id] = row.rank;
+        }
+      });
+      ranks[divisionId] = map;
+    });
+
+    return ranks;
+  };
+
   if (userResult.role !== "organizer") {
     const [courtsResult, slotBoard] = await Promise.all([
       getCourtsByTournament(id),
       getScheduleSlots(id),
     ]);
+    const divisionRanks = await buildDivisionRanks(slotBoard);
 
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -72,6 +106,7 @@ export default async function SchedulePage({ params }: PageProps) {
               error={slotBoard.error}
               courts={courtsResult.data ?? []}
               tournamentId={id}
+              divisionRanks={divisionRanks}
               isEditable={false}
             />
           </section>
@@ -80,13 +115,11 @@ export default async function SchedulePage({ params }: PageProps) {
     );
   }
 
-  const [courtsResult, slotBoard, divisionsResult, groupsResult] =
-    await Promise.all([
-      getCourtsByTournament(id),
-      getScheduleSlots(id),
-      getDivisionsByTournament(id),
-      getDivisionGroupsByTournament(id),
-    ]);
+  const [courtsResult, slotBoard] = await Promise.all([
+    getCourtsByTournament(id),
+    getScheduleSlots(id),
+  ]);
+  const divisionRanks = await buildDivisionRanks(slotBoard);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -102,37 +135,20 @@ export default async function SchedulePage({ params }: PageProps) {
         </header>
 
         <section className="space-y-3">
+          <ScheduleGenerateActions tournamentId={id} />
           <ScheduleSyncActions tournamentId={id} />
-        </section>
-
-        <section className="space-y-3">
-          {divisionsResult.error || groupsResult.error ? (
-            <Card className="text-sm text-red-600">
-              {divisionsResult.error ?? groupsResult.error}
-            </Card>
-          ) : (
-            <ScheduleBreakActions
-              tournamentId={id}
-              divisions={divisionsResult.data ?? []}
-              groups={groupsResult.data ?? []}
-            />
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <ScheduleTimeActions tournamentId={id} />
         </section>
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">스케줄 슬롯 조회</h2>
-            <span className="text-xs text-gray-400">편집 가능</span>
           </div>
           <ScheduleSlotsBoard
             slots={slotBoard.data}
             error={slotBoard.error}
             courts={courtsResult.data ?? []}
             tournamentId={id}
+            divisionRanks={divisionRanks}
             isEditable
           />
         </section>

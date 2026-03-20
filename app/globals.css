@@ -1,7 +1,24 @@
 @import "tailwindcss";
 
+:root {
+  --ui-bg: #f6f7fb;
+  --ui-surface: #ffffff;
+  --ui-surface-muted: #f1f5f9;
+  --ui-border: #e2e8f0;
+  --ui-text: #0f172a;
+  --ui-muted: #64748b;
+  --ui-accent: #f59e0b;
+  --ui-accent-strong: #f97316;
+  --ui-success: #10b981;
+  --ui-warning: #f43f5e;
+}
+
 body {
-  background: #ffffff;
-  color: #0f172a;
-  font-family: "Segoe UI", sans-serif;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  min-height: 100vh;
+}
+
+main {
+  min-height: 100vh;
 }

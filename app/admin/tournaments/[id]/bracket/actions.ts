@@ -7,6 +7,8 @@ import {
   createGroupTeams,
   createGroups,
   createMatches,
+  createLeagueMatches,
+  createTournamentMatches,
   getApprovedTeamsByDivision,
   getDivisionById,
   getTournamentStatus,
@@ -214,6 +216,34 @@ export async function seedTournamentSlotsFromBracketAction(input: {
 
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${input.tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function createLeagueMatchesAction(input: {
+  tournamentId: string;
+  divisionId: string;
+  groupSize: number;
+}): Promise<ActionResult> {
+  const result = await createLeagueMatches(input);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${input.tournamentId}/bracket`);
+  }
+
+  return result;
+}
+
+export async function createTournamentMatchesAction(input: {
+  tournamentId: string;
+  divisionId: string;
+  tournamentSize: number;
+}): Promise<ActionResult> {
+  const result = await createTournamentMatches(input);
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${input.tournamentId}/bracket`);
   }
 
   return result;

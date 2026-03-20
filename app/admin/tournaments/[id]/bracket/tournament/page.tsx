@@ -76,8 +76,40 @@ async function TournamentBracketContent({
 
   const standingsRows = standings.data ?? [];
   const matchRows = matches.data ?? [];
+  const rankByTeamId = new Map<string, number>();
+  standingsRows.forEach((row) => {
+    if (!row.team_id || !row.rank) return;
+    rankByTeamId.set(row.team_id, row.rank);
+  });
+
+  const roundLabels: Record<string, string> = {
+    round_of_16: "16강",
+    quarterfinal: "8강",
+    semifinal: "4강",
+    third_place: "3,4위전",
+    final: "결승",
+  };
+
+  const buildSeedLabel = (match: (typeof matchRows)[number]) => {
+    const teamAId = match.team_a?.id ?? null;
+    const teamBId = match.team_b?.id ?? null;
+    const rankA = teamAId ? rankByTeamId.get(teamAId) ?? null : null;
+    const rankB = teamBId ? rankByTeamId.get(teamBId) ?? null : null;
+    if (!rankA || !rankB) return null;
+    return `${rankA}위 vs ${rankB}위`;
+  };
+  const renderTournamentMatch = (match: (typeof matchRows)[number]) => {
+    const teamA = match.team_a?.team_name ?? "TBD";
+    const teamB = match.team_b?.team_name ?? "TBD";
+    const roundLabel = match.round ? roundLabels[match.round] ?? "토너먼트" : "토너먼트";
+    const seedLabel = buildSeedLabel(match) ?? "TBD vs TBD";
+    const scoreLabel = "-:-";
+    return `[${roundLabel}] ${seedLabel} (${scoreLabel})`;
+  };
+  const roundOf16Matches = matchRows.filter((match) => match.round === "round_of_16");
   const quarterfinalMatches = matchRows.filter((match) => match.round === "quarterfinal");
   const semifinalMatches = matchRows.filter((match) => match.round === "semifinal");
+  const thirdPlaceMatches = matchRows.filter((match) => match.round === "third_place");
   const finalMatches = matchRows.filter((match) => match.round === "final");
   const currentRound = finalMatches.length > 0
     ? "final"
@@ -85,6 +117,8 @@ async function TournamentBracketContent({
     ? "semifinal"
     : quarterfinalMatches.length > 0
     ? "quarterfinal"
+    : roundOf16Matches.length > 0
+    ? "round_of_16"
     : null;
   const finalCompleted =
     finalMatches.length > 0 && finalMatches.every((match) => match.status === "completed");
@@ -148,13 +182,25 @@ async function TournamentBracketContent({
         <p style={{ marginTop: 16 }}>생성된 토너먼트 경기가 없습니다.</p>
       ) : (
         <div style={{ marginTop: 16 }}>
+          {roundOf16Matches.length > 0 ? (
+            <section style={{ marginBottom: 16 }}>
+              <h3>Round of 16</h3>
+              <ul>
+                {roundOf16Matches.map((match) => (
+                  <li key={match.id} style={{ marginBottom: 8 }}>
+                    {renderTournamentMatch(match)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {quarterfinalMatches.length > 0 ? (
             <section style={{ marginBottom: 16 }}>
               <h3>Quarterfinal</h3>
               <ul>
                 {quarterfinalMatches.map((match) => (
                   <li key={match.id} style={{ marginBottom: 8 }}>
-                    {match.team_a?.team_name ?? "TBD"} vs {match.team_b?.team_name ?? "TBD"}
+                    {renderTournamentMatch(match)}
                   </li>
                 ))}
               </ul>
@@ -166,7 +212,19 @@ async function TournamentBracketContent({
               <ul>
                 {semifinalMatches.map((match) => (
                   <li key={match.id} style={{ marginBottom: 8 }}>
-                    {match.team_a?.team_name ?? "TBD"} vs {match.team_b?.team_name ?? "TBD"}
+                    {renderTournamentMatch(match)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {thirdPlaceMatches.length > 0 ? (
+            <section style={{ marginBottom: 16 }}>
+              <h3>3,4위전</h3>
+              <ul>
+                {thirdPlaceMatches.map((match) => (
+                  <li key={match.id} style={{ marginBottom: 8 }}>
+                    {renderTournamentMatch(match)}
                   </li>
                 ))}
               </ul>
@@ -178,7 +236,7 @@ async function TournamentBracketContent({
               <ul>
                 {finalMatches.map((match) => (
                   <li key={match.id} style={{ marginBottom: 8 }}>
-                    {match.team_a?.team_name ?? "TBD"} vs {match.team_b?.team_name ?? "TBD"}
+                    {renderTournamentMatch(match)}
                   </li>
                 ))}
               </ul>

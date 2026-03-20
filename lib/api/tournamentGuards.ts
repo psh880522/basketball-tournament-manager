@@ -181,8 +181,7 @@ export async function assertTournamentStepAllowed(
       .from("matches")
       .select("id", { count: "exact", head: true })
       .eq("division_id", input.divisionId)
-      .is("group_id", null)
-      .eq("round", "quarterfinal");
+      .is("group_id", null);
 
     if (bracketMatchesResult.error) {
       return { ok: false, error: bracketMatchesResult.error.message };
@@ -240,7 +239,11 @@ export async function assertTournamentStepAllowed(
     }
 
     const nextRound =
-      input.currentRound === "quarterfinal" ? "semifinal" : "final";
+      input.currentRound === "round_of_16"
+        ? "quarterfinal"
+        : input.currentRound === "quarterfinal"
+        ? "semifinal"
+        : "final";
 
     const nextRoundResult = await supabase
       .from("matches")

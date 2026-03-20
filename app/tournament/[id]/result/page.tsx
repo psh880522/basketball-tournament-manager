@@ -1,7 +1,11 @@
 import { Suspense } from "react";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getTournamentBracketMatches } from "@/lib/api/matches";
-import { getDivisionsWithGroups, getStandingsByGroup } from "@/lib/api/standings";
+import {
+  getDivisionsWithGroups,
+  getStandingsByDivision,
+  getStandingsByGroup,
+} from "@/lib/api/standings";
 import { getPublicTournamentById } from "@/lib/api/tournaments";
 
 type PageProps = {
@@ -13,6 +17,8 @@ type RoundGroup = {
   label: string;
   matches: {
     id: string;
+    division_id: string;
+    round: string | null;
     status: string;
     score_a: number | null;
     score_b: number | null;
@@ -22,12 +28,14 @@ type RoundGroup = {
 };
 
 const roundLabels: Record<string, string> = {
+  round_of_16: "16강",
   quarterfinal: "8강",
   semifinal: "4강",
+  third_place: "3,4위전",
   final: "결승",
 };
 
-const roundOrder = ["quarterfinal", "semifinal", "final"];
+const roundOrder = ["round_of_16", "quarterfinal", "semifinal", "third_place", "final"];
 
 const formatDateRange = (start: string | null, end: string | null) => {
   const startLabel = start || "TBD";
@@ -88,6 +96,8 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
     }
     roundGroups.get(roundKey)?.matches.push({
       id: match.id,
+      division_id: match.division_id,
+      round: match.round,
       status: match.status,
       score_a: match.score_a,
       score_b: match.score_b,
@@ -106,6 +116,32 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
   });
 
   const divisions = divisionsResult.data ?? [];
+  const divisionStandings = await Promise.all(
+    divisions.map(async (division) => {
+      const standingsResult = await getStandingsByDivision(division.id);
+      return {
+        divisionId: division.id,
+        standings: standingsResult.data ?? [],
+        error: standingsResult.error,
+      };
+    })
+  );
+
+  const divisionStandingsError = divisionStandings.find((entry) => entry.error);
+  if (divisionStandingsError?.error) {
+    return <p style={{ color: "crimson" }}>순위 정보를 불러오지 못했습니다.</p>;
+  }
+
+  const rankByDivision = new Map<string, Map<string, number>>();
+  divisionStandings.forEach((entry) => {
+    const map = new Map<string, number>();
+    entry.standings.forEach((row) => {
+      if (row.team_id && row.rank) {
+        map.set(row.team_id, row.rank);
+      }
+    });
+    rankByDivision.set(entry.divisionId, map);
+  });
   const standingsByGroup = await Promise.all(
     divisions.flatMap((division) =>
       (division.groups ?? []).map(async (group) => {
@@ -187,10 +223,23 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
                     {round.matches.map((match) => {
                       const teamA = match.team_a?.team_name ?? "TBD";
                       const teamB = match.team_b?.team_name ?? "TBD";
+                      const divisionRanks = rankByDivision.get(match.division_id);
+                      const teamARank = match.team_a?.id
+                        ? divisionRanks?.get(match.team_a.id) ?? null
+                        : null;
+                      const teamBRank = match.team_b?.id
+                        ? divisionRanks?.get(match.team_b.id) ?? null
+                        : null;
+                      const seedLabel = `${teamARank ? `${teamARank}위` : "TBD"} vs ${
+                        teamBRank ? `${teamBRank}위` : "TBD"
+                      }`;
+                      const roundLabel = match.round
+                        ? roundLabels[match.round] ?? "기타"
+                        : "기타";
                       const scoreLabel =
                         match.score_a !== null && match.score_b !== null
-                          ? `${match.score_a} : ${match.score_b}`
-                          : "-";
+                          ? `${match.score_a}:${match.score_b}`
+                          : "-:-";
                       return (
                         <div
                           key={match.id}
@@ -201,7 +250,7 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
                           }}
                         >
                           <strong>
-                            {teamA} vs {teamB}
+                            [토너먼트] {teamA} vs {teamB} ({scoreLabel}) -&gt; [{roundLabel}] {seedLabel} ({scoreLabel})
                           </strong>
                           <div style={{ marginTop: 6, color: "#4b5563" }}>
                             점수: {scoreLabel}

@@ -25,9 +25,9 @@ export default async function GlobalHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/85 backdrop-blur">
       <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="text-base font-bold tracking-tight">
+        <Link href="/" className="text-base font-bold tracking-tight text-slate-900">
           🏀 Basketball TM
         </Link>
 

@@ -3,7 +3,10 @@ import type { HTMLAttributes } from "react";
 type CardProps = HTMLAttributes<HTMLDivElement>;
 
 export default function Card({ className, ...props }: CardProps) {
-  const classes = ["rounded-xl border bg-white p-4 shadow-sm", className]
+  const classes = [
+    "rounded-xl border border-slate-200 bg-white p-5 shadow-sm",
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
 

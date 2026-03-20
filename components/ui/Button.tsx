@@ -7,12 +7,12 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const baseClasses =
-  "rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:opacity-50";
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-black text-white hover:opacity-90",
-  secondary: "border border-gray-300 hover:bg-gray-50",
-  ghost: "px-3 py-2 hover:bg-gray-50",
+  primary: "bg-amber-400 text-slate-900 hover:bg-amber-300",
+  secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+  ghost: "px-3 py-2 text-slate-600 hover:bg-slate-100",
 };
 
 export default function Button({

@@ -1,397 +1,333 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import type { BracketGenerationSummary } from "@/lib/api/bracket";
 import {
-  updateGroupSizeAction,
-  generateDivisionMatches,
-  previewDivisionAction,
-  seedGroupSlotsFromBracketAction,
-  seedTournamentSlotsFromBracketAction,
+  createLeagueMatchesAction,
+  createTournamentMatchesAction,
 } from "./actions";
-import type { PreviewResult } from "@/lib/api/bracketPreview";
-
-type DivisionStat = {
-  id: string;
-  name: string;
-  group_size: number;
-  sort_order: number;
-  approvedCount: number;
-  matchCount: number;
-};
-
-type Message = { tone: "success" | "error"; text: string };
 
 type Props = {
   tournamentId: string;
-  divisions: DivisionStat[];
+  summary: BracketGenerationSummary;
 };
 
-/* ── Preview Panel ── */
+type Message = { tone: "success" | "error"; text: string } | null;
 
-type PreviewData = Extract<PreviewResult, { ok: true }>;
+export function BracketConsoleForm({ tournamentId, summary }: Props) {
+  const divisions = summary.divisions;
+  const [leagueDivisionId, setLeagueDivisionId] = useState("");
+  const [groupSize, setGroupSize] = useState("");
+  const [leagueMsg, setLeagueMsg] = useState<Message>(null);
+  const [isLeaguePending, startLeagueTransition] = useTransition();
 
-function PreviewPanel({
-  data,
-  onClose,
-}: {
-  data: PreviewData;
-  onClose: () => void;
-}) {
+  const [tournamentDivisionId, setTournamentDivisionId] = useState("");
+  const [tournamentSize, setTournamentSize] = useState("");
+  const [tournamentMsg, setTournamentMsg] = useState<Message>(null);
+  const [isTournamentPending, startTournamentTransition] = useTransition();
+
+  const leagueDivision = useMemo(
+    () => divisions.find((d) => d.id === leagueDivisionId) ?? null,
+    [divisions, leagueDivisionId]
+  );
+  const tournamentDivision = useMemo(
+    () => divisions.find((d) => d.id === tournamentDivisionId) ?? null,
+    [divisions, tournamentDivisionId]
+  );
+
+  if (divisions.length === 0) {
+    return <p className="text-gray-500">등록된 디비전이 없습니다.</p>;
+  }
+
   return (
-    <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h4 className="font-semibold text-blue-800">미리보기</h4>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          닫기
-        </button>
-      </div>
-
-      {/* 요약 */}
-      <div className="mb-3 grid grid-cols-4 gap-2 text-sm">
-        <div className="rounded bg-white px-3 py-2 text-center">
-          <div className="text-gray-500">승인 팀</div>
-          <div className="text-lg font-bold">{data.totals.teamCount}</div>
-        </div>
-        <div className="rounded bg-white px-3 py-2 text-center">
-          <div className="text-gray-500">그룹 크기</div>
-          <div className="text-lg font-bold">{data.division.groupSize}</div>
-        </div>
-        <div className="rounded bg-white px-3 py-2 text-center">
-          <div className="text-gray-500">조 개수</div>
-          <div className="text-lg font-bold">{data.totals.groupCount}</div>
-        </div>
-        <div className="rounded bg-white px-3 py-2 text-center">
-          <div className="text-gray-500">경기 수</div>
-          <div className="text-lg font-bold">{data.totals.matchCount}</div>
-        </div>
-      </div>
-
-      {/* 경고 */}
-      {data.warnings.length > 0 && (
-        <div className="mb-3 rounded border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
-          {data.warnings.map((w, i) => (
-            <p key={i}>{w}</p>
-          ))}
-        </div>
-      )}
-
-      {/* 조 편성 */}
-      <div className="space-y-2">
-        {data.groupsPreview.map((g) => (
-          <div key={g.groupIndex} className="rounded bg-white px-3 py-2">
-            <div className="mb-1 flex items-center justify-between text-sm font-medium">
-              <span>{g.groupName}</span>
-              <span className="text-gray-500">{g.matchCount}경기</span>
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h1 className="text-2xl font-bold">조/경기 생성 콘솔</h1>
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-gray-500">대회명</p>
+              <p className="text-lg font-semibold text-gray-800">
+                {summary.tournamentName}
+              </p>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {g.teams.map((t) => (
-                <span
-                  key={t.teamId}
-                  className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
-                >
-                  {t.teamName}
-                </span>
-              ))}
+            <div className="text-sm text-gray-500">
+              디비전 {divisions.length}
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── Main Form ── */
-
-export default function BracketConsoleForm({
-  tournamentId,
-  divisions,
-}: Props) {
-  const [groupSizes, setGroupSizes] = useState<Record<string, number>>(
-    Object.fromEntries(divisions.map((d) => [d.id, d.group_size]))
-  );
-  const [messages, setMessages] = useState<Record<string, Message | null>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [confirmOverwrite, setConfirmOverwrite] = useState<
-    Record<string, boolean>
-  >({});
-  const [assignTournament, setAssignTournament] = useState<
-    Record<string, boolean>
-  >({});
-  const [previews, setPreviews] = useState<Record<string, PreviewData | null>>(
-    {}
-  );
-  const [previewingId, setPreviewingId] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const setMsg = (id: string, tone: Message["tone"], text: string) =>
-    setMessages((prev) => ({ ...prev, [id]: { tone, text } }));
-  const clearMsg = (id: string) =>
-    setMessages((prev) => ({ ...prev, [id]: null }));
-
-  /* ── group_size 저장 ── */
-  const handleSaveGroupSize = (divisionId: string) => {
-    const size = groupSizes[divisionId];
-    if (!size || size < 2) {
-      setMsg(divisionId, "error", "그룹 크기는 2 이상이어야 합니다.");
-      return;
-    }
-    setSavingId(divisionId);
-    clearMsg(divisionId);
-    startTransition(async () => {
-      const result = await updateGroupSizeAction(divisionId, size);
-      if (result.ok) {
-        setMsg(divisionId, "success", "그룹 크기가 저장되었습니다.");
-      } else {
-        setMsg(divisionId, "error", result.error);
-      }
-      setSavingId(null);
-    });
-  };
-
-  /* ── 경기 생성 ── */
-  const handleGenerate = (divisionId: string, overwrite: boolean) => {
-    setGeneratingId(divisionId);
-    clearMsg(divisionId);
-    startTransition(async () => {
-      const result = await generateDivisionMatches({
-        tournamentId,
-        divisionId,
-        overwrite,
-      });
-      // redirect 성공 시 여기에 도달하지 않음
-      if (!result.ok) {
-        setMsg(divisionId, "error", result.error);
-      }
-      setGeneratingId(null);
-      setConfirmOverwrite((prev) => ({ ...prev, [divisionId]: false }));
-    });
-  };
-
-  const handleSeedGroupSlots = (divisionId: string) => {
-    clearMsg(divisionId);
-    startTransition(async () => {
-      const result = await seedGroupSlotsFromBracketAction({
-        tournamentId,
-        divisionId,
-      });
-      if (result.ok) {
-        setMsg(divisionId, "success", "리그 슬롯이 반영되었습니다.");
-      } else {
-        setMsg(divisionId, "error", result.error);
-      }
-    });
-  };
-
-  const handleSeedTournamentSlots = (divisionId: string) => {
-    clearMsg(divisionId);
-    const assignToTournament = assignTournament[divisionId] ?? true;
-    startTransition(async () => {
-      const result = await seedTournamentSlotsFromBracketAction({
-        tournamentId,
-        divisionId,
-        assignToTournament,
-      });
-      if (result.ok) {
-        setMsg(divisionId, "success", "토너먼트 슬롯이 반영되었습니다.");
-      } else {
-        setMsg(divisionId, "error", result.error);
-      }
-    });
-  };
-
-  /* ── 미리보기 ── */
-  const handlePreview = (divisionId: string) => {
-    // 토글: 이미 열려있으면 닫기
-    if (previews[divisionId]) {
-      setPreviews((prev) => ({ ...prev, [divisionId]: null }));
-      return;
-    }
-    setPreviewingId(divisionId);
-    clearMsg(divisionId);
-    startTransition(async () => {
-      const result = await previewDivisionAction({
-        tournamentId,
-        divisionId,
-        groupSize: groupSizes[divisionId],
-      });
-      if (result.ok) {
-        setPreviews((prev) => ({ ...prev, [divisionId]: result }));
-      } else {
-        setMsg(divisionId, "error", result.error);
-      }
-      setPreviewingId(null);
-    });
-  };
-
-  return (
-    <div className="space-y-4">
-      {divisions.map((div) => {
-        const msg = messages[div.id];
-        const isSaving = isPending && savingId === div.id;
-        const isGenerating = isPending && generatingId === div.id;
-        const isPreviewing = isPending && previewingId === div.id;
-        const isBusy = isSaving || isGenerating || isPreviewing;
-        const isConfirming = confirmOverwrite[div.id] ?? false;
-        const preview = previews[div.id] ?? null;
-
-        return (
-          <Card key={div.id}>
-            {/* Header */}
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">{div.name}</h3>
-              <div className="flex gap-3 text-sm text-gray-500">
-                <span>승인 팀 {div.approvedCount}</span>
-                <span>경기 {div.matchCount}</span>
+          <div className="grid gap-2 text-sm">
+            {divisions.map((division) => (
+              <div
+                key={division.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 bg-gray-50 px-3 py-2"
+              >
+                <span className="font-medium text-gray-700">{division.name}</span>
+                <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                  <span>
+                    리그 경기: {division.hasLeagueMatches ? "생성됨" : "미생성"}
+                  </span>
+                  <span>
+                    토너먼트 경기:{" "}
+                    {division.hasTournamentMatches ? "생성됨" : "미생성"}
+                  </span>
+                  <span>
+                    스케줄 준비: {division.readyForSchedule ? "가능" : "불가"}
+                  </span>
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
+        </Card>
+      </section>
 
-            {/* group_size quick edit */}
-            <div className="flex items-center gap-2 mb-4">
-              <label className="text-sm text-gray-600">그룹 크기</label>
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">리그 경기 생성</h2>
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">디비전</label>
+              <select
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={leagueDivisionId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setLeagueDivisionId(value);
+                  const selected = divisions.find((d) => d.id === value);
+                  setGroupSize(selected?.group_size ? String(selected.group_size) : "");
+                  setLeagueMsg(null);
+                }}
+              >
+                <option value="">선택</option>
+                {divisions.map((division) => (
+                  <option key={division.id} value={division.id}>
+                    {division.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">그룹 크기</label>
               <input
                 type="number"
                 min={2}
-                value={groupSizes[div.id] ?? div.group_size}
-                onChange={(e) =>
-                  setGroupSizes((prev) => ({
-                    ...prev,
-                    [div.id]: parseInt(e.target.value, 10) || 2,
-                  }))
-                }
-                className="w-20 rounded border px-2 py-1 text-sm"
-                disabled={isBusy}
+                className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={groupSize}
+                onChange={(event) => setGroupSize(event.target.value)}
+                placeholder={leagueDivision?.group_size?.toString() ?? ""}
               />
-              <Button
-                variant="secondary"
-                onClick={() => handleSaveGroupSize(div.id)}
-                disabled={isBusy}
-              >
-                {isSaving ? "저장 중…" : "저장"}
-              </Button>
             </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="secondary"
-                onClick={() => handlePreview(div.id)}
-                disabled={isBusy}
-              >
-                {isPreviewing
-                  ? "로딩 중…"
-                  : preview
-                    ? "미리보기 닫기"
-                    : "미리보기"}
-              </Button>
-
-              <Button
-                onClick={() => handleGenerate(div.id, false)}
-                disabled={isBusy}
-              >
-                {isGenerating && !isConfirming ? "생성 중…" : "경기 생성"}
-              </Button>
-
-              {!isConfirming ? (
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    setConfirmOverwrite((prev) => ({
-                      ...prev,
-                      [div.id]: true,
-                    }))
+            <Button
+              onClick={() => {
+                setLeagueMsg(null);
+                startLeagueTransition(async () => {
+                  const result = await createLeagueMatchesAction({
+                    tournamentId,
+                    divisionId: leagueDivisionId,
+                    groupSize: Number(groupSize),
+                  });
+                  if (!result.ok) {
+                    setLeagueMsg({ tone: "error", text: result.error });
+                    return;
                   }
-                  disabled={isBusy}
-                >
-                  덮어쓰기 재생성
-                </Button>
-              ) : (
-                <div className="flex items-center gap-2 rounded border border-red-200 bg-red-50 px-3 py-2">
-                  <span className="text-sm text-red-700">
-                    기존 경기가 삭제되고 재생성됩니다
-                  </span>
-                  <Button
-                    onClick={() => handleGenerate(div.id, true)}
-                    disabled={isGenerating}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    {isGenerating ? "재생성 중…" : "확인"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      setConfirmOverwrite((prev) => ({
-                        ...prev,
-                        [div.id]: false,
-                      }))
-                    }
-                    disabled={isGenerating}
-                  >
-                    취소
-                  </Button>
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => handleSeedGroupSlots(div.id)}
-                  disabled={isBusy}
-                >
-                  리그 슬롯 반영
-                </Button>
-                <label className="flex items-center gap-2 text-xs text-gray-600">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300"
-                    checked={assignTournament[div.id] ?? true}
-                    onChange={(event) =>
-                      setAssignTournament((prev) => ({
-                        ...prev,
-                        [div.id]: event.target.checked,
-                      }))
-                    }
-                  />
-                  토너먼트 매치 연결
-                </label>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleSeedTournamentSlots(div.id)}
-                  disabled={isBusy}
-                >
-                  토너먼트 슬롯 반영
-                </Button>
+                  setLeagueMsg({ tone: "success", text: "리그 경기가 생성되었습니다." });
+                });
+              }}
+              disabled={isLeaguePending}
+            >
+              {isLeaguePending ? "생성 중..." : "리그 경기 생성"}
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500">
+            선택한 디비전에 리그 경기를 생성합니다. 생성된 경기는 schedule 페이지에서
+            스케줄 생성 대상으로 사용됩니다.
+          </p>
+          {leagueMsg && (
+            <p
+              className={`text-sm ${
+                leagueMsg.tone === "error" ? "text-red-600" : "text-green-600"
+              }`}
+            >
+              {leagueMsg.text}
+            </p>
+          )}
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">토너먼트 경기 생성</h2>
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">디비전</label>
+              <select
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={tournamentDivisionId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setTournamentDivisionId(value);
+                  const selected = divisions.find((d) => d.id === value);
+                  setTournamentSize(
+                    selected?.tournament_size ? String(selected.tournament_size) : ""
+                  );
+                  setTournamentMsg(null);
+                }}
+              >
+                <option value="">선택</option>
+                {divisions.map((division) => (
+                  <option key={division.id} value={division.id}>
+                    {division.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">
+                토너먼트 크기
+              </label>
+              <input
+                type="number"
+                min={2}
+                className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={tournamentSize}
+                onChange={(event) => setTournamentSize(event.target.value)}
+                placeholder={tournamentDivision?.tournament_size?.toString() ?? ""}
+              />
+            </div>
+            <Button
+              onClick={() => {
+                setTournamentMsg(null);
+                startTournamentTransition(async () => {
+                  const result = await createTournamentMatchesAction({
+                    tournamentId,
+                    divisionId: tournamentDivisionId,
+                    tournamentSize: Number(tournamentSize),
+                  });
+                  if (!result.ok) {
+                    setTournamentMsg({ tone: "error", text: result.error });
+                    return;
+                  }
+                  setTournamentMsg({
+                    tone: "success",
+                    text: "토너먼트 경기가 생성되었습니다.",
+                  });
+                });
+              }}
+              disabled={isTournamentPending}
+            >
+              {isTournamentPending ? "생성 중..." : "토너먼트 경기 생성"}
+            </Button>
+          </div>
+          <div className="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <p>같은 디비전에 리그 경기가 이미 있으면:</p>
+            <p>- 토너먼트 경기만 생성되며 팀은 미배정 상태로 생성됩니다.</p>
+            <p>리그 경기가 없으면:</p>
+            <p>- 일반 토너먼트처럼 팀이 배정된 상태로 생성됩니다.</p>
+          </div>
+          {tournamentMsg && (
+            <p
+              className={`text-sm ${
+                tournamentMsg.tone === "error" ? "text-red-600" : "text-green-600"
+              }`}
+            >
+              {tournamentMsg.text}
+            </p>
+          )}
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">생성 결과 요약</h2>
+        <Card className="space-y-2">
+          {divisions.map((division) => (
+            <div
+              key={division.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 px-3 py-2 text-sm"
+            >
+              <span className="font-medium text-gray-700">{division.name}</span>
+              <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                <span>
+                  리그 경기: {division.hasLeagueMatches ? "생성됨" : "미생성"}
+                </span>
+                <span>
+                  토너먼트 경기: {division.hasTournamentMatches ? "생성됨" : "미생성"}
+                </span>
+                <span>
+                  미배정 토너먼트: {division.hasUnassignedTournament ? "있음" : "없음"}
+                </span>
               </div>
             </div>
+          ))}
+        </Card>
+      </section>
 
-            {/* Preview Panel */}
-            {preview && (
-              <PreviewPanel
-                data={preview}
-                onClose={() =>
-                  setPreviews((prev) => ({ ...prev, [div.id]: null }))
-                }
-              />
-            )}
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">경기 구조 확인</h2>
+        <div className="space-y-4">
+          {divisions.map((division) => (
+            <Card key={division.id} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">{division.name}</h3>
+                <span className="text-xs text-gray-500">
+                  리그 {division.leagueMatchCount} · 토너먼트 {division.tournamentMatchCount}
+                </span>
+              </div>
 
-            {/* Message */}
-            {msg && (
-              <p
-                className={`mt-3 text-sm ${
-                  msg.tone === "error" ? "text-red-600" : "text-green-600"
-                }`}
-              >
-                {msg.text}
-              </p>
-            )}
-          </Card>
-        );
-      })}
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-600">조별 경기</p>
+                {division.groups.length === 0 ? (
+                  <p className="text-xs text-gray-400">생성된 조 경기가 없습니다.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {division.groups.map((group) => (
+                      <div key={group.name} className="rounded border border-gray-100 p-2">
+                        <p className="text-xs font-semibold text-gray-600">
+                          {group.name}
+                        </p>
+                        <div className="mt-1 space-y-1 text-xs text-gray-500">
+                          {group.matches.map((match) => (
+                            <p key={match.id}>
+                              {match.teamAName} vs {match.teamBName}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-600">토너먼트</p>
+                {division.tournamentRounds.length === 0 ? (
+                  <p className="text-xs text-gray-400">생성된 토너먼트 경기가 없습니다.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {division.tournamentRounds.map((round) => (
+                      <div key={round.round} className="rounded border border-gray-100 p-2">
+                        <p className="text-xs font-semibold text-gray-600">
+                          {round.round}
+                        </p>
+                        <div className="mt-1 space-y-1 text-xs text-gray-500">
+                          {round.matches.map((match) => (
+                            <p key={match.id}>
+                              {match.teamAName} vs {match.teamBName} ·
+                              {match.isAssigned ? " 배정" : " 미배정"}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
+
+export default BracketConsoleForm;
