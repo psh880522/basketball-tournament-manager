@@ -65,6 +65,9 @@ export default async function TournamentResultPage({
     listTournamentMatchesByDivision(selectedDivision.id),
   ]);
 
+  const isConfirmed =
+    !selectedDivision.standings_dirty && (standingsResult.data?.length ?? 0) > 0;
+
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -137,7 +140,7 @@ export default async function TournamentResultPage({
           divisionName={selectedDivision.name}
           isOrganizer={userResult.role === "organizer"}
           standingsDirty={selectedDivision.standings_dirty}
-          isConfirmed={selectedDivision.include_tournament_slots}
+          isConfirmed={isConfirmed}
           tournamentSize={selectedDivision.tournament_size}
           standings={standingsResult.data ?? []}
           preview={previewResult.data ?? []}

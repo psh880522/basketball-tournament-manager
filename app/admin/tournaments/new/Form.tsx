@@ -4,6 +4,10 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import FieldHint from "@/components/ui/FieldHint";
+import {
+  TOURNAMENT_SIZE_LABELS,
+  TOURNAMENT_SIZE_OPTIONS,
+} from "@/lib/constants/tournament";
 
 type FormState = {
   name: string;
@@ -66,7 +70,14 @@ export default function NewTournamentForm() {
       }
       if (division.tournamentSize.trim()) {
         const parsed = Number(division.tournamentSize);
-        if (!Number.isInteger(parsed) || parsed < 2) return true;
+        if (
+          !Number.isInteger(parsed) ||
+          !TOURNAMENT_SIZE_OPTIONS.includes(
+            parsed as (typeof TOURNAMENT_SIZE_OPTIONS)[number]
+          )
+        ) {
+          return true;
+        }
       }
       return false;
     });
@@ -320,7 +331,10 @@ export default function NewTournamentForm() {
                 Number.isInteger(division.groupSize) && division.groupSize >= 2;
               const isTournamentSizeValid =
                 tournamentSizeValue === null ||
-                (Number.isInteger(tournamentSizeValue) && tournamentSizeValue >= 2);
+                (Number.isInteger(tournamentSizeValue) &&
+                  TOURNAMENT_SIZE_OPTIONS.includes(
+                    tournamentSizeValue as (typeof TOURNAMENT_SIZE_OPTIONS)[number]
+                  ));
 
               return (
                 <div
@@ -378,9 +392,7 @@ export default function NewTournamentForm() {
                       <label className="text-xs font-medium text-gray-600">
                         토너먼트 크기
                       </label>
-                      <input
-                        type="number"
-                        min={2}
+                      <select
                         value={division.tournamentSize}
                         onChange={(event) =>
                           updateDivision(division.id, {
@@ -392,8 +404,14 @@ export default function NewTournamentForm() {
                             ? "border-gray-300"
                             : "border-rose-400"
                         }`}
-                        placeholder="예: 8"
-                      />
+                      >
+                        <option value="">선택</option>
+                        {TOURNAMENT_SIZE_OPTIONS.map((size) => (
+                          <option key={size} value={String(size)}>
+                            {TOURNAMENT_SIZE_LABELS[size]}
+                          </option>
+                        ))}
+                      </select>
                       <FieldHint>비워두면 토너먼트 설정이 생략됩니다.</FieldHint>
                     </div>
                   </div>

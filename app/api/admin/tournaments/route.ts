@@ -144,7 +144,6 @@ export async function POST(request: Request) {
       name: division.name,
       group_size: division.group_size,
       tournament_size: division.tournament_size,
-      include_tournament_slots: false,
       sort_order: index,
     }));
 

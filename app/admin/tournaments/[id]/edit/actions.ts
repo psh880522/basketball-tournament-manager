@@ -54,8 +54,7 @@ export async function createDivisionAction(
   tournamentId: string,
   name: string,
   groupSize?: number,
-  tournamentSize?: number | null,
-  includeTournamentSlots?: boolean
+  tournamentSize?: number | null
 ): Promise<ActionResult> {
   if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
   if (!name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
@@ -64,9 +63,6 @@ export async function createDivisionAction(
     name,
     ...(groupSize !== undefined ? { group_size: groupSize } : {}),
     ...(tournamentSize !== undefined ? { tournament_size: tournamentSize } : {}),
-    ...(includeTournamentSlots !== undefined
-      ? { include_tournament_slots: includeTournamentSlots }
-      : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
@@ -79,8 +75,7 @@ export async function updateDivisionAction(
   divisionId: string,
   name: string,
   groupSize?: number,
-  tournamentSize?: number | null,
-  includeTournamentSlots?: boolean
+  tournamentSize?: number | null
 ): Promise<ActionResult> {
   if (!divisionId) return { ok: false, error: "Division 정보가 없습니다." };
   if (!name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
@@ -89,9 +84,6 @@ export async function updateDivisionAction(
     name,
     ...(groupSize !== undefined ? { group_size: groupSize } : {}),
     ...(tournamentSize !== undefined ? { tournament_size: tournamentSize } : {}),
-    ...(includeTournamentSlots !== undefined
-      ? { include_tournament_slots: includeTournamentSlots }
-      : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);

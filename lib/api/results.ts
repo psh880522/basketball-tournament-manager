@@ -23,7 +23,6 @@ type DivisionSeedingRow = {
   tournament_id: string;
   standings_dirty: boolean;
   tournament_size: number | null;
-  include_tournament_slots: boolean;
 };
 
 export type LeagueMatchRow = {
@@ -146,7 +145,7 @@ async function getDivisionForSeeding(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("divisions")
-    .select("id,tournament_id,standings_dirty,tournament_size,include_tournament_slots")
+    .select("id,tournament_id,standings_dirty,tournament_size")
     .eq("id", divisionId)
     .maybeSingle();
 
@@ -649,12 +648,6 @@ export async function confirmLeagueStandings(
     return { ok: false, error: "확정할 순위가 없습니다." };
   }
 
-  const { error: updateErr } = await supabase
-    .from("divisions")
-    .update({ include_tournament_slots: true })
-    .eq("id", divisionId);
-
-  if (updateErr) return { ok: false, error: updateErr.message };
   return { ok: true };
 }
 
@@ -740,18 +733,24 @@ export async function seedTournamentTeamsFromConfirmedStandings(
     return { ok: false, error: "Division을 찾을 수 없습니다." };
   }
 
-  const { standings_dirty, tournament_size, include_tournament_slots } =
-    divisionResult.data;
+  const { standings_dirty, tournament_size } = divisionResult.data;
 
   if (standings_dirty) {
     return { ok: false, error: "순위 재계산이 필요합니다." };
   }
 
-  if (!include_tournament_slots) {
+  const supabase = await createSupabaseServerClient();
+  const { data: standingsCheck, error: standingsCheckErr } = await supabase
+    .from("standings")
+    .select("id")
+    .eq("division_id", divisionId)
+    .is("group_id", null)
+    .limit(1);
+
+  if (standingsCheckErr) return { ok: false, error: standingsCheckErr.message };
+  if (!standingsCheck || standingsCheck.length === 0) {
     return { ok: false, error: "리그 순위가 확정되지 않았습니다." };
   }
-
-  const supabase = await createSupabaseServerClient();
   const { data: roundGroups, error: roundGroupErr } = await supabase
     .from("groups")
     .select("id,name,order")

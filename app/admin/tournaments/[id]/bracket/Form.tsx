@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import type { BracketGenerationSummary } from "@/lib/api/bracket";
+import {
+  TOURNAMENT_SIZE_LABELS,
+  TOURNAMENT_SIZE_OPTIONS,
+} from "@/lib/constants/tournament";
 import { formatRoundLabel } from "@/lib/formatters/matchLabel";
 import {
   createLeagueMatchesAction,
@@ -260,9 +264,11 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
                 onChange={(event) => setTournamentSize(event.target.value)}
               >
                 <option value="">선택</option>
-                <option value="4">4강</option>
-                <option value="8">8강</option>
-                <option value="16">16강</option>
+                {TOURNAMENT_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={String(size)}>
+                    {TOURNAMENT_SIZE_LABELS[size]}
+                  </option>
+                ))}
               </select>
             </div>
             <Button
@@ -384,50 +390,63 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {division.tournamentRounds.flatMap((round) =>
-                          round.matches.map((match) => (
+                        {division.tournamentRounds.flatMap((round) => {
+                          const firstRoundOrder = Math.min(
+                            ...division.tournamentRounds.map((entry) => entry.roundOrder)
+                          );
+                          const isInitialRound = round.roundOrder === firstRoundOrder;
+
+                          return round.matches.map((match) => (
                             <tr key={match.id} className="hover:bg-gray-50">
                               <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
                                 {formatRoundLabel(round.roundName)}
                               </td>
                               <td className="px-1 py-2 text-center">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  className="w-14 border rounded px-1.5 py-1 text-center text-sm"
-                                  value={seedValues[match.id]?.seedA ?? ""}
-                                  onChange={(event) =>
-                                    setSeedValues((prev) => ({
-                                      ...prev,
-                                      [match.id]: {
-                                        seedA: event.target.value,
-                                        seedB: prev[match.id]?.seedB ?? "",
-                                      },
-                                    }))
-                                  }
-                                  placeholder="-"
-                                />
+                                {isInitialRound ? (
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                    value={seedValues[match.id]?.seedA ?? ""}
+                                    onChange={(event) =>
+                                      setSeedValues((prev) => ({
+                                        ...prev,
+                                        [match.id]: {
+                                          seedA: event.target.value,
+                                          seedB: prev[match.id]?.seedB ?? "",
+                                        },
+                                      }))
+                                    }
+                                    placeholder="-"
+                                  />
+                                ) : (
+                                  <span className="text-sm text-gray-400">-</span>
+                                )}
                               </td>
                               <td className="px-3 py-2">{match.teamAName}</td>
                               <td className="px-1 py-2 text-gray-400 text-center">VS</td>
                               <td className="px-3 py-2">{match.teamBName}</td>
                               <td className="px-1 py-2 text-center">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  className="w-14 border rounded px-1.5 py-1 text-center text-sm"
-                                  value={seedValues[match.id]?.seedB ?? ""}
-                                  onChange={(event) =>
-                                    setSeedValues((prev) => ({
-                                      ...prev,
-                                      [match.id]: {
-                                        seedA: prev[match.id]?.seedA ?? "",
-                                        seedB: event.target.value,
-                                      },
-                                    }))
-                                  }
-                                  placeholder="-"
-                                />
+                                {isInitialRound ? (
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                    value={seedValues[match.id]?.seedB ?? ""}
+                                    onChange={(event) =>
+                                      setSeedValues((prev) => ({
+                                        ...prev,
+                                        [match.id]: {
+                                          seedA: prev[match.id]?.seedA ?? "",
+                                          seedB: event.target.value,
+                                        },
+                                      }))
+                                    }
+                                    placeholder="-"
+                                  />
+                                ) : (
+                                  <span className="text-sm text-gray-400">-</span>
+                                )}
                               </td>
                               <td className="px-3 py-2 text-center">
                                 <span
@@ -454,14 +473,14 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
                                   type="button"
                                   className="inline-flex items-center justify-center px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                                   onClick={() => handleSaveSeed(match.id)}
-                                  disabled={isSeedPending || savingSeedId === match.id}
+                                  disabled={!isInitialRound || isSeedPending || savingSeedId === match.id}
                                 >
                                   {savingSeedId === match.id ? "저장 중..." : "저장"}
                                 </button>
                               </td>
                             </tr>
-                          ))
-                        )}
+                          ));
+                        })}
                       </tbody>
                     </table>
                   </div>

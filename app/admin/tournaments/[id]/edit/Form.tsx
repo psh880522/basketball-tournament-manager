@@ -7,6 +7,10 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FieldHint from "@/components/ui/FieldHint";
 import {
+  TOURNAMENT_SIZE_LABELS,
+  TOURNAMENT_SIZE_OPTIONS,
+} from "@/lib/constants/tournament";
+import {
   type TournamentEditRow,
   type TournamentStatus,
 } from "@/lib/api/tournaments";
@@ -291,7 +295,6 @@ function AddDivisionForm({
   const [name, setName] = useState("");
   const [groupSize, setGroupSize] = useState<number>(4);
   const [tournamentSize, setTournamentSize] = useState<string>("");
-  const [includeTournamentSlots, setIncludeTournamentSlots] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const isGroupSizeValid = typeof groupSize === "number" && groupSize >= 2;
@@ -300,11 +303,10 @@ function AddDivisionForm({
     : null;
   const isTournamentSizeValid =
     tournamentSizeValue === null ||
-    (Number.isInteger(tournamentSizeValue) && tournamentSizeValue >= 2);
-  const isTournamentSizePowerOfTwo =
-    tournamentSizeValue !== null &&
-    Number.isInteger(tournamentSizeValue) &&
-    (tournamentSizeValue & (tournamentSizeValue - 1)) === 0;
+    (Number.isInteger(tournamentSizeValue) &&
+      TOURNAMENT_SIZE_OPTIONS.includes(
+        tournamentSizeValue as (typeof TOURNAMENT_SIZE_OPTIONS)[number]
+      ));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,8 +317,7 @@ function AddDivisionForm({
         tournamentId,
         name.trim(),
         groupSize,
-        isTournamentSizeValid ? tournamentSizeValue : null,
-        includeTournamentSlots
+        isTournamentSizeValid ? tournamentSizeValue : null
       );
       if (!result.ok) {
         onError(result.error);
@@ -329,7 +330,6 @@ function AddDivisionForm({
         name: name.trim(),
         group_size: groupSize,
         tournament_size: isTournamentSizeValid ? tournamentSizeValue : null,
-        include_tournament_slots: includeTournamentSlots,
         sort_order: 9999,
         standings_dirty: false,
       });
@@ -369,42 +369,29 @@ function AddDivisionForm({
         <label className="text-xs font-medium text-gray-600">
           토너먼트 크기
         </label>
-        <input
-          type="number"
-          className={`w-24 rounded-md border px-2 py-2 text-sm ${
+        <select
+          className={`w-28 rounded-md border px-2 py-2 text-sm ${
             !isTournamentSizeValid ? "border-red-400" : "border-gray-300"
           }`}
           value={tournamentSize}
           onChange={(e) => setTournamentSize(e.target.value)}
-          min={2}
-          placeholder="예: 8"
-        />
-        <p className="text-[11px] text-gray-400">2의 거듭제곱 권장</p>
+        >
+          <option value="">선택</option>
+          {TOURNAMENT_SIZE_OPTIONS.map((size) => (
+            <option key={size} value={String(size)}>
+              {TOURNAMENT_SIZE_LABELS[size]}
+            </option>
+          ))}
+        </select>
       </div>
-      <label className="flex items-center gap-2 text-xs text-gray-600">
-        <input
-          type="checkbox"
-          className="rounded border-gray-300"
-          checked={includeTournamentSlots}
-          onChange={(e) => setIncludeTournamentSlots(e.target.checked)}
-        />
-        토너먼트 슬롯 포함
-      </label>
       {!isGroupSizeValid && (
         <span className="text-xs text-red-500 self-center">2 이상 입력</span>
       )}
       {!isTournamentSizeValid && (
         <span className="text-xs text-red-500 self-center">
-          토너먼트 크기는 2 이상의 정수
+          토너먼트 크기를 선택하세요.
         </span>
       )}
-      {isTournamentSizeValid &&
-        tournamentSizeValue !== null &&
-        !isTournamentSizePowerOfTwo && (
-          <span className="text-xs text-amber-600 self-center">
-            2의 거듭제곱 권장
-          </span>
-        )}
       <Button
         type="submit"
         disabled={isPending || !isGroupSizeValid || !isTournamentSizeValid}
@@ -441,9 +428,6 @@ function DivisionItem({
       ? String(division.tournament_size)
       : ""
   );
-  const [includeTournamentSlots, setIncludeTournamentSlots] = useState(
-    division.include_tournament_slots ?? false
-  );
   const [isPending, startTransition] = useTransition();
 
   const isGroupSizeValid = typeof groupSize === "number" && groupSize >= 2;
@@ -452,11 +436,10 @@ function DivisionItem({
     : null;
   const isTournamentSizeValid =
     tournamentSizeValue === null ||
-    (Number.isInteger(tournamentSizeValue) && tournamentSizeValue >= 2);
-  const isTournamentSizePowerOfTwo =
-    tournamentSizeValue !== null &&
-    Number.isInteger(tournamentSizeValue) &&
-    (tournamentSizeValue & (tournamentSizeValue - 1)) === 0;
+    (Number.isInteger(tournamentSizeValue) &&
+      TOURNAMENT_SIZE_OPTIONS.includes(
+        tournamentSizeValue as (typeof TOURNAMENT_SIZE_OPTIONS)[number]
+      ));
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -468,8 +451,7 @@ function DivisionItem({
         division.id,
         name.trim(),
         groupSize,
-        isTournamentSizeValid ? tournamentSizeValue : null,
-        includeTournamentSlots
+        isTournamentSizeValid ? tournamentSizeValue : null
       );
       if (!result.ok) {
         onError(result.error);
@@ -480,7 +462,6 @@ function DivisionItem({
         name: name.trim(),
         group_size: groupSize,
         tournament_size: isTournamentSizeValid ? tournamentSizeValue : null,
-        include_tournament_slots: includeTournamentSlots,
       });
       setEditing(false);
     });
@@ -528,41 +509,29 @@ function DivisionItem({
           </label>
           <label className="flex items-center gap-1 text-sm text-gray-600">
             토너먼트 크기
-            <input
-              type="number"
+            <select
               className={`w-24 rounded-md border px-2 py-1.5 text-sm ${
                 !isTournamentSizeValid ? "border-red-400" : "border-gray-300"
               }`}
               value={tournamentSize}
               onChange={(e) => setTournamentSize(e.target.value)}
-              min={2}
-              placeholder="예: 8"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              className="rounded border-gray-300"
-              checked={includeTournamentSlots}
-              onChange={(e) => setIncludeTournamentSlots(e.target.checked)}
-            />
-            토너먼트 슬롯 포함
+            >
+              <option value="">선택</option>
+              {TOURNAMENT_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={String(size)}>
+                  {TOURNAMENT_SIZE_LABELS[size]}
+                </option>
+              ))}
+            </select>
           </label>
           {!isGroupSizeValid && (
             <span className="text-xs text-red-500">2 이상 입력</span>
           )}
           {!isTournamentSizeValid && (
             <span className="text-xs text-red-500">
-              토너먼트 크기는 2 이상의 정수
+              토너먼트 크기를 선택하세요.
             </span>
           )}
-          {isTournamentSizeValid &&
-            tournamentSizeValue !== null &&
-            !isTournamentSizePowerOfTwo && (
-              <span className="text-xs text-amber-600">
-                2의 거듭제곱 권장
-              </span>
-            )}
           <Button
             type="submit"
             disabled={
@@ -583,9 +552,6 @@ function DivisionItem({
                   ? String(division.tournament_size)
                   : ""
               );
-              setIncludeTournamentSlots(
-                division.include_tournament_slots ?? false
-              );
               setEditing(false);
             }}
           >
@@ -602,8 +568,7 @@ function DivisionItem({
         <p className="text-sm font-medium">{division.name}</p>
         <p className="text-xs text-gray-400">
           그룹 크기: {division.group_size ?? "-"} · 토너먼트 크기:{" "}
-          {division.tournament_size ?? "-"} · 토너먼트 슬롯:{" "}
-          {division.include_tournament_slots ? "포함" : "미포함"} · 정렬:{" "}
+          {division.tournament_size ?? "-"} · 정렬:{" "}
           {division.sort_order}
         </p>
       </div>

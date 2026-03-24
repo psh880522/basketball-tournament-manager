@@ -13,7 +13,6 @@ export type DivisionRow = {
   name: string;
   group_size: number | null;
   tournament_size: number | null;
-  include_tournament_slots: boolean;
   sort_order: number;
   standings_dirty: boolean;
 };
@@ -25,7 +24,7 @@ export async function getDivisionsByTournament(
   const { data, error } = await supabase
     .from("divisions")
     .select(
-      "id,tournament_id,name,group_size,tournament_size,include_tournament_slots,sort_order,standings_dirty"
+      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty"
     )
     .eq("tournament_id", tournamentId)
     .order("sort_order", { ascending: true });
@@ -56,7 +55,6 @@ export async function createDivision(
     name: string;
     group_size?: number;
     tournament_size?: number | null;
-    include_tournament_slots?: boolean;
   }
 ): Promise<ActionResult> {
   const groupSize = input.group_size ?? 4;
@@ -88,7 +86,6 @@ export async function createDivision(
     name: input.name.trim(),
     group_size: groupSize,
     tournament_size: input.tournament_size ?? null,
-    include_tournament_slots: input.include_tournament_slots ?? false,
     sort_order: nextOrder,
   });
 
@@ -102,7 +99,6 @@ export async function updateDivision(
     name?: string;
     group_size?: number;
     tournament_size?: number | null;
-    include_tournament_slots?: boolean;
   }
 ): Promise<ActionResult> {
   if (input.group_size !== undefined && (typeof input.group_size !== "number" || input.group_size < 2)) {
@@ -121,9 +117,6 @@ export async function updateDivision(
   if (input.tournament_size !== undefined) {
     payload.tournament_size = input.tournament_size;
   }
-  if (input.include_tournament_slots !== undefined) {
-    payload.include_tournament_slots = input.include_tournament_slots;
-  }
 
   const supabase = await createSupabaseServerClient();
 
@@ -139,9 +132,9 @@ export async function updateDivision(
 export async function updateDivisionConfig(
   divisionId: string,
   input: {
+    name?: string;
     group_size?: number;
     tournament_size?: number | null;
-    include_tournament_slots?: boolean;
   }
 ): Promise<ActionResult> {
   return updateDivision(divisionId, input);
