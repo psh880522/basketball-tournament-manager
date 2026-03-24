@@ -7,6 +7,7 @@ import {
   createMatches,
   createTournamentMatches,
 } from "@/lib/api/bracket";
+import { compareTournamentMatchOrder } from "@/lib/formatters/tournamentMatchOrder";
 
 type ApiResult<T> = {
   data: T | null;
@@ -25,6 +26,8 @@ export type ScheduleSlotMatch = {
   id: string;
   groupName: string | null;
   groupOrder: number | null;
+  seedA: number | null;
+  seedB: number | null;
   team_a_id: string | null;
   team_b_id: string | null;
   team_a: string | null;
@@ -315,6 +318,8 @@ export async function getScheduleSlots(
           score_a: number | null;
           score_b: number | null;
           group_id: string | null;
+          seed_a: number | null;
+          seed_b: number | null;
           groups: { id: string; name: string; order: number; type: string } | null;
           team_a: { id: string; team_name: string } | null;
           team_b: { id: string; team_name: string } | null;
@@ -370,6 +375,8 @@ export async function getScheduleSlots(
             id: match.id,
             groupName: match.groups?.name ?? null,
             groupOrder: match.groups?.order ?? null,
+            seedA: (match.seed_a as number | null) ?? null,
+            seedB: (match.seed_b as number | null) ?? null,
             team_a_id: match.team_a?.id ?? null,
             team_b_id: match.team_b?.id ?? null,
             team_a: match.team_a?.team_name ?? null,
@@ -947,7 +954,9 @@ export async function generateScheduleSlots(input: {
 
   const { data: matches, error: matchesErr } = await supabase
     .from("matches")
-    .select("id,division_id,group_id,court_id,created_at,groups(id,name,order,type)")
+    .select(
+      "id,division_id,group_id,seed_a,seed_b,court_id,created_at,groups(id,name,order,type)"
+    )
     .eq("tournament_id", tournamentId)
     .order("created_at", { ascending: true });
 
@@ -1029,6 +1038,22 @@ export async function generateScheduleSlots(input: {
     groupAssignments.set(divisionId, assignment);
   }
 
+  const initialRoundByDivision = new Map<string, { name: string; order: number }>();
+  (matches ?? []).forEach((match) => {
+    const groupMeta = match.groups as
+      | { name: string; order: number; type: string }
+      | null;
+    if (!groupMeta || groupMeta.type !== "tournament") return;
+    const divisionId = match.division_id as string;
+    const existing = initialRoundByDivision.get(divisionId);
+    if (!existing || (groupMeta.order ?? 999) < existing.order) {
+      initialRoundByDivision.set(divisionId, {
+        name: groupMeta.name,
+        order: groupMeta.order ?? 999,
+      });
+    }
+  });
+
   const tournamentMatchesByCourt = new Map<string, typeof matches>();
   let tournamentCourtIndex = 0;
   const tournamentMatches = (matches ?? [])
@@ -1042,8 +1067,26 @@ export async function generateScheduleSlots(input: {
       const groupA = (a.groups as { order?: number } | null)?.order ?? 999;
       const groupB = (b.groups as { order?: number } | null)?.order ?? 999;
       if (groupA !== groupB) return groupA - groupB;
-      return new Date(a.created_at as string).getTime() -
-        new Date(b.created_at as string).getTime();
+      const initialRound = initialRoundByDivision.get(divisionA)?.name ?? null;
+      const groupNameA = (a.groups as { name?: string } | null)?.name ?? null;
+      const groupNameB = (b.groups as { name?: string } | null)?.name ?? null;
+      return compareTournamentMatchOrder(
+        {
+          id: a.id as string,
+          groupName: groupNameA,
+          seedA: (a.seed_a as number | null) ?? null,
+          seedB: (a.seed_b as number | null) ?? null,
+          createdAt: (a.created_at as string | null) ?? null,
+        },
+        {
+          id: b.id as string,
+          groupName: groupNameB,
+          seedA: (b.seed_a as number | null) ?? null,
+          seedB: (b.seed_b as number | null) ?? null,
+          createdAt: (b.created_at as string | null) ?? null,
+        },
+        initialRound
+      );
     });
 
   tournamentMatches.forEach((match) => {

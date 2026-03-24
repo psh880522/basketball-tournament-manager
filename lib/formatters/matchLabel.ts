@@ -55,6 +55,9 @@ export function formatTournamentMatchLabel({
   const hasRealTeams = isRealTeam(teamA) && isRealTeam(teamB);
   if (hasRealTeams) return `${teamA} vs ${teamB}`;
 
+  const leftIsReal = isRealTeam(teamA);
+  const rightIsReal = isRealTeam(teamB);
+
   const isInitialRound = Boolean(initialRound && groupName === initialRound);
   if (isInitialRound) {
     const derivedSeedA = roundIndex ? roundIndex : null;
@@ -62,9 +65,11 @@ export function formatTournamentMatchLabel({
       roundIndex && roundTotal ? roundTotal * 2 - roundIndex + 1 : null;
     const leftSeed = seedA ?? derivedSeedA;
     const rightSeed = seedB ?? derivedSeedB;
-    if (leftSeed !== null && rightSeed !== null) {
-      return `${leftSeed}위 vs ${rightSeed}위`;
-    }
+    const leftLabel = leftSeed !== null ? `${leftSeed}위` : null;
+    const rightLabel = rightSeed !== null ? `${rightSeed}위` : null;
+    if (leftLabel && rightLabel) return `${leftLabel} vs ${rightLabel}`;
+    if (leftIsReal && rightLabel) return `${teamA} vs ${rightLabel}`;
+    if (rightIsReal && leftLabel) return `${leftLabel} vs ${teamB}`;
   }
 
   const needsFinalReference = groupName === "final" || groupName === "third_place";
@@ -78,14 +83,24 @@ export function formatTournamentMatchLabel({
     const rightIndex = leftIndex + 1;
     if (rightIndex <= referenceTotal) {
       const role = groupName === "third_place" ? "패자" : "승자";
-      return `${leftIndex}경기 ${role} vs ${rightIndex}경기 ${role}`;
+      const leftRef = `${leftIndex}경기 ${role}`;
+      const rightRef = `${rightIndex}경기 ${role}`;
+      if (leftIsReal && !rightIsReal) return `${teamA} vs ${rightRef}`;
+      if (rightIsReal && !leftIsReal) return `${leftRef} vs ${teamB}`;
+      return `${leftRef} vs ${rightRef}`;
     }
   }
 
-  if (seedA !== null && seedB !== null) {
-    return `${seedA}위 vs ${seedB}위`;
+  if (seedA !== null || seedB !== null) {
+    const leftLabel = seedA !== null ? `${seedA}위` : null;
+    const rightLabel = seedB !== null ? `${seedB}위` : null;
+    if (leftLabel && rightLabel) return `${leftLabel} vs ${rightLabel}`;
+    if (leftIsReal && rightLabel) return `${teamA} vs ${rightLabel}`;
+    if (rightIsReal && leftLabel) return `${leftLabel} vs ${teamB}`;
   }
 
+  if (leftIsReal && !rightIsReal) return `${teamA} vs TBD`;
+  if (rightIsReal && !leftIsReal) return `TBD vs ${teamB}`;
   return "-";
 }
 

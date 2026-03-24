@@ -7,15 +7,17 @@ import {
   formatLeagueMatchLabel,
   formatTournamentCategoryLabel,
   formatTournamentMatchLabel,
-  getInitialTournamentRound,
-  getPreviousTournamentRound,
 } from "@/lib/formatters/matchLabel";
+import { buildTournamentRoundMetaByRound } from "@/lib/formatters/tournamentRoundMeta";
+import {
+  compareTournamentMatchOrder,
+  getInitialRoundFromRoundMap,
+} from "@/lib/formatters/tournamentMatchOrder";
 import type {
   LeagueMatchRow,
   LeagueStandingRow,
   SeedingPreviewRow,
   TournamentMatchRow,
-  TournamentProgress,
 } from "@/lib/api/results";
 import {
   calculateLeagueStandingsAction,
@@ -36,7 +38,6 @@ type Props = {
   preview: SeedingPreviewRow[];
   matches: LeagueMatchRow[];
   tournamentMatches: TournamentMatchRow[];
-  tournamentProgress: TournamentProgress | null;
 };
 
 type Message = { tone: "success" | "error"; text: string } | null;
@@ -96,9 +97,9 @@ export default function ResultForm({
   preview,
   matches,
   tournamentMatches,
-  tournamentProgress,
 }: Props) {
-  const [message, setMessage] = useState<Message>(null);
+  const [standingsMessage, setStandingsMessage] = useState<Message>(null);
+  const [seedMessage, setSeedMessage] = useState<Message>(null);
   const [isSaving, startSaving] = useTransition();
   const [isCalculating, startCalculating] = useTransition();
   const [isSeeding, startSeeding] = useTransition();
@@ -182,6 +183,41 @@ export default function ResultForm({
     return [...courtMap.values()].sort((a, b) => {
       if (a.order !== b.order) return a.order - b.order;
       return a.label.localeCompare(b.label, "ko-KR");
+    });
+  }, [tournamentRows]);
+
+  const tournamentMetaByMatchId = useMemo(() => {
+    const roundMap = new Map<string, TournamentMatchRow[]>();
+
+    tournamentRows.forEach((match) => {
+      const key = match.group?.name ?? "tournament";
+      const list = roundMap.get(key) ?? [];
+      list.push(match);
+      roundMap.set(key, list);
+    });
+
+    const initialRound = getInitialRoundFromRoundMap(roundMap);
+
+    return buildTournamentRoundMetaByRound(roundMap, {
+      getId: (match) => match.id,
+      sort: (left, right) =>
+        compareTournamentMatchOrder(
+          {
+            id: left.id,
+            groupName: left.group?.name ?? null,
+            seedA: left.seed_a ?? null,
+            seedB: left.seed_b ?? null,
+            createdAt: left.created_at ?? null,
+          },
+          {
+            id: right.id,
+            groupName: right.group?.name ?? null,
+            seedA: right.seed_a ?? null,
+            seedB: right.seed_b ?? null,
+            createdAt: right.created_at ?? null,
+          },
+          initialRound
+        ),
     });
   }, [tournamentRows]);
 
@@ -280,18 +316,23 @@ export default function ResultForm({
   };
 
   const handleSaveMatch = (matchId: string) => {
-    setMessage(null);
     setRowMessages((prev) => ({ ...prev, [matchId]: null }));
 
     const score = scores[matchId] ?? { scoreA: "", scoreB: "" };
     if (score.scoreA === "" || score.scoreB === "") {
-      setMessage({ tone: "error", text: "점수를 모두 입력해주세요." });
+      setRowMessages((prev) => ({
+        ...prev,
+        [matchId]: { tone: "error", text: "점수를 모두 입력해주세요." },
+      }));
       return;
     }
     const scoreA = Number(score.scoreA);
     const scoreB = Number(score.scoreB);
     if (!Number.isFinite(scoreA) || !Number.isFinite(scoreB)) {
-      setMessage({ tone: "error", text: "점수 형식이 올바르지 않습니다." });
+      setRowMessages((prev) => ({
+        ...prev,
+        [matchId]: { tone: "error", text: "점수 형식이 올바르지 않습니다." },
+      }));
       return;
     }
 
@@ -303,7 +344,6 @@ export default function ResultForm({
         results: [{ matchId, scoreA, scoreB }],
       });
       if (!result.ok) {
-        setMessage({ tone: "error", text: result.error });
         setRowMessages((prev) => ({
           ...prev,
           [matchId]: { tone: "error", text: result.error },
@@ -311,7 +351,6 @@ export default function ResultForm({
         setSavingMatchId(null);
         return;
       }
-      setMessage({ tone: "success", text: "리그 경기 결과가 저장되었습니다." });
       setRowStatus((prev) => ({ ...prev, [matchId]: "completed" }));
       setRowMessages((prev) => ({
         ...prev,
@@ -325,18 +364,23 @@ export default function ResultForm({
   };
 
   const handleSaveTournamentMatch = (matchId: string) => {
-    setMessage(null);
     setTournamentRowMessages((prev) => ({ ...prev, [matchId]: null }));
 
     const score = tournamentScores[matchId] ?? { scoreA: "", scoreB: "" };
     if (score.scoreA === "" || score.scoreB === "") {
-      setMessage({ tone: "error", text: "점수를 모두 입력해주세요." });
+      setTournamentRowMessages((prev) => ({
+        ...prev,
+        [matchId]: { tone: "error", text: "점수를 모두 입력해주세요." },
+      }));
       return;
     }
     const scoreA = Number(score.scoreA);
     const scoreB = Number(score.scoreB);
     if (!Number.isFinite(scoreA) || !Number.isFinite(scoreB)) {
-      setMessage({ tone: "error", text: "점수 형식이 올바르지 않습니다." });
+      setTournamentRowMessages((prev) => ({
+        ...prev,
+        [matchId]: { tone: "error", text: "점수 형식이 올바르지 않습니다." },
+      }));
       return;
     }
 
@@ -350,7 +394,6 @@ export default function ResultForm({
         scoreB,
       });
       if (!result.ok) {
-        setMessage({ tone: "error", text: result.error });
         setTournamentRowMessages((prev) => ({
           ...prev,
           [matchId]: { tone: "error", text: result.error },
@@ -359,7 +402,6 @@ export default function ResultForm({
         return;
       }
       const messageText = result.message ?? "저장 완료";
-      setMessage({ tone: "success", text: messageText });
       setTournamentRowMessages((prev) => ({
         ...prev,
         [matchId]: { tone: "success", text: messageText },
@@ -372,38 +414,44 @@ export default function ResultForm({
   };
 
   const handleSeed = () => {
-    setMessage(null);
+    setSeedMessage(null);
     startSeeding(async () => {
       const result = await seedTournamentTeamsAction({
         tournamentId,
         divisionId,
       });
       if (!result.ok) {
-        setMessage({ tone: "error", text: result.error });
+        setSeedMessage({ tone: "error", text: result.error });
         return;
       }
-      setMessage({ tone: "success", text: "토너먼트 팀 배치가 완료되었습니다." });
+      setSeedMessage({
+        tone: "success",
+        text: "토너먼트 팀 배치가 완료되었습니다.",
+      });
     });
   };
 
   const handleCalculate = () => {
-    setMessage(null);
+    setStandingsMessage(null);
     startCalculating(async () => {
       const result = await calculateLeagueStandingsAction({
         tournamentId,
         divisionId,
       });
       if (!result.ok) {
-        setMessage({ tone: "error", text: result.error });
+        setStandingsMessage({ tone: "error", text: result.error });
         return;
       }
-      setMessage({ tone: "success", text: "리그 순위가 계산 및 확정되었습니다." });
+      setStandingsMessage({
+        tone: "success",
+        text: "리그 순위가 계산 및 확정되었습니다.",
+      });
     });
   };
 
   return (
     <div className="space-y-4">
-      <Card className="space-y-3">
+      <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">리그 결과 입력</h2>
@@ -566,88 +614,139 @@ export default function ResultForm({
           <p className="text-sm text-gray-500">권한이 없습니다.</p>
         )}
 
-        <div className="border-t border-gray-200 pt-4">
-          <div>
-            <h3 className="text-base font-semibold">리그 순위 계산</h3>
-            <p className="text-xs text-gray-500">
-              현재 저장된 리그 경기 결과만 기준으로 계산되며 자동으로 확정됩니다.
-            </p>
+      </section>
+
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">리그 순위</h2>
+          <p className="text-xs text-gray-500">
+            현재 저장된 리그 경기 결과만 기준으로 계산되며 자동으로 확정됩니다.
+          </p>
+        </div>
+
+        {standings.length === 0 ? (
+          <Card className="text-sm text-gray-500">순위 데이터가 없습니다.</Card>
+        ) : (
+          <div className="overflow-x-auto rounded border border-gray-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600">
+                <tr>
+                  <th className="px-3 py-2 text-left">순위</th>
+                  <th className="px-3 py-2 text-left">팀명</th>
+                  <th className="px-3 py-2 text-right">승</th>
+                  <th className="px-3 py-2 text-right">패</th>
+                  <th className="px-3 py-2 text-right">득점</th>
+                  <th className="px-3 py-2 text-right">실점</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((row) => (
+                  <tr key={row.id} className="border-t border-gray-100">
+                    <td className="px-3 py-2">{row.rank}</td>
+                    <td className="px-3 py-2">
+                      {row.teams?.team_name ?? "-"}
+                    </td>
+                    <td className="px-3 py-2 text-right">{row.wins}</td>
+                    <td className="px-3 py-2 text-right">{row.losses}</td>
+                    <td className="px-3 py-2 text-right">{row.points_for}</td>
+                    <td className="px-3 py-2 text-right">{row.points_against}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )}
+
+        <div className="space-y-2 text-sm">
           {standingsDirty ? (
-            <p className="text-sm text-red-600">리그 순위 확정 불가: 순위 재계산 필요</p>
+            <p className="text-red-600">리그 순위 확정 불가: 순위 재계산 필요</p>
           ) : isConfirmed ? (
-            <p className="text-sm text-emerald-600">리그 순위 확정됨</p>
+            <p className="text-emerald-600">리그 순위 확정됨</p>
           ) : (
-            <p className="text-sm text-gray-600">확정 가능한 상태입니다.</p>
+            <p className="text-gray-600">확정 가능한 상태입니다.</p>
           )}
-          {isOrganizer ? (
-            <Button onClick={handleCalculate} disabled={isCalculating}>
-              {isCalculating ? "계산 중..." : "리그 순위 계산"}
-            </Button>
-          ) : (
-            <p className="text-sm text-gray-500">권한이 없습니다.</p>
+
+          {standingsMessage && (
+            <p
+              className={
+                standingsMessage.tone === "error"
+                  ? "text-red-600"
+                  : "text-emerald-600"
+              }
+            >
+              {standingsMessage.text}
+            </p>
           )}
         </div>
+
+        {isOrganizer ? (
+          <Button onClick={handleCalculate} disabled={isCalculating}>
+            {isCalculating ? "계산 중..." : "리그 순위 계산"}
+          </Button>
+        ) : (
+          <p className="text-sm text-gray-500">권한이 없습니다.</p>
+        )}
       </Card>
 
       <Card className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">토너먼트 팀 배치</h2>
+          <h2 className="text-lg font-semibold">토너먼트 배치 미리보기</h2>
           <p className="text-xs text-gray-500">
             확정된 리그 순위를 기준으로 토너먼트 경기에 팀을 배치합니다.
           </p>
         </div>
 
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-gray-700">리그 순위</h3>
-          {standings.length === 0 ? (
-            <Card className="text-sm text-gray-500">순위 데이터가 없습니다.</Card>
-          ) : (
-            <div className="overflow-x-auto rounded border border-gray-200 bg-white">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
-                  <tr>
-                    <th className="px-3 py-2 text-left">순위</th>
-                    <th className="px-3 py-2 text-left">팀명</th>
-                    <th className="px-3 py-2 text-right">승</th>
-                    <th className="px-3 py-2 text-right">패</th>
-                    <th className="px-3 py-2 text-right">득점</th>
-                    <th className="px-3 py-2 text-right">실점</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((row) => (
-                    <tr key={row.id} className="border-t border-gray-100">
-                      <td className="px-3 py-2">{row.rank}</td>
-                      <td className="px-3 py-2">
-                        {row.teams?.team_name ?? "-"}
-                      </td>
-                      <td className="px-3 py-2 text-right">{row.wins}</td>
-                      <td className="px-3 py-2 text-right">{row.losses}</td>
-                      <td className="px-3 py-2 text-right">{row.points_for}</td>
-                      <td className="px-3 py-2 text-right">{row.points_against}</td>
+        {preview.length === 0 ? (
+          <Card className="text-sm text-gray-500">미리보기 데이터가 없습니다.</Card>
+        ) : (
+          <div className="overflow-x-auto rounded border border-gray-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600">
+                <tr>
+                  <th className="px-3 py-2 text-left">구분</th>
+                  <th className="px-3 py-2 text-left">순위(시드)</th>
+                  <th className="px-3 py-2 text-left">경기</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map((row) => {
+                  const roundLabel = tournamentSize
+                    ? roundLabelMap[
+                        tournamentSize === 16
+                          ? "round_of_16"
+                          : tournamentSize === 8
+                          ? "quarterfinal"
+                          : tournamentSize === 4
+                          ? "semifinal"
+                          : "final"
+                      ]
+                    : "토너먼트";
+                  const seedLabel = `${row.seedA}위 vs ${row.seedB}위`;
+                  const matchLabel = `${row.teamAName ?? "TBD"} vs ${row.teamBName ?? "TBD"}`;
+                  return (
+                    <tr key={`${row.seedA}-${row.seedB}`} className="border-t border-gray-100">
+                      <td className="px-3 py-2">{roundLabel}</td>
+                      <td className="px-3 py-2">{seedLabel}</td>
+                      <td className="px-3 py-2">{matchLabel}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-gray-700">토너먼트 배치 미리보기</h3>
-          {preview.length === 0 ? (
-            <Card className="text-sm text-gray-500">미리보기 데이터가 없습니다.</Card>
-          ) : (
-            <ul className="space-y-1 text-sm text-gray-700">
-              {preview.map((row) => (
-                <li key={`${row.seedA}-${row.seedB}`}>
-                  {row.seedA}위 {row.teamAName ?? "TBD"} vs {row.seedB}위 {row.teamBName ?? "TBD"}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {seedMessage && (
+          <p
+            className={
+              seedMessage.tone === "error"
+                ? "text-red-600"
+                : "text-emerald-600"
+            }
+          >
+            {seedMessage.text}
+          </p>
+        )}
 
         {isOrganizer ? (
           <Button
@@ -666,11 +765,13 @@ export default function ResultForm({
         )}
 
         {!isConfirmed && (
-          <p className="text-xs text-gray-500">리그 순위 확정 이후 배치할 수 있습니다.</p>
+          <p className="text-xs text-gray-500">
+            리그 순위 확정 이후 배치할 수 있습니다.
+          </p>
         )}
       </Card>
 
-      <Card className="space-y-3">
+      <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">토너먼트 결과 입력</h2>
@@ -737,26 +838,13 @@ export default function ResultForm({
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {(() => {
-                            const roundCounts = new Map<string, number>();
-                            orderedMatches.forEach((match) => {
-                              const key = match.group?.name ?? "tournament";
-                              roundCounts.set(key, (roundCounts.get(key) ?? 0) + 1);
-                            });
-                            const initialRound =
-                              getInitialTournamentRound(roundCounts);
-                            const roundIndexes = new Map<string, number>();
-
-                            return orderedMatches.map((match) => {
-                              const key = match.group?.name ?? "tournament";
-                              const nextIndex = (roundIndexes.get(key) ?? 0) + 1;
-                              roundIndexes.set(key, nextIndex);
-                              const roundTotal = roundCounts.get(key) ?? null;
-                              const previousRound =
-                                getPreviousTournamentRound(match.group?.name ?? null);
-                              const previousRoundTotal = previousRound
-                                ? roundCounts.get(previousRound) ?? null
-                                : null;
+                          {(() =>
+                            orderedMatches.map((match) => {
+                              const meta = tournamentMetaByMatchId.get(match.id) ?? null;
+                              const roundIndex = meta?.roundIndex ?? null;
+                              const roundTotal = meta?.roundTotal ?? null;
+                              const initialRound = meta?.initialRound ?? null;
+                              const previousRoundTotal = meta?.previousRoundTotal ?? null;
                               const seedA = match.team_a_id
                                 ? divisionRanks[match.team_a_id] ?? null
                                 : null;
@@ -769,7 +857,7 @@ export default function ResultForm({
                                 teamB: match.team_b?.team_name ?? "TBD",
                                 seedA,
                                 seedB,
-                                roundIndex: nextIndex,
+                                roundIndex,
                                 roundTotal,
                                 initialRound,
                                 previousRoundTotal,
@@ -787,7 +875,7 @@ export default function ResultForm({
                                   <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                                     {formatTournamentCategoryLabel(
                                       match.group?.name ?? null,
-                                      nextIndex,
+                                      roundIndex,
                                       roundTotal
                                     )}
                                   </td>
@@ -867,8 +955,7 @@ export default function ResultForm({
                                   </td>
                                 </tr>
                               );
-                            });
-                          })()}
+                            }))()}
                         </tbody>
                       </table>
                       );
@@ -883,70 +970,8 @@ export default function ResultForm({
         {!isOrganizer && (
           <p className="text-sm text-gray-500">권한이 없습니다.</p>
         )}
-      </Card>
+      </section>
 
-      <Card className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold">토너먼트 진행 상태</h2>
-          <p className="text-xs text-gray-500">
-            라운드별 경기와 다음 라운드 배치 상태를 확인합니다.
-          </p>
-        </div>
-
-        {!tournamentProgress || tournamentProgress.rounds.length === 0 ? (
-          <Card className="text-sm text-gray-500">토너먼트 진행 데이터가 없습니다.</Card>
-        ) : (
-          <div className="space-y-4">
-            {tournamentProgress.rounds.map((round) => (
-              <div key={round.round}>
-                <div className="mb-2 flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-gray-700">
-                    {round.label}
-                  </h3>
-                  <span className="text-xs text-gray-400">
-                    {round.matches.length}경기
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {round.matches.map((match) => (
-                    <div key={match.id} className="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-sm">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium text-gray-700">
-                          {match.teamAName ?? "TBD"} vs {match.teamBName ?? "TBD"}
-                        </span>
-                        <span
-                          className={`inline-block text-xs px-2 py-0.5 rounded ${statusClass(
-                            match.status
-                          )}`}
-                        >
-                          {statusLabel(match.status)}
-                        </span>
-                      </div>
-                      {match.nextRound ? (
-                        <p className="mt-1 text-xs text-gray-500">
-                          다음 라운드 {roundLabelMap[match.nextRound] ?? match.nextRound} 슬롯 {match.nextSlot ?? "-"}: {match.nextAssignedTeamId ? "배치됨" : "미배치"}
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-xs text-gray-500">다음 라운드 없음</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {message && (
-        <Card
-          className={`text-sm ${
-            message.tone === "error" ? "text-red-600" : "text-green-600"
-          }`}
-        >
-          {message.text}
-        </Card>
-      )}
     </div>
   );
 }

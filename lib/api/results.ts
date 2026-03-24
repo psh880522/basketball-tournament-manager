@@ -2,6 +2,9 @@ import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { setDivisionStandingsDirty } from "@/lib/api/divisions";
 import { replaceDivisionStandings } from "@/lib/api/standings";
+import {
+  compareTournamentMatchOrder,
+} from "@/lib/formatters/tournamentMatchOrder";
 
 type ApiResult<T> = {
   data: T | null;
@@ -58,6 +61,8 @@ export type TournamentMatchRow = {
   division_id: string;
   group_id: string | null;
   group: { id: string; name: string; order: number; type: string } | null;
+  seed_a: number | null;
+  seed_b: number | null;
   status: string;
   score_a: number | null;
   score_b: number | null;
@@ -274,7 +279,7 @@ export async function listTournamentMatchesByDivision(
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,division_id,group_id,group:groups!matches_group_id_fkey!inner(id,name,order,type),status,score_a,score_b,scheduled_at,court_id,team_a_id,team_b_id,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name)"
+      "id,division_id,group_id,seed_a,seed_b,group:groups!matches_group_id_fkey!inner(id,name,order,type),status,score_a,score_b,scheduled_at,court_id,team_a_id,team_b_id,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name)"
     )
     .eq("division_id", divisionId)
     .eq("group.type", "tournament")
@@ -450,17 +455,37 @@ export async function saveTournamentResult(input: {
     return { ok: true, message: "저장 완료" };
   }
 
+  const { data: roundGroups, error: roundGroupsErr } = await supabase
+    .from("groups")
+    .select("name,order")
+    .eq("division_id", matchRow.division_id)
+    .eq("type", "tournament")
+    .order("order", { ascending: true });
+
+  if (roundGroupsErr) return { ok: false, error: roundGroupsErr.message };
+
+  const initialRound = (roundGroups ?? [])[0]?.name ?? null;
+
   const { data: currentMatches, error: currentErr } = await supabase
     .from("matches")
-    .select("id")
+    .select("id,seed_a,seed_b,created_at")
     .eq("division_id", matchRow.division_id)
-    .eq("group_id", matchRow.group.id)
-    .order("created_at", { ascending: true });
+    .eq("group_id", matchRow.group.id);
 
   if (currentErr) return { ok: false, error: currentErr.message };
-  const currentIndex = (currentMatches ?? []).findIndex(
-    (row) => row.id === matchId
-  );
+  const orderedCurrent = (currentMatches ?? [])
+    .map((row) => ({
+      id: row.id as string,
+      groupName: matchRow.group?.name ?? null,
+      seedA: (row.seed_a as number | null) ?? null,
+      seedB: (row.seed_b as number | null) ?? null,
+      createdAt: (row.created_at as string | null) ?? null,
+    }))
+    .sort((left, right) =>
+      compareTournamentMatchOrder(left, right, initialRound)
+    );
+
+  const currentIndex = orderedCurrent.findIndex((row) => row.id === matchId);
   if (currentIndex < 0) {
     return { ok: false, error: "현재 경기 순서를 찾을 수 없습니다." };
   }
@@ -480,13 +505,26 @@ export async function saveTournamentResult(input: {
 
   const { data: nextMatches, error: nextErr } = await supabase
     .from("matches")
-    .select("id,team_a_id,team_b_id")
+    .select("id,team_a_id,team_b_id,seed_a,seed_b,created_at")
     .eq("division_id", matchRow.division_id)
-    .eq("group_id", nextGroup.id)
-    .order("created_at", { ascending: true });
+    .eq("group_id", nextGroup.id);
 
   if (nextErr) return { ok: false, error: nextErr.message };
-  const nextMatch = (nextMatches ?? [])[Math.floor(currentIndex / 2)];
+  const orderedNext = (nextMatches ?? [])
+    .map((row) => ({
+      id: row.id as string,
+      groupName: nextRound,
+      seedA: (row.seed_a as number | null) ?? null,
+      seedB: (row.seed_b as number | null) ?? null,
+      createdAt: (row.created_at as string | null) ?? null,
+      team_a_id: row.team_a_id as string | null,
+      team_b_id: row.team_b_id as string | null,
+    }))
+    .sort((left, right) =>
+      compareTournamentMatchOrder(left, right, initialRound)
+    );
+
+  const nextMatch = orderedNext[Math.floor(currentIndex / 2)];
   if (!nextMatch) {
     return { ok: false, error: "다음 라운드 경기를 찾을 수 없습니다." };
   }
@@ -521,13 +559,26 @@ export async function saveTournamentResult(input: {
 
     const { data: thirdMatches, error: thirdErr } = await supabase
       .from("matches")
-      .select("id,team_a_id,team_b_id")
+      .select("id,team_a_id,team_b_id,seed_a,seed_b,created_at")
       .eq("division_id", matchRow.division_id)
-      .eq("group_id", thirdGroup.id)
-      .order("created_at", { ascending: true });
+      .eq("group_id", thirdGroup.id);
 
     if (thirdErr) return { ok: false, error: thirdErr.message };
-    const thirdMatch = (thirdMatches ?? [])[Math.floor(currentIndex / 2)];
+    const orderedThird = (thirdMatches ?? [])
+      .map((row) => ({
+        id: row.id as string,
+        groupName: "third_place",
+        seedA: (row.seed_a as number | null) ?? null,
+        seedB: (row.seed_b as number | null) ?? null,
+        createdAt: (row.created_at as string | null) ?? null,
+        team_a_id: row.team_a_id as string | null,
+        team_b_id: row.team_b_id as string | null,
+      }))
+      .sort((left, right) =>
+        compareTournamentMatchOrder(left, right, initialRound)
+      );
+
+    const thirdMatch = orderedThird[Math.floor(currentIndex / 2)];
     if (thirdMatch) {
       const thirdSlotKey = currentIndex % 2 === 0 ? "team_a_id" : "team_b_id";
       const thirdExisting = thirdMatch[thirdSlotKey as "team_a_id" | "team_b_id"];
@@ -616,12 +667,30 @@ export async function getTournamentSeedingPreview(
   if (divisionResult.error) return { data: null, error: divisionResult.error };
   if (!divisionResult.data) return { data: null, error: "Division을 찾을 수 없습니다." };
 
-  const tournamentSize = divisionResult.data.tournament_size ?? 0;
-  if (!roundByTournamentSize[tournamentSize]) {
-    return { data: null, error: "토너먼트 크기가 올바르지 않습니다." };
-  }
-
   const supabase = await createSupabaseServerClient();
+  const { data: roundGroups, error: roundGroupErr } = await supabase
+    .from("groups")
+    .select("id,name,order")
+    .eq("division_id", divisionId)
+    .eq("type", "tournament")
+    .order("order", { ascending: true });
+
+  if (roundGroupErr) return { data: null, error: roundGroupErr.message };
+  const firstGroup = (roundGroups ?? [])[0] as { id: string } | undefined;
+  if (!firstGroup) return { data: null, error: "토너먼트 그룹이 없습니다." };
+
+  const { data: roundMatches, error: roundErr } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("division_id", divisionId)
+    .eq("group_id", firstGroup.id);
+
+  if (roundErr) return { data: null, error: roundErr.message };
+
+  const tournamentSize = (roundMatches ?? []).length * 2;
+  if (tournamentSize <= 0) {
+    return { data: null, error: "토너먼트 매치가 없습니다." };
+  }
   const { data: standings, error: standingsErr } = await supabase
     .from("standings")
     .select("team_id,rank,teams(team_name)")
@@ -682,12 +751,41 @@ export async function seedTournamentTeamsFromConfirmedStandings(
     return { ok: false, error: "리그 순위가 확정되지 않았습니다." };
   }
 
-  const size = tournament_size ?? 0;
-  if (!roundByTournamentSize[size]) {
-    return { ok: false, error: "토너먼트 크기가 올바르지 않습니다." };
+  const supabase = await createSupabaseServerClient();
+  const { data: roundGroups, error: roundGroupErr } = await supabase
+    .from("groups")
+    .select("id,name,order")
+    .eq("division_id", divisionId)
+    .eq("type", "tournament")
+    .order("order", { ascending: true });
+
+  if (roundGroupErr) return { ok: false, error: roundGroupErr.message };
+  const firstGroup = (roundGroups ?? [])[0] as { id: string } | undefined;
+  if (!firstGroup) {
+    return { ok: false, error: "토너먼트 그룹이 없습니다." };
   }
 
-  const supabase = await createSupabaseServerClient();
+  const { data: roundMatches, error: roundErr } = await supabase
+    .from("matches")
+    .select("id,team_a_id,team_b_id,created_at")
+    .eq("division_id", divisionId)
+    .eq("group_id", firstGroup.id)
+    .order("created_at", { ascending: true });
+
+  if (roundErr) return { ok: false, error: roundErr.message };
+
+  const matches = (roundMatches ?? []) as {
+    id: string;
+    team_a_id: string | null;
+    team_b_id: string | null;
+  }[];
+
+  if (matches.length === 0) {
+    return { ok: false, error: "토너먼트 매치가 없습니다." };
+  }
+
+  const size = matches.length * 2;
+
   const { data: standings, error: standingsErr } = await supabase
     .from("standings")
     .select("team_id,rank")
@@ -715,33 +813,6 @@ export async function seedTournamentTeamsFromConfirmedStandings(
   if (hasAssigned) {
     return { ok: false, error: "이미 팀이 배치된 토너먼트 경기가 있습니다." };
   }
-
-  const firstRound = roundByTournamentSize[size];
-  const { data: firstGroup, error: firstGroupErr } = await supabase
-    .from("groups")
-    .select("id")
-    .eq("division_id", divisionId)
-    .eq("type", "tournament")
-    .eq("name", firstRound)
-    .maybeSingle();
-
-  if (firstGroupErr) return { ok: false, error: firstGroupErr.message };
-  if (!firstGroup) return { ok: false, error: "토너먼트 그룹이 없습니다." };
-
-  const { data: roundMatches, error: roundErr } = await supabase
-    .from("matches")
-    .select("id,team_a_id,team_b_id,created_at")
-    .eq("division_id", divisionId)
-    .eq("group_id", firstGroup.id)
-    .order("created_at", { ascending: true });
-
-  if (roundErr) return { ok: false, error: roundErr.message };
-
-  const matches = (roundMatches ?? []) as {
-    id: string;
-    team_a_id: string | null;
-    team_b_id: string | null;
-  }[];
 
   const pairs = buildSeedPairs(size);
   if (matches.length < pairs.length) {

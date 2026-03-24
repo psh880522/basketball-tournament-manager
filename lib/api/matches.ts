@@ -287,7 +287,7 @@ export async function listMatchesForResultEntry(
   let query = supabase
     .from("matches")
     .select(
-      "id,tournament_id,division_id,group_id,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name,type),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
+      "id,tournament_id,division_id,group_id,seed_a,seed_b,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name,type),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
     )
     .eq("tournament_id", tournamentId);
 
@@ -329,6 +329,8 @@ export async function listMatchesForResultEntry(
         group_id: row.group_id as string | null,
         groupName: grp?.name ?? null,
         groupType: grp?.type ?? null,
+        seedA: (row.seed_a as number | null) ?? null,
+        seedB: (row.seed_b as number | null) ?? null,
         team_a_id: row.team_a_id as string,
         team_b_id: row.team_b_id as string,
         teamAName: teamA?.team_name ?? "TBD",
@@ -472,6 +474,8 @@ export type MatchListRow = {
   group_id: string | null;
   groupName: string | null;
   groupType: string | null;
+  seedA: number | null;
+  seedB: number | null;
   team_a_id: string | null;
   team_b_id: string | null;
   teamAName: string;
@@ -497,7 +501,7 @@ export async function listTournamentMatches(
   let query = supabase
     .from("matches")
     .select(
-      "id,tournament_id,division_id,group_id,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name,type),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
+      "id,tournament_id,division_id,group_id,seed_a,seed_b,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name,type),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
     )
     .eq("tournament_id", tournamentId);
 
@@ -533,6 +537,8 @@ export async function listTournamentMatches(
         group_id: row.group_id as string | null,
         groupName: grp?.name ?? null,
         groupType: grp?.type ?? null,
+        seedA: (row.seed_a as number | null) ?? null,
+        seedB: (row.seed_b as number | null) ?? null,
         team_a_id: (row.team_a_id as string | null) ?? null,
         team_b_id: (row.team_b_id as string | null) ?? null,
         teamAName: teamA?.team_name ?? "TBD",

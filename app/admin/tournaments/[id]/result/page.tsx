@@ -6,7 +6,6 @@ import { getCourtsByTournament } from "@/lib/api/courts";
 import {
   getLeagueStandings,
   getTournamentSeedingPreview,
-  getTournamentBracketProgress,
   listLeagueMatchesForResult,
   listTournamentMatchesByDivision,
 } from "@/lib/api/results";
@@ -56,7 +55,7 @@ export default async function TournamentResultPage({
     divisions.find((division) => division.id === selectedDivisionId) ??
     divisions[0];
 
-  const [standingsResult, previewResult, matchesResult, tournamentMatchesResult, progressResult] = await Promise.all([
+  const [standingsResult, previewResult, matchesResult, tournamentMatchesResult] = await Promise.all([
     getLeagueStandings(selectedDivision.id),
     getTournamentSeedingPreview(selectedDivision.id),
     listLeagueMatchesForResult(tournamentId, {
@@ -64,7 +63,6 @@ export default async function TournamentResultPage({
       courtId: selectedCourtId || undefined,
     }),
     listTournamentMatchesByDivision(selectedDivision.id),
-    getTournamentBracketProgress(selectedDivision.id),
   ]);
 
   return (
@@ -133,10 +131,6 @@ export default async function TournamentResultPage({
           <Card className="text-sm text-red-600">{tournamentMatchesResult.error}</Card>
         ) : null}
 
-        {progressResult.error ? (
-          <Card className="text-sm text-red-600">{progressResult.error}</Card>
-        ) : null}
-
         <ResultForm
           tournamentId={tournamentId}
           divisionId={selectedDivision.id}
@@ -149,7 +143,6 @@ export default async function TournamentResultPage({
           preview={previewResult.data ?? []}
           matches={matchesResult.data ?? []}
           tournamentMatches={tournamentMatchesResult.data ?? []}
-          tournamentProgress={progressResult.data}
         />
       </div>
     </main>

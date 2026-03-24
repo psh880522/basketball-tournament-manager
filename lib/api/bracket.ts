@@ -384,6 +384,15 @@ export async function createTournamentMatches(input: {
     return { ok: false, error: "이미 토너먼트 경기가 존재합니다." };
   }
 
+  const { error: updateDivisionErr } = await supabase
+    .from("divisions")
+    .update({ tournament_size: tournamentSize })
+    .eq("id", divisionId);
+
+  if (updateDivisionErr) {
+    return { ok: false, error: updateDivisionErr.message };
+  }
+
   const roundStructure: { name: string; matchCount: number }[] = (() => {
     if (tournamentSize === 4) {
       return [

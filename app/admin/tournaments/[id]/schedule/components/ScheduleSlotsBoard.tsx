@@ -19,9 +19,15 @@ import {
   formatLeagueMatchLabel,
   formatTournamentCategoryLabel,
   formatTournamentMatchLabel,
-  getInitialTournamentRound,
-  getPreviousTournamentRound,
 } from "@/lib/formatters/matchLabel";
+import {
+  buildTournamentRoundMetaByRound,
+  type TournamentRoundMeta,
+} from "@/lib/formatters/tournamentRoundMeta";
+import {
+  compareTournamentMatchOrder,
+  getInitialRoundFromRoundMap,
+} from "@/lib/formatters/tournamentMatchOrder";
 
 type Message = { tone: "error"; text: string } | null;
 
@@ -31,12 +37,7 @@ type DragState = {
   matchId: string;
 } | null;
 
-type TournamentSlotMeta = {
-  roundIndex: number | null;
-  roundTotal: number | null;
-  previousRoundTotal: number | null;
-  initialRound: string | null;
-};
+type TournamentSlotMeta = TournamentRoundMeta;
 
 type Props = {
   slots: ScheduleSlotCourtGroup[] | null;
@@ -196,28 +197,31 @@ function buildTournamentSlotMeta(
   });
 
   divisionRoundBuckets.forEach((roundBucket) => {
-    const roundCounts = new Map<string, number>();
-    roundBucket.forEach((list, key) => {
-      roundCounts.set(key, list.length);
+    const initialRound = getInitialRoundFromRoundMap(roundBucket);
+    const metaById = buildTournamentRoundMetaByRound(roundBucket, {
+      getId: (slot) => slot.id,
+      sort: (left, right) =>
+        compareTournamentMatchOrder(
+          {
+            id: left.id,
+            groupName: left.match?.groupName ?? null,
+            seedA: left.match?.seedA ?? null,
+            seedB: left.match?.seedB ?? null,
+            createdAt: null,
+          },
+          {
+            id: right.id,
+            groupName: right.match?.groupName ?? null,
+            seedA: right.match?.seedA ?? null,
+            seedB: right.match?.seedB ?? null,
+            createdAt: null,
+          },
+          initialRound
+        ),
     });
-    const initialRound = getInitialTournamentRound(roundCounts);
 
-    roundBucket.forEach((list, key) => {
-      const ordered = [...list].sort(sortSlots);
-      const roundTotal = roundCounts.get(key) ?? null;
-      const previousRound = getPreviousTournamentRound(key);
-      const previousRoundTotal = previousRound
-        ? roundCounts.get(previousRound) ?? null
-        : null;
-
-      ordered.forEach((slot, index) => {
-        metaBySlotId.set(slot.id, {
-          roundIndex: index + 1,
-          roundTotal,
-          previousRoundTotal,
-          initialRound,
-        });
-      });
+    metaById.forEach((meta, id) => {
+      metaBySlotId.set(id, meta);
     });
   });
 

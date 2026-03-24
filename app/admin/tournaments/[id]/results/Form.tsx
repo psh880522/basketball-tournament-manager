@@ -11,9 +11,8 @@ import {
   formatLeagueMatchLabel,
   formatTournamentCategoryLabel,
   formatTournamentMatchLabel,
-  getInitialTournamentRound,
-  getPreviousTournamentRound,
 } from "@/lib/formatters/matchLabel";
+import { buildTournamentRoundMetaByRound } from "@/lib/formatters/tournamentRoundMeta";
 
 type Props = {
   tournamentId: string;
@@ -448,32 +447,51 @@ export default function ResultEntryForm({
                                     </thead>
                                     <tbody className="divide-y">
                                       {(() => {
-                                        const roundCounts = new Map<string, number>();
+                                        const roundMap = new Map<
+                                          string,
+                                          (typeof division.tournamentMatches)[number][]
+                                        >();
+
                                         division.tournamentMatches.forEach((match) => {
                                           const key = match.groupName ?? "tournament";
-                                          roundCounts.set(key, (roundCounts.get(key) ?? 0) + 1);
+                                          const list = roundMap.get(key) ?? [];
+                                          list.push(match);
+                                          roundMap.set(key, list);
                                         });
-                                        const initialRound =
-                                          getInitialTournamentRound(roundCounts);
-                                        const roundIndexes = new Map<string, number>();
+
+                                        const sortMatches = (
+                                          left: (typeof division.tournamentMatches)[number],
+                                          right: (typeof division.tournamentMatches)[number]
+                                        ) => {
+                                          const leftTime = left.scheduled_at
+                                            ? Date.parse(left.scheduled_at)
+                                            : Infinity;
+                                          const rightTime = right.scheduled_at
+                                            ? Date.parse(right.scheduled_at)
+                                            : Infinity;
+                                          if (leftTime !== rightTime) return leftTime - rightTime;
+                                          return left.id.localeCompare(right.id);
+                                        };
+
+                                        const metaById = buildTournamentRoundMetaByRound(roundMap, {
+                                          getId: (match) => match.id,
+                                          sort: sortMatches,
+                                        });
 
                                         return division.tournamentMatches.map((m) => {
                                           const row = rowStates[m.id] ?? buildRowState(m);
                                           const isBusy = row.saving;
-                                          const key = m.groupName ?? "tournament";
-                                          const nextIndex = (roundIndexes.get(key) ?? 0) + 1;
-                                          roundIndexes.set(key, nextIndex);
-                                          const roundTotal = roundCounts.get(key) ?? null;
-                                          const previousRound =
-                                            getPreviousTournamentRound(m.groupName ?? null);
-                                          const previousRoundTotal = previousRound
-                                            ? roundCounts.get(previousRound) ?? null
-                                            : null;
+                                          const meta = metaById.get(m.id) ?? null;
+                                          const roundIndex = meta?.roundIndex ?? null;
+                                          const roundTotal = meta?.roundTotal ?? null;
+                                          const initialRound = meta?.initialRound ?? null;
+                                          const previousRoundTotal =
+                                            meta?.previousRoundTotal ?? null;
                                           const matchLabel = formatTournamentMatchLabel({
                                             groupName: m.groupName,
                                             teamA: m.teamAName,
                                             teamB: m.teamBName,
-                                            roundIndex: nextIndex,
+                                            roundIndex,
                                             roundTotal,
                                             initialRound,
                                             previousRoundTotal,
@@ -490,7 +508,7 @@ export default function ResultEntryForm({
                                               <td className="px-3 py-2 text-gray-600">
                                                 {formatTournamentCategoryLabel(
                                                   m.groupName,
-                                                  nextIndex,
+                                                  roundIndex,
                                                   roundTotal
                                                 )}
                                               </td>

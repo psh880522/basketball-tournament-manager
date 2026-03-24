@@ -9,7 +9,6 @@ export type ScheduleMatchRow = {
   tournament_id: string;
   division_id: string;
   group_id: string | null;
-  round: string | null;
   team_a_id: string;
   team_b_id: string;
   court_id: string | null;
@@ -44,7 +43,7 @@ export async function getScheduleMatches(
   let query = supabase
     .from("matches")
     .select(
-      "id,tournament_id,division_id,group_id,round,team_a_id,team_b_id,court_id,scheduled_at,status,divisions(name),groups(name,order),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts(id,name)"
+      "id,tournament_id,division_id,group_id,team_a_id,team_b_id,court_id,scheduled_at,status,divisions(name),groups(name,order),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts(id,name)"
     )
     .eq("tournament_id", tournamentId)
     .order("scheduled_at", { ascending: true, nullsFirst: false })
@@ -108,7 +107,7 @@ export async function generateSchedule(input: {
   // 3) Fetch all matches for tournament, ordered by division
   const { data: allMatches, error: matchErr } = await supabase
     .from("matches")
-    .select("id,division_id,group_id,round,created_at")
+    .select("id,division_id,group_id,created_at")
     .eq("tournament_id", tournamentId)
     .order("created_at", { ascending: true });
 

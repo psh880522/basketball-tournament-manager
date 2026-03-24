@@ -10,9 +10,15 @@ import {
   formatLeagueMatchLabel,
   formatTournamentCategoryLabel,
   formatTournamentMatchLabel,
-  getInitialTournamentRound,
-  getPreviousTournamentRound,
 } from "@/lib/formatters/matchLabel";
+import {
+  buildTournamentRoundMetaByRound,
+  type TournamentRoundMeta,
+} from "@/lib/formatters/tournamentRoundMeta";
+import {
+  compareTournamentMatchOrder,
+  getInitialRoundFromRoundMap,
+} from "@/lib/formatters/tournamentMatchOrder";
 import MatchFilters from "./Filters";
 
 type PageProps = {
@@ -178,6 +184,57 @@ export default async function TournamentMatchesPage({
           const divisionOrder = new Map(
             divisions.map((d, i) => [d.id, i])
           );
+
+          const divisionTournamentMap = new Map<
+            string,
+            (typeof matches)[number][]
+          >();
+
+          matches.forEach((match) => {
+            if (match.groupType !== "tournament") return;
+            const list = divisionTournamentMap.get(match.division_id) ?? [];
+            list.push(match);
+            divisionTournamentMap.set(match.division_id, list);
+          });
+
+          const divisionMetaMap = new Map<string, Map<string, TournamentRoundMeta>>();
+
+          divisionTournamentMap.forEach((divisionMatches, divisionId) => {
+            const roundMap = new Map<
+              string,
+              (typeof divisionMatches)[number][]
+            >();
+            divisionMatches.forEach((match) => {
+              const key = match.groupName ?? "tournament";
+              const list = roundMap.get(key) ?? [];
+              list.push(match);
+              roundMap.set(key, list);
+            });
+
+            const initialRound = getInitialRoundFromRoundMap(roundMap);
+            const metaById = buildTournamentRoundMetaByRound(roundMap, {
+              getId: (match) => match.id,
+              sort: (left, right) =>
+                compareTournamentMatchOrder(
+                  {
+                    id: left.id,
+                    groupName: left.groupName ?? null,
+                    seedA: left.seedA ?? null,
+                    seedB: left.seedB ?? null,
+                    createdAt: left.created_at ?? null,
+                  },
+                  {
+                    id: right.id,
+                    groupName: right.groupName ?? null,
+                    seedA: right.seedA ?? null,
+                    seedB: right.seedB ?? null,
+                    createdAt: right.created_at ?? null,
+                  },
+                  initialRound
+                ),
+            });
+            divisionMetaMap.set(divisionId, metaById);
+          });
 
           type DivisionSection = {
             id: string;
@@ -372,14 +429,8 @@ export default async function TournamentMatchesPage({
                                     </thead>
                                     <tbody className="divide-y">
                                       {(() => {
-                                        const roundCounts = new Map<string, number>();
-                                        division.tournamentMatches.forEach((match) => {
-                                          const key = match.groupName ?? "tournament";
-                                          roundCounts.set(key, (roundCounts.get(key) ?? 0) + 1);
-                                        });
-                                        const initialRound =
-                                          getInitialTournamentRound(roundCounts);
-                                        const roundIndexes = new Map<string, number>();
+                                        const metaById =
+                                          divisionMetaMap.get(division.id) ?? new Map();
 
                                         return division.tournamentMatches.map((m) => {
                                           const rankMap = divisionRanks[division.id] ?? {};
@@ -389,22 +440,19 @@ export default async function TournamentMatchesPage({
                                           const seedB = m.team_b_id
                                             ? rankMap[m.team_b_id] ?? null
                                             : null;
-                                          const key = m.groupName ?? "tournament";
-                                          const nextIndex = (roundIndexes.get(key) ?? 0) + 1;
-                                          roundIndexes.set(key, nextIndex);
-                                          const roundTotal = roundCounts.get(key) ?? null;
-                                          const previousRound =
-                                            getPreviousTournamentRound(m.groupName ?? null);
-                                          const previousRoundTotal = previousRound
-                                            ? roundCounts.get(previousRound) ?? null
-                                            : null;
+                                          const meta = metaById.get(m.id) ?? null;
+                                          const roundIndex = meta?.roundIndex ?? null;
+                                          const roundTotal = meta?.roundTotal ?? null;
+                                          const initialRound = meta?.initialRound ?? null;
+                                          const previousRoundTotal =
+                                            meta?.previousRoundTotal ?? null;
                                           const matchLabel = formatTournamentMatchLabel({
                                             groupName: m.groupName,
                                             teamA: m.teamAName,
                                             teamB: m.teamBName,
                                             seedA,
                                             seedB,
-                                            roundIndex: nextIndex,
+                                            roundIndex,
                                             roundTotal,
                                             initialRound,
                                             previousRoundTotal,
@@ -418,7 +466,7 @@ export default async function TournamentMatchesPage({
                                               <td className="px-4 py-3 text-gray-600">
                                                 {formatTournamentCategoryLabel(
                                                   m.groupName,
-                                                  nextIndex,
+                                                  roundIndex,
                                                   roundTotal
                                                 )}
                                               </td>
