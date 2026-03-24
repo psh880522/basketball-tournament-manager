@@ -137,6 +137,8 @@ const metaById = buildTournamentRoundMetaByRound(roundMap, {
 - schedule.ts(legacy)와 schedule-slots.ts가 이중으로 존재하므로,
   - 실제 운영 플로우에서 사용하는 경로에만 변경 적용 여부 확인 필요.
 
+//TODO: schedule.ts(legacy) 관련 코드 제거
+
 ## 6. 계획 요약
 - 공통 정렬 유틸을 추가하여 토너먼트 경기 순서를 시드 기반으로 통일.
 - 스케줄 생성, 결과 자동 진출, 라벨링 계산 모두 동일한 정렬 기준 사용.
