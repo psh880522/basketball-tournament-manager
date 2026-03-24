@@ -59,6 +59,10 @@ export async function getTournamentProgressState(
   }
 
   if (!tournament) {
+    console.log("[tournamentProgress] not found", {
+      tournamentId,
+      userId,
+    });
     return { data: null, error: "Tournament not found." };
   }
 
@@ -100,9 +104,12 @@ export async function getTournamentProgressState(
 
   const groupMatchesResult = await supabase
     .from("matches")
-    .select("id", { count: "exact", head: true })
+    .select("id,group:groups!matches_group_id_fkey!inner(type)", {
+      count: "exact",
+      head: true,
+    })
     .eq("tournament_id", tournamentId)
-    .not("group_id", "is", null);
+    .eq("group.type", "league");
 
   if (groupMatchesResult.error) {
     return { data: null, error: groupMatchesResult.error.message };
@@ -110,9 +117,12 @@ export async function getTournamentProgressState(
 
   const completedGroupMatchesResult = await supabase
     .from("matches")
-    .select("id", { count: "exact", head: true })
+    .select("id,group:groups!matches_group_id_fkey!inner(type)", {
+      count: "exact",
+      head: true,
+    })
     .eq("tournament_id", tournamentId)
-    .not("group_id", "is", null)
+    .eq("group.type", "league")
     .eq("status", "completed");
 
   if (completedGroupMatchesResult.error) {
@@ -149,9 +159,12 @@ export async function getTournamentProgressState(
 
   const tournamentMatchesResult = await supabase
     .from("matches")
-    .select("id", { count: "exact", head: true })
+    .select("id,group:groups!matches_group_id_fkey!inner(type)", {
+      count: "exact",
+      head: true,
+    })
     .eq("tournament_id", tournamentId)
-    .is("group_id", null);
+    .eq("group.type", "tournament");
 
   if (tournamentMatchesResult.error) {
     return { data: null, error: tournamentMatchesResult.error.message };
@@ -159,10 +172,13 @@ export async function getTournamentProgressState(
 
   const finalCompletedResult = await supabase
     .from("matches")
-    .select("id", { count: "exact", head: true })
+    .select("id,group:groups!matches_group_id_fkey!inner(name,type)", {
+      count: "exact",
+      head: true,
+    })
     .eq("tournament_id", tournamentId)
-    .is("group_id", null)
-    .eq("round", "final")
+    .eq("group.type", "tournament")
+    .eq("group.name", "final")
     .eq("status", "completed");
 
   if (finalCompletedResult.error) {
@@ -171,10 +187,13 @@ export async function getTournamentProgressState(
 
   const finalExistsResult = await supabase
     .from("matches")
-    .select("id", { count: "exact", head: true })
+    .select("id,group:groups!matches_group_id_fkey!inner(name,type)", {
+      count: "exact",
+      head: true,
+    })
     .eq("tournament_id", tournamentId)
-    .is("group_id", null)
-    .eq("round", "final");
+    .eq("group.type", "tournament")
+    .eq("group.name", "final");
 
   if (finalExistsResult.error) {
     return { data: null, error: finalExistsResult.error.message };
@@ -218,6 +237,7 @@ export async function getTournamentProgressState(
 
   const state = resolveState(summary);
   const nextAction = resolveNextAction(tournamentId, state, summary);
+
 
   return {
     data: {

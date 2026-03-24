@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getUserWithRole } from "@/src/lib/auth/roles";
 import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
 import {
   countMatchesByDivision,
@@ -14,7 +15,7 @@ import {
   getTournamentStatus,
 } from "@/lib/api/bracket";
 import { updateDivision } from "@/lib/api/divisions";
-import { deleteMatchesByDivision } from "@/lib/api/matches";
+import { deleteMatchesByDivision, updateMatchSeeds } from "@/lib/api/matches";
 import { deleteGroupsByDivision } from "@/lib/api/groups";
 import {
   previewDivisionGeneration,
@@ -247,4 +248,32 @@ export async function createTournamentMatchesAction(input: {
   }
 
   return result;
+}
+
+export async function updateMatchSeedAction(input: {
+  tournamentId: string;
+  matchId: string;
+  seedA: number | null;
+  seedB: number | null;
+}): Promise<ActionResult> {
+  const auth = await getUserWithRole();
+  if (auth.status !== "ready" || auth.role !== "organizer") {
+    return { ok: false, error: "권한이 없습니다." };
+  }
+
+  const { tournamentId, matchId, seedA, seedB } = input;
+  if (!matchId) return { ok: false, error: "경기 ID가 없습니다." };
+
+  if (seedA !== null && (!Number.isInteger(seedA) || seedA < 1)) {
+    return { ok: false, error: "시드A는 1 이상의 정수여야 합니다." };
+  }
+  if (seedB !== null && (!Number.isInteger(seedB) || seedB < 1)) {
+    return { ok: false, error: "시드B는 1 이상의 정수여야 합니다." };
+  }
+
+  const result = await updateMatchSeeds(matchId, seedA, seedB);
+  if (result.error) return { ok: false, error: result.error };
+
+  revalidatePath(`/admin/tournaments/${tournamentId}/bracket`);
+  return { ok: true };
 }

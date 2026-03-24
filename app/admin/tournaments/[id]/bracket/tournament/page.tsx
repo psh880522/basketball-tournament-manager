@@ -101,16 +101,25 @@ async function TournamentBracketContent({
   const renderTournamentMatch = (match: (typeof matchRows)[number]) => {
     const teamA = match.team_a?.team_name ?? "TBD";
     const teamB = match.team_b?.team_name ?? "TBD";
-    const roundLabel = match.round ? roundLabels[match.round] ?? "토너먼트" : "토너먼트";
+    const roundKey = match.group?.name ?? null;
+    const roundLabel = roundKey ? roundLabels[roundKey] ?? "토너먼트" : "토너먼트";
     const seedLabel = buildSeedLabel(match) ?? "TBD vs TBD";
     const scoreLabel = "-:-";
     return `[${roundLabel}] ${seedLabel} (${scoreLabel})`;
   };
-  const roundOf16Matches = matchRows.filter((match) => match.round === "round_of_16");
-  const quarterfinalMatches = matchRows.filter((match) => match.round === "quarterfinal");
-  const semifinalMatches = matchRows.filter((match) => match.round === "semifinal");
-  const thirdPlaceMatches = matchRows.filter((match) => match.round === "third_place");
-  const finalMatches = matchRows.filter((match) => match.round === "final");
+  const roundOf16Matches = matchRows.filter(
+    (match) => match.group?.name === "round_of_16"
+  );
+  const quarterfinalMatches = matchRows.filter(
+    (match) => match.group?.name === "quarterfinal"
+  );
+  const semifinalMatches = matchRows.filter(
+    (match) => match.group?.name === "semifinal"
+  );
+  const thirdPlaceMatches = matchRows.filter(
+    (match) => match.group?.name === "third_place"
+  );
+  const finalMatches = matchRows.filter((match) => match.group?.name === "final");
   const currentRound = finalMatches.length > 0
     ? "final"
     : semifinalMatches.length > 0

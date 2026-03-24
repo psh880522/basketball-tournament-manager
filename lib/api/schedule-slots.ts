@@ -1,7 +1,12 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { listApprovedTeamsByDivision } from "@/lib/api/applications";
-import { createGroups, createGroupTeams, createMatches } from "@/lib/api/bracket";
+import {
+  createGroups,
+  createGroupTeams,
+  createMatches,
+  createTournamentMatches,
+} from "@/lib/api/bracket";
 
 type ApiResult<T> = {
   data: T | null;
@@ -18,7 +23,8 @@ export type ScheduleValidationResult = {
 
 export type ScheduleSlotMatch = {
   id: string;
-  round: string | null;
+  groupName: string | null;
+  groupOrder: number | null;
   team_a_id: string | null;
   team_b_id: string | null;
   team_a: string | null;
@@ -123,7 +129,7 @@ export async function getScheduleSlots(
   const { data, error } = await supabase
     .from("schedule_slots")
     .select(
-      "id,slot_type,stage_type,start_at,end_at,court_id,division_id,match_id,label,sort_order,divisions(id,name),courts(id,name),matches!schedule_slots_match_id_fkey(id,round,score_a,score_b,group_id,groups(name,order),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name))"
+      "id,slot_type,stage_type,start_at,end_at,court_id,division_id,match_id,label,sort_order,divisions(id,name),courts(id,name),matches!schedule_slots_match_id_fkey(id,score_a,score_b,group_id,seed_a,seed_b,groups(id,name,order,type),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name))"
     )
     .eq("tournament_id", tournamentId)
     .order("court_id", { ascending: true })
@@ -177,7 +183,7 @@ export async function getScheduleSlots(
 
     let lastGroupKey: string | null = null;
     const pendingBreaks: Record<number, string> = {};
-    ordered.forEach((row) => {
+    ordered.forEach((row, index) => {
       const match = row.matches as
         | {
             groups: { name: string } | null;
@@ -309,9 +315,9 @@ export async function getScheduleSlots(
           score_a: number | null;
           score_b: number | null;
           group_id: string | null;
-          groups: { name: string; order: number } | null;
-          team_a: { team_name: string } | null;
-          team_b: { team_name: string } | null;
+          groups: { id: string; name: string; order: number; type: string } | null;
+          team_a: { id: string; team_name: string } | null;
+          team_b: { id: string; team_name: string } | null;
         }
       | null;
 
@@ -362,9 +368,10 @@ export async function getScheduleSlots(
       match: match
         ? {
             id: match.id,
-            round: (match.round as string | null) ?? null,
-            team_a_id: (match.team_a?.id as string | null) ?? null,
-            team_b_id: (match.team_b?.id as string | null) ?? null,
+            groupName: match.groups?.name ?? null,
+            groupOrder: match.groups?.order ?? null,
+            team_a_id: match.team_a?.id ?? null,
+            team_b_id: match.team_b?.id ?? null,
             team_a: match.team_a?.team_name ?? null,
             team_b: match.team_b?.team_name ?? null,
             score_a: match.score_a ?? null,
@@ -509,14 +516,18 @@ export async function seedGroupMatchSlots(input: {
   const supabase = await createSupabaseServerClient();
   const { data: existingMatches, error: matchErr } = await supabase
     .from("matches")
-    .select("id,group_id,created_at")
+    .select("id,group_id,created_at,group:groups!matches_group_id_fkey!inner(type)")
     .eq("division_id", divisionId)
-    .not("group_id", "is", null)
+    .eq("group.type", "league")
     .order("created_at", { ascending: true });
 
   if (matchErr) return { ok: false, error: matchErr.message };
 
-  let matches = (existingMatches ?? []) as { id: string; group_id: string | null; created_at: string }[];
+  let matches = (existingMatches ?? []) as {
+    id: string;
+    group_id: string | null;
+    created_at: string;
+  }[];
 
   if (matches.length === 0) {
     const { data: groups, error: groupsErr } = await supabase
@@ -619,9 +630,9 @@ export async function seedGroupMatchSlots(input: {
 
     const { data: refreshedMatches, error: refreshErr } = await supabase
       .from("matches")
-      .select("id,group_id,created_at")
+      .select("id,group_id,created_at,group:groups!matches_group_id_fkey!inner(type)")
       .eq("division_id", divisionId)
-      .not("group_id", "is", null)
+      .eq("group.type", "league")
       .order("created_at", { ascending: true });
 
     if (refreshErr) return { ok: false, error: refreshErr.message };
@@ -698,100 +709,27 @@ export async function seedTournamentMatchSlots(input: {
   if (assignToTournament) {
     const { data: existingMatches, error: matchErr } = await supabase
       .from("matches")
-      .select("id")
+      .select("id,group:groups!matches_group_id_fkey!inner(type)")
       .eq("division_id", divisionId)
-      .is("group_id", null)
+      .eq("group.type", "tournament")
       .order("created_at", { ascending: true });
 
     if (matchErr) return { ok: false, error: matchErr.message };
     matches = (existingMatches ?? []) as { id: string }[];
 
     if (matches.length === 0) {
-      const teamsResult = await listApprovedTeamsByDivision(tournamentId, divisionId);
-      if (teamsResult.error) return { ok: false, error: teamsResult.error };
-
-      const teams = (teamsResult.data ?? []).map((t) => t.team_id);
-      if (teams.length < tournamentSize) {
-        return { ok: false, error: "승인된 팀 수가 부족합니다." };
-      }
-
-      const selected = teams.slice(0, tournamentSize);
-      const initialRound =
-        tournamentSize === 4
-          ? "semifinal"
-          : tournamentSize === 8
-          ? "quarterfinal"
-          : tournamentSize === 16
-          ? "round_of_16"
-          : null;
-
-      if (!initialRound) {
-        return { ok: false, error: "토너먼트 크기는 4/8/16만 허용됩니다." };
-      }
-      const matchEntries = [] as {
-        tournament_id: string;
-        division_id: string;
-        group_id: string | null;
-        round: string | null;
-        team_a_id: string | null;
-        team_b_id: string | null;
-        status: string;
-        court_id: string | null;
-      }[];
-
-      const pushMatch = (
-        round: string,
-        teamAId: string | null,
-        teamBId: string | null
-      ) => {
-        matchEntries.push({
-          tournament_id: tournamentId,
-          division_id: divisionId,
-          group_id: null,
-          round,
-          team_a_id: teamAId,
-          team_b_id: teamBId,
-          status: "scheduled",
-          court_id: null,
-        });
-      };
-
-      for (let i = 0; i < selected.length; i += 2) {
-        pushMatch(initialRound, selected[i] ?? null, selected[i + 1] ?? null);
-      }
-
-      if (tournamentSize === 4) {
-        pushMatch("final", null, null);
-        pushMatch("third_place", null, null);
-      }
-
-      if (tournamentSize === 8) {
-        for (let i = 0; i < 2; i += 1) {
-          pushMatch("semifinal", null, null);
-        }
-        pushMatch("final", null, null);
-        pushMatch("third_place", null, null);
-      }
-
-      if (tournamentSize === 16) {
-        for (let i = 0; i < 4; i += 1) {
-          pushMatch("quarterfinal", null, null);
-        }
-        for (let i = 0; i < 2; i += 1) {
-          pushMatch("semifinal", null, null);
-        }
-        pushMatch("final", null, null);
-        pushMatch("third_place", null, null);
-      }
-
-      const created = await createMatches(matchEntries);
-      if (created.error) return { ok: false, error: created.error };
+      const created = await createTournamentMatches({
+        tournamentId,
+        divisionId,
+        tournamentSize,
+      });
+      if (!created.ok) return { ok: false, error: created.error };
 
       const { data: refreshedMatches, error: refreshErr } = await supabase
         .from("matches")
-        .select("id")
+        .select("id,group:groups!matches_group_id_fkey!inner(type)")
         .eq("division_id", divisionId)
-        .is("group_id", null)
+        .eq("group.type", "tournament")
         .order("created_at", { ascending: true });
 
       if (refreshErr) return { ok: false, error: refreshErr.message };
@@ -908,9 +846,9 @@ export async function seedGroupMatchSlotsFromBracket(input: {
   const supabase = await createSupabaseServerClient();
   const { data: matches, error } = await supabase
     .from("matches")
-    .select("id")
+    .select("id,group:groups!matches_group_id_fkey!inner(type)")
     .eq("division_id", divisionId)
-    .not("group_id", "is", null)
+    .eq("group.type", "league")
     .order("created_at", { ascending: true });
 
   if (error) return { ok: false, error: error.message };
@@ -1009,7 +947,7 @@ export async function generateScheduleSlots(input: {
 
   const { data: matches, error: matchesErr } = await supabase
     .from("matches")
-    .select("id,division_id,group_id,court_id,round,created_at,groups(name,order)")
+    .select("id,division_id,group_id,court_id,created_at,groups(id,name,order,type)")
     .eq("tournament_id", tournamentId)
     .order("created_at", { ascending: true });
 
@@ -1046,13 +984,17 @@ export async function generateScheduleSlots(input: {
 
   for (const divisionId of divisionIds) {
     const divisionMatches = matchesByDivision.get(divisionId) ?? [];
-    const groupMatches = divisionMatches.filter((match) => match.group_id);
+    const groupMatches = divisionMatches.filter(
+      (match) => (match.groups as { type?: string } | null)?.type === "league"
+    );
     const matchesByGroup = new Map<string, typeof groupMatches>();
     const groupOrders = new Map<string, number>();
     let missingGroupCount = 0;
 
     groupMatches.forEach((match) => {
-      const groupMeta = match.groups as { name: string; order: number } | null;
+      const groupMeta = match.groups as
+        | { name: string; order: number; type: string }
+        | null;
       const groupName = groupMeta?.name ?? null;
       if (!groupName) {
         missingGroupCount += 1;
@@ -1087,34 +1029,25 @@ export async function generateScheduleSlots(input: {
     groupAssignments.set(divisionId, assignment);
   }
 
-  const roundOrder = [
-    "round_of_16",
-    "quarterfinal",
-    "semifinal",
-    "final",
-    "third_place",
-  ];
-  const roundIndex = new Map(roundOrder.map((round, index) => [round, index]));
   const tournamentMatchesByCourt = new Map<string, typeof matches>();
   let tournamentCourtIndex = 0;
   const tournamentMatches = (matches ?? [])
-    .filter((match) => !match.group_id)
+    .filter((match) => (match.groups as { type?: string } | null)?.type === "tournament")
     .sort((a, b) => {
       const divisionA = a.division_id as string;
       const divisionB = b.division_id as string;
       const divisionOrderA = divisionOrder.get(divisionA) ?? 999;
       const divisionOrderB = divisionOrder.get(divisionB) ?? 999;
       if (divisionOrderA !== divisionOrderB) return divisionOrderA - divisionOrderB;
-      const roundA = roundIndex.get((a.round as string | null) ?? "") ?? 999;
-      const roundB = roundIndex.get((b.round as string | null) ?? "") ?? 999;
-      if (roundA !== roundB) return roundA - roundB;
+      const groupA = (a.groups as { order?: number } | null)?.order ?? 999;
+      const groupB = (b.groups as { order?: number } | null)?.order ?? 999;
+      if (groupA !== groupB) return groupA - groupB;
       return new Date(a.created_at as string).getTime() -
         new Date(b.created_at as string).getTime();
     });
 
   tournamentMatches.forEach((match) => {
     let resolvedCourtId = match.court_id as string | null;
-    const round = (match.round as string | null) ?? null;
     if (!resolvedCourtId && courtOrder.length > 0) {
       resolvedCourtId =
         courtOrder[tournamentCourtIndex % courtOrder.length] ?? null;
@@ -1134,7 +1067,9 @@ export async function generateScheduleSlots(input: {
     const courtKey = courtId ?? "__unassigned__";
     for (const divisionId of divisionIds) {
       const divisionMatches = matchesByDivision.get(divisionId) ?? [];
-      const groupMatches = divisionMatches.filter((match) => match.group_id);
+      const groupMatches = divisionMatches.filter(
+        (match) => (match.groups as { type?: string } | null)?.type === "league"
+      );
       const matchesByGroup = new Map<string, typeof groupMatches>();
 
       groupMatches.forEach((match) => {
@@ -1300,9 +1235,9 @@ export async function seedTournamentMatchSlotsFromBracket(input: {
   const supabase = await createSupabaseServerClient();
   const { data: matches, error } = await supabase
     .from("matches")
-    .select("id")
+    .select("id,group:groups!matches_group_id_fkey!inner(type)")
     .eq("division_id", divisionId)
-    .is("group_id", null)
+    .eq("group.type", "tournament")
     .order("created_at", { ascending: true });
 
   if (error) return { ok: false, error: error.message };

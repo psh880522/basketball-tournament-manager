@@ -26,6 +26,7 @@ export type TournamentEditRow = {
   start_date: string | null;
   end_date: string | null;
   status: TournamentStatus;
+  max_teams: number | null;
 };
 
 export type PublicTournamentRow = {
@@ -55,6 +56,7 @@ type TournamentUpdatePayload = {
   start_date: string;
   end_date: string;
   status: TournamentStatus;
+  max_teams: number | null;
 };
 
 const tournamentStatuses: TournamentStatus[] = [
@@ -144,7 +146,7 @@ export async function getTournamentForEdit(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status")
+    .select("id,name,location,start_date,end_date,status,max_teams")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -239,6 +241,12 @@ export async function updateTournament(
     return { ok: false, error: "?占쎈せ???占쏀깭 媛믪엯?占쎈떎." };
   }
 
+  if (payload.max_teams !== null) {
+    if (!Number.isInteger(payload.max_teams) || payload.max_teams < 2) {
+      return { ok: false, error: "최대 팀 수는 2 이상의 정수여야 합니다." };
+    }
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data: current, error: currentError } = await supabase
     .from("tournaments")
@@ -266,6 +274,7 @@ export async function updateTournament(
       start_date: payload.start_date,
       end_date: payload.end_date,
       status: payload.status,
+      max_teams: payload.max_teams,
     })
     .eq("id", tournamentId);
 

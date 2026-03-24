@@ -11,7 +11,8 @@ export type MatchRow = {
   tournament_id: string;
   division_id: string;
   group_id: string | null;
-  round: string | null;
+  seed_a: number | null;
+  seed_b: number | null;
   team_a_id: string;
   team_b_id: string;
   court_id: string | null;
@@ -20,7 +21,7 @@ export type MatchRow = {
   score_b: number | null;
   winner_team_id: string | null;
   divisions: { name: string } | null;
-  groups: { name: string; order: number } | null;
+  groups: { id: string; name: string; order: number; type: string } | null;
   team_a: { id: string; team_name: string } | null;
   team_b: { id: string; team_name: string } | null;
   court: { id: string; name: string } | null;
@@ -45,7 +46,7 @@ export async function getMatchesByTournament(
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,tournament_id,division_id,group_id,round,team_a_id,team_b_id,court_id,status,score_a,score_b,winner_team_id,divisions(name),groups(name,order),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts(id,name)"
+      "id,tournament_id,division_id,group_id,seed_a,seed_b,team_a_id,team_b_id,court_id,status,score_a,score_b,winner_team_id,divisions(name),groups(id,name,order,type),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts(id,name)"
     )
     .eq("tournament_id", tournamentId);
 
@@ -64,7 +65,8 @@ export async function getMatchById(
       | "id"
       | "tournament_id"
       | "court_id"
-      | "round"
+      | "seed_a"
+      | "seed_b"
       | "team_a_id"
       | "team_b_id"
       | "status"
@@ -78,7 +80,7 @@ export async function getMatchById(
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,tournament_id,court_id,round,team_a_id,team_b_id,status,score_a,score_b,winner_team_id"
+      "id,tournament_id,court_id,seed_a,seed_b,team_a_id,team_b_id,status,score_a,score_b,winner_team_id"
     )
     .eq("id", matchId)
     .maybeSingle();
@@ -90,7 +92,8 @@ export async function getMatchById(
           | "id"
           | "tournament_id"
           | "court_id"
-          | "round"
+          | "seed_a"
+          | "seed_b"
           | "team_a_id"
           | "team_b_id"
           | "status"
@@ -149,7 +152,8 @@ type MatchResultUpdate = {
 type TournamentMatchRow = {
   id: string;
   division_id: string;
-  round: string | null;
+  group_id: string | null;
+  group: { id: string; name: string; order: number; type: string } | null;
   status: string;
   winner_team_id: string | null;
   team_a: { id: string; team_name: string } | null;
@@ -160,7 +164,8 @@ type TournamentMatchRow = {
 export type TournamentBracketMatchRow = {
   id: string;
   division_id: string;
-  round: string | null;
+  group_id: string | null;
+  group: { id: string; name: string; order: number; type: string } | null;
   status: string;
   score_a: number | null;
   score_b: number | null;
@@ -196,10 +201,10 @@ export async function getTournamentMatchesByDivision(
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,division_id,round,status,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
+      "id,division_id,group_id,group:groups!matches_group_id_fkey!inner(id,name,order,type),status,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
     )
     .eq("division_id", divisionId)
-    .is("group_id", null)
+    .eq("group.type", "tournament")
     .order("created_at", { ascending: true });
 
   return {
@@ -208,19 +213,19 @@ export async function getTournamentMatchesByDivision(
   };
 }
 
-export async function getTournamentMatchesByRound(
+export async function getTournamentMatchesByGroupName(
   divisionId: string,
-  round: string
+  groupName: string
 ): Promise<ApiResult<TournamentMatchRow[]>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,division_id,round,status,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
+      "id,division_id,group_id,group:groups!matches_group_id_fkey!inner(id,name,order,type),status,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
     )
     .eq("division_id", divisionId)
-    .eq("round", round)
-    .is("group_id", null)
+    .eq("group.type", "tournament")
+    .eq("group.name", groupName)
     .order("created_at", { ascending: true });
 
   return {
@@ -236,10 +241,10 @@ export async function getTournamentBracketMatches(
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,division_id,round,status,score_a,score_b,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
+      "id,division_id,group_id,group:groups!matches_group_id_fkey!inner(id,name,order,type),status,score_a,score_b,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
     )
     .eq("tournament_id", tournamentId)
-    .is("group_id", null)
+    .eq("group.type", "tournament")
     .order("created_at", { ascending: true });
 
   return {
@@ -282,7 +287,7 @@ export async function listMatchesForResultEntry(
   let query = supabase
     .from("matches")
     .select(
-      "id,tournament_id,division_id,group_id,round,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
+      "id,tournament_id,division_id,group_id,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name,type),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
     )
     .eq("tournament_id", tournamentId);
 
@@ -311,7 +316,7 @@ export async function listMatchesForResultEntry(
   const rows: MatchResultRow[] = ((data ?? []) as Record<string, unknown>[]).map(
     (row) => {
       const div = row.divisions as { name: string } | null;
-      const grp = row.groups as { name: string } | null;
+      const grp = row.groups as { name: string; type: string } | null;
       const teamA = row.team_a as { team_name: string } | null;
       const teamB = row.team_b as { team_name: string } | null;
       const court = row.court as { name: string } | null;
@@ -323,9 +328,9 @@ export async function listMatchesForResultEntry(
         divisionName: div?.name ?? "",
         group_id: row.group_id as string | null,
         groupName: grp?.name ?? null,
+        groupType: grp?.type ?? null,
         team_a_id: row.team_a_id as string,
         team_b_id: row.team_b_id as string,
-        round: (row.round as string | null) ?? null,
         teamAName: teamA?.team_name ?? "TBD",
         teamBName: teamB?.team_name ?? "TBD",
         scheduled_at: row.scheduled_at as string | null,
@@ -466,7 +471,7 @@ export type MatchListRow = {
   divisionName: string;
   group_id: string | null;
   groupName: string | null;
-  round: string | null;
+  groupType: string | null;
   team_a_id: string | null;
   team_b_id: string | null;
   teamAName: string;
@@ -492,7 +497,7 @@ export async function listTournamentMatches(
   let query = supabase
     .from("matches")
     .select(
-      "id,tournament_id,division_id,group_id,round,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
+      "id,tournament_id,division_id,group_id,team_a_id,team_b_id,scheduled_at,court_id,status,score_a,score_b,created_at,divisions(name),groups(name,type),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name),court:courts(name)"
     )
     .eq("tournament_id", tournamentId);
 
@@ -515,7 +520,7 @@ export async function listTournamentMatches(
   const rows: MatchListRow[] = ((data ?? []) as Record<string, unknown>[]).map(
     (row) => {
       const div = row.divisions as { name: string } | null;
-      const grp = row.groups as { name: string } | null;
+      const grp = row.groups as { name: string; type: string } | null;
       const teamA = row.team_a as { team_name: string } | null;
       const teamB = row.team_b as { team_name: string } | null;
       const court = row.court as { name: string } | null;
@@ -527,9 +532,9 @@ export async function listTournamentMatches(
         divisionName: div?.name ?? "",
         group_id: row.group_id as string | null,
         groupName: grp?.name ?? null,
+        groupType: grp?.type ?? null,
         team_a_id: (row.team_a_id as string | null) ?? null,
         team_b_id: (row.team_b_id as string | null) ?? null,
-        round: (row.round as string | null) ?? null,
         teamAName: teamA?.team_name ?? "TBD",
         teamBName: teamB?.team_name ?? "TBD",
         scheduled_at: row.scheduled_at as string | null,
@@ -544,4 +549,23 @@ export async function listTournamentMatches(
   );
 
   return { data: rows, error: null };
+}
+
+export async function updateMatchSeeds(
+  matchId: string,
+  seedA: number | null,
+  seedB: number | null
+): Promise<ApiResult<{ id: string }>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .update({ seed_a: seedA, seed_b: seedB })
+    .eq("id", matchId)
+    .select("id")
+    .single();
+
+  return {
+    data: data as { id: string } | null,
+    error: error ? error.message : null,
+  };
 }

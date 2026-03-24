@@ -77,7 +77,8 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
   }
 
   const bracketMatches = bracketResult.data ?? [];
-  const finalMatch = bracketMatches.find((match) => match.round === "final") ?? null;
+  const finalMatch =
+    bracketMatches.find((match) => match.group?.name === "final") ?? null;
   const championName =
     finalMatch && finalMatch.status === "completed" && finalMatch.winner_team_id
       ? finalMatch.winner_team_id === finalMatch.team_a?.id
@@ -89,7 +90,7 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
 
   const roundGroups = new Map<string, RoundGroup>();
   bracketMatches.forEach((match) => {
-    const roundKey = match.round || "other";
+    const roundKey = match.group?.name || "other";
     const label = roundLabels[roundKey] ?? "기타";
     if (!roundGroups.has(roundKey)) {
       roundGroups.set(roundKey, { round: roundKey, label, matches: [] });
@@ -97,7 +98,7 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
     roundGroups.get(roundKey)?.matches.push({
       id: match.id,
       division_id: match.division_id,
-      round: match.round,
+      round: match.group?.name ?? null,
       status: match.status,
       score_a: match.score_a,
       score_b: match.score_b,

@@ -2,10 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createMatches, getDivisionById, getTournamentStatus } from "@/lib/api/bracket";
-import { getTournamentMatchesByDivision, getTournamentMatchesByRound } from "@/lib/api/matches";
+import {
+  createGroups,
+  createMatches,
+  getDivisionById,
+  getTournamentStatus,
+} from "@/lib/api/bracket";
+import {
+  getTournamentMatchesByDivision,
+  getTournamentMatchesByGroupName,
+} from "@/lib/api/matches";
 import { getStandingsByDivision } from "@/lib/api/standings";
 import { assertTournamentStepAllowed } from "@/lib/api/tournamentGuards";
+import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
 type ActionResult =
   | { ok: true }
@@ -20,6 +29,39 @@ type SeedPair = {
 };
 
 type RoundName = "round_of_16" | "quarterfinal" | "semifinal" | "final";
+
+const TOURNAMENT_GROUP_ORDER: Record<RoundName | "third_place", number> = {
+  round_of_16: 1,
+  quarterfinal: 2,
+  semifinal: 3,
+  final: 4,
+  third_place: 5,
+};
+
+async function ensureTournamentGroup(
+  divisionId: string,
+  name: RoundName | "third_place"
+): Promise<{ ok: true; groupId: string } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("groups")
+    .select("id")
+    .eq("division_id", divisionId)
+    .eq("type", "tournament")
+    .eq("name", name)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (data?.id) return { ok: true, groupId: data.id as string };
+
+  const created = await createGroups(divisionId, [
+    { name, order: TOURNAMENT_GROUP_ORDER[name] ?? 999, type: "tournament" },
+  ]);
+  if (created.error) return { ok: false, error: created.error };
+  const group = (created.data ?? [])[0];
+  if (!group) return { ok: false, error: "토너먼트 그룹 생성에 실패했습니다." };
+  return { ok: true, groupId: group.id };
+}
 
 export async function generateSeededBracket(formData: FormData): Promise<void> {
   const tournamentId = toText(formData.get("tournamentId"));
@@ -109,6 +151,24 @@ export async function generateSeededBracket(formData: FormData): Promise<void> {
     );
   }
 
+  const supabase = await createSupabaseServerClient();
+  const { count: existingGroups, error: groupErr } = await supabase
+    .from("groups")
+    .select("id", { count: "exact", head: true })
+    .eq("division_id", divisionId)
+    .eq("type", "tournament");
+
+  if (groupErr) {
+    return redirectWithError(tournamentId, divisionId, groupErr.message);
+  }
+  if ((existingGroups ?? 0) > 0) {
+    return redirectWithError(
+      tournamentId,
+      divisionId,
+      "Tournament groups already exist."
+    );
+  }
+
   const bracketSize = seeded.length >= 16 ? 16 : 8;
   const seeds = seeded.slice(0, bracketSize);
   const pairs = buildSeedPairs(seeds, bracketSize);
@@ -121,64 +181,72 @@ export async function generateSeededBracket(formData: FormData): Promise<void> {
     );
   }
 
-  const matchEntries = pairs.map((pair) => ({
+  const roundNames: (RoundName | "third_place")[] =
+    bracketSize === 16
+      ? ["round_of_16", "quarterfinal", "semifinal", "final", "third_place"]
+      : ["quarterfinal", "semifinal", "final", "third_place"];
+
+  const groupDefs = roundNames.map((name) => ({
+    name,
+    order: TOURNAMENT_GROUP_ORDER[name] ?? 999,
+    type: "tournament",
+  }));
+
+  const groupsResult = await createGroups(divisionId, groupDefs);
+  if (groupsResult.error) {
+    return redirectWithError(tournamentId, divisionId, groupsResult.error);
+  }
+
+  const groupMap = new Map(
+    (groupsResult.data ?? []).map((group) => [group.name, group.id])
+  );
+
+  const firstRound = bracketSize === 16 ? "round_of_16" : "quarterfinal";
+  const firstGroupId = groupMap.get(firstRound);
+  if (!firstGroupId) {
+    return redirectWithError(tournamentId, divisionId, "라운드 그룹이 없습니다.");
+  }
+
+  const matchEntries: {
+    tournament_id: string;
+    division_id: string;
+    group_id: string;
+    team_a_id: string | null;
+    team_b_id: string | null;
+    status: string;
+    court_id: string | null;
+  }[] = pairs.map((pair) => ({
     tournament_id: tournamentId,
     division_id: divisionId,
-    group_id: null,
-    round: bracketSize === 16 ? "round_of_16" : "quarterfinal",
+    group_id: firstGroupId,
     team_a_id: pair.teamAId,
     team_b_id: pair.teamBId,
     status: "scheduled",
     court_id: null,
   }));
 
-  if (bracketSize === 16) {
-    for (let i = 0; i < 4; i += 1) {
+  const pushEmptyMatches = (name: RoundName | "third_place", count: number) => {
+    const groupId = groupMap.get(name);
+    if (!groupId) return;
+    for (let i = 0; i < count; i += 1) {
       matchEntries.push({
         tournament_id: tournamentId,
         division_id: divisionId,
-        group_id: null,
-        round: "quarterfinal",
+        group_id: groupId,
         team_a_id: null,
         team_b_id: null,
         status: "scheduled",
         court_id: null,
       });
     }
-  }
+  };
 
-  for (let i = 0; i < 2; i += 1) {
-    matchEntries.push({
-      tournament_id: tournamentId,
-      division_id: divisionId,
-      group_id: null,
-      round: "semifinal",
-      team_a_id: null,
-      team_b_id: null,
-      status: "scheduled",
-      court_id: null,
-    });
+  if (bracketSize === 16) {
+    pushEmptyMatches("quarterfinal", 4);
   }
-  matchEntries.push({
-    tournament_id: tournamentId,
-    division_id: divisionId,
-    group_id: null,
-    round: "final",
-    team_a_id: null,
-    team_b_id: null,
-    status: "scheduled",
-    court_id: null,
-  });
-  matchEntries.push({
-    tournament_id: tournamentId,
-    division_id: divisionId,
-    group_id: null,
-    round: "third_place",
-    team_a_id: null,
-    team_b_id: null,
-    status: "scheduled",
-    court_id: null,
-  });
+  pushEmptyMatches("semifinal", 2);
+  pushEmptyMatches("final", 1);
+  pushEmptyMatches("third_place", 1);
 
   const created = await createMatches(matchEntries);
 
@@ -217,7 +285,7 @@ export async function advanceTournamentRound(
     return redirectWithError(tournamentId, divisionId, guard.error);
   }
 
-  const currentMatches = await getTournamentMatchesByRound(
+  const currentMatches = await getTournamentMatchesByGroupName(
     divisionId,
     currentRound
   );
@@ -271,7 +339,7 @@ export async function advanceTournamentRound(
   if (currentRound === "round_of_16" || currentRound === "quarterfinal") {
     const nextRound =
       currentRound === "round_of_16" ? "quarterfinal" : "semifinal";
-    const nextMatches = await getTournamentMatchesByRound(divisionId, nextRound);
+    const nextMatches = await getTournamentMatchesByGroupName(divisionId, nextRound);
 
     if (nextMatches.error) {
       return redirectWithError(tournamentId, divisionId, nextMatches.error);
@@ -295,11 +363,15 @@ export async function advanceTournamentRound(
       );
     }
 
+    const nextGroup = await ensureTournamentGroup(divisionId, nextRound);
+    if (!nextGroup.ok) {
+      return redirectWithError(tournamentId, divisionId, nextGroup.error);
+    }
+
     const matchEntries = pairs.map((pair) => ({
       tournament_id: tournamentId,
       division_id: divisionId,
-      group_id: null,
-      round: nextRound,
+      group_id: nextGroup.groupId,
       team_a_id: pair.teamAId,
       team_b_id: pair.teamBId,
       status: "scheduled",
@@ -317,7 +389,7 @@ export async function advanceTournamentRound(
     return redirectWithSuccess(tournamentId, divisionId, nextRound);
   }
 
-  const finalMatches = await getTournamentMatchesByRound(divisionId, "final");
+  const finalMatches = await getTournamentMatchesByGroupName(divisionId, "final");
   if (finalMatches.error) {
     return redirectWithError(tournamentId, divisionId, finalMatches.error);
   }
@@ -329,7 +401,7 @@ export async function advanceTournamentRound(
     );
   }
 
-  const thirdPlaceMatches = await getTournamentMatchesByRound(
+  const thirdPlaceMatches = await getTournamentMatchesByGroupName(
     divisionId,
     "third_place"
   );
@@ -360,12 +432,20 @@ export async function advanceTournamentRound(
     return redirectWithError(tournamentId, divisionId, "패자 정보가 부족합니다.");
   }
 
+  const finalGroup = await ensureTournamentGroup(divisionId, "final");
+  if (!finalGroup.ok) {
+    return redirectWithError(tournamentId, divisionId, finalGroup.error);
+  }
+  const thirdGroup = await ensureTournamentGroup(divisionId, "third_place");
+  if (!thirdGroup.ok) {
+    return redirectWithError(tournamentId, divisionId, thirdGroup.error);
+  }
+
   const matchEntries = [
     {
       tournament_id: tournamentId,
       division_id: divisionId,
-      group_id: null,
-      round: "final",
+      group_id: finalGroup.groupId,
       team_a_id: winners[0],
       team_b_id: winners[1],
       status: "scheduled",
@@ -374,8 +454,7 @@ export async function advanceTournamentRound(
     {
       tournament_id: tournamentId,
       division_id: divisionId,
-      group_id: null,
-      round: "third_place",
+      group_id: thirdGroup.groupId,
       team_a_id: losers[0],
       team_b_id: losers[1],
       status: "scheduled",

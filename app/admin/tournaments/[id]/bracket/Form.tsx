@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import type { BracketGenerationSummary } from "@/lib/api/bracket";
+import { formatRoundLabel } from "@/lib/formatters/matchLabel";
 import {
   createLeagueMatchesAction,
   createTournamentMatchesAction,
+  updateMatchSeedAction,
 } from "./actions";
 
 type Props = {
@@ -15,6 +17,13 @@ type Props = {
 };
 
 type Message = { tone: "success" | "error"; text: string } | null;
+
+type SeedEntry = { seedA: string; seedB: string };
+
+const assignmentClass = (isAssigned: boolean) =>
+  isAssigned
+    ? "bg-green-100 text-green-800"
+    : "bg-gray-100 text-gray-600";
 
 export function BracketConsoleForm({ tournamentId, summary }: Props) {
   const divisions = summary.divisions;
@@ -28,6 +37,11 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
   const [tournamentMsg, setTournamentMsg] = useState<Message>(null);
   const [isTournamentPending, startTournamentTransition] = useTransition();
 
+  const [seedValues, setSeedValues] = useState<Record<string, SeedEntry>>({});
+  const [savingSeedId, setSavingSeedId] = useState<string | null>(null);
+  const [seedRowMessages, setSeedRowMessages] = useState<Record<string, Message>>({});
+  const [isSeedPending, startSeedTransition] = useTransition();
+
   const leagueDivision = useMemo(
     () => divisions.find((d) => d.id === leagueDivisionId) ?? null,
     [divisions, leagueDivisionId]
@@ -37,9 +51,67 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
     [divisions, tournamentDivisionId]
   );
 
+  useEffect(() => {
+    const initial: Record<string, SeedEntry> = {};
+    summary.divisions.forEach((division) => {
+      division.tournamentRounds.forEach((round) => {
+        round.matches.forEach((match) => {
+          initial[match.id] = {
+            seedA: match.seedA !== null ? String(match.seedA) : "",
+            seedB: match.seedB !== null ? String(match.seedB) : "",
+          };
+        });
+      });
+    });
+    setSeedValues(initial);
+  }, [summary]);
+
   if (divisions.length === 0) {
     return <p className="text-gray-500">등록된 디비전이 없습니다.</p>;
   }
+
+  const handleSaveSeed = (matchId: string) => {
+    const values = seedValues[matchId] ?? { seedA: "", seedB: "" };
+    const seedA = values.seedA === "" ? null : Number(values.seedA);
+    const seedB = values.seedB === "" ? null : Number(values.seedB);
+
+    if (seedA !== null && (!Number.isInteger(seedA) || seedA < 1)) {
+      setSeedRowMessages((prev) => ({
+        ...prev,
+        [matchId]: { tone: "error", text: "시드A는 1 이상의 정수여야 합니다." },
+      }));
+      return;
+    }
+    if (seedB !== null && (!Number.isInteger(seedB) || seedB < 1)) {
+      setSeedRowMessages((prev) => ({
+        ...prev,
+        [matchId]: { tone: "error", text: "시드B는 1 이상의 정수여야 합니다." },
+      }));
+      return;
+    }
+
+    setSavingSeedId(matchId);
+    startSeedTransition(async () => {
+      const result = await updateMatchSeedAction({
+        tournamentId,
+        matchId,
+        seedA,
+        seedB,
+      });
+      setSavingSeedId(null);
+      setSeedRowMessages((prev) => ({
+        ...prev,
+        [matchId]: result.ok
+          ? { tone: "success", text: "저장 완료" }
+          : { tone: "error", text: result.error },
+      }));
+      if (result.ok) {
+        setTimeout(() => {
+          setSeedRowMessages((prev) => ({ ...prev, [matchId]: null }));
+        }, 1200);
+      }
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -53,9 +125,7 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
                 {summary.tournamentName}
               </p>
             </div>
-            <div className="text-sm text-gray-500">
-              디비전 {divisions.length}
-            </div>
+            <div className="text-sm text-gray-500">디비전 {divisions.length}</div>
           </div>
           <div className="grid gap-2 text-sm">
             {divisions.map((division) => (
@@ -183,17 +253,17 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">
-                토너먼트 크기
-              </label>
-              <input
-                type="number"
-                min={2}
-                className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm"
+              <label className="text-xs font-medium text-gray-600">토너먼트 크기</label>
+              <select
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
                 value={tournamentSize}
                 onChange={(event) => setTournamentSize(event.target.value)}
-                placeholder={tournamentDivision?.tournament_size?.toString() ?? ""}
-              />
+              >
+                <option value="">선택</option>
+                <option value="4">4강</option>
+                <option value="8">8강</option>
+                <option value="16">16강</option>
+              </select>
             </div>
             <Button
               onClick={() => {
@@ -219,12 +289,9 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
               {isTournamentPending ? "생성 중..." : "토너먼트 경기 생성"}
             </Button>
           </div>
-          <div className="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            <p>같은 디비전에 리그 경기가 이미 있으면:</p>
-            <p>- 토너먼트 경기만 생성되며 팀은 미배정 상태로 생성됩니다.</p>
-            <p>리그 경기가 없으면:</p>
-            <p>- 일반 토너먼트처럼 팀이 배정된 상태로 생성됩니다.</p>
-          </div>
+          <p className="text-xs text-gray-500">
+            토너먼트 경기는 항상 미배정 상태로 생성됩니다.
+          </p>
           {tournamentMsg && (
             <p
               className={`text-sm ${
@@ -234,31 +301,6 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
               {tournamentMsg.text}
             </p>
           )}
-        </Card>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">생성 결과 요약</h2>
-        <Card className="space-y-2">
-          {divisions.map((division) => (
-            <div
-              key={division.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 px-3 py-2 text-sm"
-            >
-              <span className="font-medium text-gray-700">{division.name}</span>
-              <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-                <span>
-                  리그 경기: {division.hasLeagueMatches ? "생성됨" : "미생성"}
-                </span>
-                <span>
-                  토너먼트 경기: {division.hasTournamentMatches ? "생성됨" : "미생성"}
-                </span>
-                <span>
-                  미배정 토너먼트: {division.hasUnassignedTournament ? "있음" : "없음"}
-                </span>
-              </div>
-            </div>
-          ))}
         </Card>
       </section>
 
@@ -274,54 +316,161 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
                 </span>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-600">조별 경기</p>
-                {division.groups.length === 0 ? (
-                  <p className="text-xs text-gray-400">생성된 조 경기가 없습니다.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {division.groups.map((group) => (
-                      <div key={group.name} className="rounded border border-gray-100 p-2">
-                        <p className="text-xs font-semibold text-gray-600">
-                          {group.name}
-                        </p>
-                        <div className="mt-1 space-y-1 text-xs text-gray-500">
-                          {group.matches.map((match) => (
-                            <p key={match.id}>
-                              {match.teamAName} vs {match.teamBName}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+              {division.groups.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-600">조별 경기</p>
+                  <div className="overflow-x-auto rounded-lg border bg-white">
+                    <table className="w-full text-sm">
+                      <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
+                        <tr>
+                          <th className="px-3 py-2">조</th>
+                          <th className="px-3 py-2">경기</th>
+                          <th className="px-3 py-2 text-center">상태</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {division.groups.flatMap((group) =>
+                          group.matches.map((match) => (
+                            <tr key={match.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 text-xs text-gray-500">
+                                {group.name}
+                              </td>
+                              <td className="px-3 py-2 font-medium">
+                                {match.teamAName} vs {match.teamBName}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span
+                                  className={`inline-block text-xs px-2 py-0.5 rounded ${assignmentClass(
+                                    match.isAssigned
+                                  )}`}
+                                >
+                                  {match.isAssigned ? "배정" : "미배정"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-600">토너먼트</p>
-                {division.tournamentRounds.length === 0 ? (
-                  <p className="text-xs text-gray-400">생성된 토너먼트 경기가 없습니다.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {division.tournamentRounds.map((round) => (
-                      <div key={round.round} className="rounded border border-gray-100 p-2">
-                        <p className="text-xs font-semibold text-gray-600">
-                          {round.round}
-                        </p>
-                        <div className="mt-1 space-y-1 text-xs text-gray-500">
-                          {round.matches.map((match) => (
-                            <p key={match.id}>
-                              {match.teamAName} vs {match.teamBName} ·
-                              {match.isAssigned ? " 배정" : " 미배정"}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+              {division.tournamentRounds.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-600">토너먼트 경기</p>
+                  <div className="overflow-x-auto rounded-lg border bg-white">
+                    <table className="w-full table-fixed text-sm">
+                      <colgroup>
+                        <col className="w-20" />
+                        <col className="w-16" />
+                        <col className="w-auto" />
+                        <col className="w-8" />
+                        <col className="w-auto" />
+                        <col className="w-16" />
+                        <col className="w-20" />
+                        <col className="w-20" />
+                      </colgroup>
+                      <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
+                        <tr>
+                          <th className="px-3 py-2">라운드</th>
+                          <th className="px-3 py-2 text-center">시드A</th>
+                          <th className="px-3 py-2">팀A</th>
+                          <th className="px-3 py-2 text-center">VS</th>
+                          <th className="px-3 py-2">팀B</th>
+                          <th className="px-3 py-2 text-center">시드B</th>
+                          <th className="px-3 py-2 text-center">상태</th>
+                          <th className="px-3 py-2 text-center">저장</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {division.tournamentRounds.flatMap((round) =>
+                          round.matches.map((match) => (
+                            <tr key={match.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                                {formatRoundLabel(round.roundName)}
+                              </td>
+                              <td className="px-1 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                  value={seedValues[match.id]?.seedA ?? ""}
+                                  onChange={(event) =>
+                                    setSeedValues((prev) => ({
+                                      ...prev,
+                                      [match.id]: {
+                                        seedA: event.target.value,
+                                        seedB: prev[match.id]?.seedB ?? "",
+                                      },
+                                    }))
+                                  }
+                                  placeholder="-"
+                                />
+                              </td>
+                              <td className="px-3 py-2">{match.teamAName}</td>
+                              <td className="px-1 py-2 text-gray-400 text-center">VS</td>
+                              <td className="px-3 py-2">{match.teamBName}</td>
+                              <td className="px-1 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                  value={seedValues[match.id]?.seedB ?? ""}
+                                  onChange={(event) =>
+                                    setSeedValues((prev) => ({
+                                      ...prev,
+                                      [match.id]: {
+                                        seedA: prev[match.id]?.seedA ?? "",
+                                        seedB: event.target.value,
+                                      },
+                                    }))
+                                  }
+                                  placeholder="-"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span
+                                  className={`inline-block text-xs px-2 py-0.5 rounded ${assignmentClass(
+                                    match.isAssigned
+                                  )}`}
+                                >
+                                  {match.isAssigned ? "배정" : "미배정"}
+                                </span>
+                                {seedRowMessages[match.id] && (
+                                  <div
+                                    className={`mt-0.5 text-xs ${
+                                      seedRowMessages[match.id]?.tone === "error"
+                                        ? "text-red-500"
+                                        : "text-green-600"
+                                    }`}
+                                  >
+                                    {seedRowMessages[match.id]?.text}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center justify-center px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                                  onClick={() => handleSaveSeed(match.id)}
+                                  disabled={isSeedPending || savingSeedId === match.id}
+                                >
+                                  {savingSeedId === match.id ? "저장 중..." : "저장"}
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {division.groups.length === 0 && division.tournamentRounds.length === 0 && (
+                <p className="text-xs text-gray-400">생성된 경기가 없습니다.</p>
+              )}
             </Card>
           ))}
         </div>

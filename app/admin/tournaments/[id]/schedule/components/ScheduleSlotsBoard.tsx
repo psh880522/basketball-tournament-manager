@@ -100,7 +100,7 @@ function buildSlotCategory(
 
   if (slot.stage_type === "tournament") {
     return formatTournamentCategoryLabel(
-      slot.match?.round ?? null,
+      slot.match?.groupName ?? null,
       roundIndex,
       roundTotal
     );
@@ -140,7 +140,7 @@ function buildMatchLabel(
       : null;
 
     return formatTournamentMatchLabel({
-      round: slot.match.round,
+      groupName: slot.match.groupName,
       teamA,
       teamB,
       seedA,
@@ -185,7 +185,7 @@ function buildTournamentSlotMeta(
       divisionGroup.tournament_slots.forEach((slot) => {
         if (slot.stage_type !== "tournament" || slot.slot_type !== "match") return;
         if (!slot.match) return;
-        const key = slot.match.round ?? "tournament";
+        const key = slot.match.groupName ?? "tournament";
         const list = bucket.get(key) ?? [];
         list.push(slot);
         bucket.set(key, list);

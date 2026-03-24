@@ -230,16 +230,16 @@ export default async function TournamentMatchesPage({
             const divisionSection = entry.divisions.get(m.division_id);
             if (!divisionSection) continue;
 
-            if (m.group_id) {
-              divisionSection.leagueMatches.push(m);
-            } else {
+            if (m.groupType === "tournament") {
               divisionSection.tournamentMatches.push(m);
+            } else {
+              divisionSection.leagueMatches.push(m);
             }
             entry.section.totalMatches += 1;
           }
 
           const sections = [...sectionMap.values()].sort(
-            (a, b) => a.order - b.order
+            (a, b) => a.section.order - b.section.order
           );
 
           return (
@@ -374,7 +374,7 @@ export default async function TournamentMatchesPage({
                                       {(() => {
                                         const roundCounts = new Map<string, number>();
                                         division.tournamentMatches.forEach((match) => {
-                                          const key = match.round ?? "tournament";
+                                          const key = match.groupName ?? "tournament";
                                           roundCounts.set(key, (roundCounts.get(key) ?? 0) + 1);
                                         });
                                         const initialRound =
@@ -389,17 +389,17 @@ export default async function TournamentMatchesPage({
                                           const seedB = m.team_b_id
                                             ? rankMap[m.team_b_id] ?? null
                                             : null;
-                                          const key = m.round ?? "tournament";
+                                          const key = m.groupName ?? "tournament";
                                           const nextIndex = (roundIndexes.get(key) ?? 0) + 1;
                                           roundIndexes.set(key, nextIndex);
                                           const roundTotal = roundCounts.get(key) ?? null;
                                           const previousRound =
-                                            getPreviousTournamentRound(m.round ?? null);
+                                            getPreviousTournamentRound(m.groupName ?? null);
                                           const previousRoundTotal = previousRound
                                             ? roundCounts.get(previousRound) ?? null
                                             : null;
                                           const matchLabel = formatTournamentMatchLabel({
-                                            round: m.round,
+                                            groupName: m.groupName,
                                             teamA: m.teamAName,
                                             teamB: m.teamBName,
                                             seedA,
@@ -417,7 +417,7 @@ export default async function TournamentMatchesPage({
                                               </td>
                                               <td className="px-4 py-3 text-gray-600">
                                                 {formatTournamentCategoryLabel(
-                                                  m.round,
+                                                  m.groupName,
                                                   nextIndex,
                                                   roundTotal
                                                 )}

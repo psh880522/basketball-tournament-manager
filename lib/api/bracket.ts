@@ -14,6 +14,7 @@ export type GroupRow = {
   division_id: string;
   name: string;
   order: number;
+  type: string;
 };
 
 export type TeamRow = {
@@ -27,6 +28,8 @@ export type BracketMatchSummary = {
   teamAName: string;
   teamBName: string;
   isAssigned: boolean;
+  seedA: number | null;
+  seedB: number | null;
 };
 
 export type BracketGroupSummary = {
@@ -36,7 +39,9 @@ export type BracketGroupSummary = {
 };
 
 export type BracketTournamentRoundSummary = {
-  round: string;
+  groupId: string;
+  roundName: string;
+  roundOrder: number;
   matches: BracketMatchSummary[];
 };
 
@@ -184,7 +189,7 @@ export async function countMatchesByDivision(
 
 export async function createGroups(
   divisionId: string,
-  groups: { name: string; order: number }[]
+  groups: { name: string; order: number; type?: string }[]
 ): Promise<ApiResult<GroupRow[]>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -194,9 +199,10 @@ export async function createGroups(
         division_id: divisionId,
         name: group.name,
         order: group.order,
+        type: group.type ?? "league",
       }))
     )
-    .select("id,division_id,name,order");
+    .select("id,division_id,name,order,type");
 
   return { data, error: error ? error.message : null };
 }
@@ -218,7 +224,6 @@ export async function createMatches(
     tournament_id: string;
     division_id: string;
     group_id: string | null;
-    round?: string | null;
     team_a_id: string | null;
     team_b_id: string | null;
     status: string;
@@ -358,13 +363,6 @@ export async function createTournamentMatches(input: {
     return { ok: false, error: "토너먼트 크기는 4/8/16만 허용됩니다." };
   }
 
-  const initialRound =
-    tournamentSize === 4
-      ? "semifinal"
-      : tournamentSize === 8
-      ? "quarterfinal"
-      : "round_of_16";
-
   const divisionResult = await getDivisionById(divisionId);
   if (divisionResult.error) return { ok: false, error: divisionResult.error };
   if (!divisionResult.data) {
@@ -375,99 +373,89 @@ export async function createTournamentMatches(input: {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { count: existingTournament, error: tournamentErr } = await supabase
-    .from("matches")
+  const { count: existingGroups, error: groupErr } = await supabase
+    .from("groups")
     .select("id", { count: "exact", head: true })
     .eq("division_id", divisionId)
-    .is("group_id", null);
+    .eq("type", "tournament");
 
-  if (tournamentErr) return { ok: false, error: tournamentErr.message };
-  if ((existingTournament ?? 0) > 0) {
+  if (groupErr) return { ok: false, error: groupErr.message };
+  if ((existingGroups ?? 0) > 0) {
     return { ok: false, error: "이미 토너먼트 경기가 존재합니다." };
   }
 
-  const { count: leagueCount, error: leagueErr } = await supabase
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("division_id", divisionId)
-    .not("group_id", "is", null);
-
-  if (leagueErr) return { ok: false, error: leagueErr.message };
-
-  const hasLeagueMatches = (leagueCount ?? 0) > 0;
-  let teamIds: string[] = [];
-
-  if (!hasLeagueMatches) {
-    const teamsResult = await getApprovedTeamsByDivision(divisionId, tournamentId);
-    if (teamsResult.error) return { ok: false, error: teamsResult.error };
-    const teams = teamsResult.data ?? [];
-    if (teams.length < tournamentSize) {
-      return { ok: false, error: "승인된 팀 수가 부족합니다." };
+  const roundStructure: { name: string; matchCount: number }[] = (() => {
+    if (tournamentSize === 4) {
+      return [
+        { name: "semifinal", matchCount: 2 },
+        { name: "final", matchCount: 1 },
+        { name: "third_place", matchCount: 1 },
+      ];
     }
-    teamIds = teams.slice(0, tournamentSize).map((team) => team.id);
+    if (tournamentSize === 8) {
+      return [
+        { name: "quarterfinal", matchCount: 4 },
+        { name: "semifinal", matchCount: 2 },
+        { name: "final", matchCount: 1 },
+        { name: "third_place", matchCount: 1 },
+      ];
+    }
+    return [
+      { name: "round_of_16", matchCount: 8 },
+      { name: "quarterfinal", matchCount: 4 },
+      { name: "semifinal", matchCount: 2 },
+      { name: "final", matchCount: 1 },
+      { name: "third_place", matchCount: 1 },
+    ];
+  })();
+
+  const roundOrder: Record<string, number> = {
+    round_of_16: 1,
+    quarterfinal: 2,
+    semifinal: 3,
+    final: 4,
+    third_place: 5,
+  };
+
+  const groupDefs = roundStructure.map((round) => ({
+    name: round.name,
+    order: roundOrder[round.name] ?? 999,
+    type: "tournament",
+  }));
+
+  const groupsResult = await createGroups(divisionId, groupDefs);
+  if (groupsResult.error) return { ok: false, error: groupsResult.error };
+  const groups = (groupsResult.data ?? []).sort((a, b) => a.order - b.order);
+
+  if (groups.length === 0) {
+    return { ok: false, error: "토너먼트 그룹 생성에 실패했습니다." };
   }
 
   const matchEntries: {
     tournament_id: string;
     division_id: string;
     group_id: string | null;
-    round: string | null;
     team_a_id: string | null;
     team_b_id: string | null;
     status: string;
     court_id: string | null;
   }[] = [];
 
-  const pushMatch = (
-    round: string,
-    teamAId: string | null,
-    teamBId: string | null
-  ) => {
-    matchEntries.push({
-      tournament_id: tournamentId,
-      division_id: divisionId,
-      group_id: null,
-      round,
-      team_a_id: teamAId,
-      team_b_id: teamBId,
-      status: "scheduled",
-      court_id: null,
-    });
-  };
-
-  if (hasLeagueMatches) {
-    for (let i = 0; i < tournamentSize; i += 2) {
-      pushMatch(initialRound, null, null);
+  roundStructure.forEach((round) => {
+    const group = groups.find((g) => g.name === round.name);
+    if (!group) return;
+    for (let i = 0; i < round.matchCount; i += 1) {
+      matchEntries.push({
+        tournament_id: tournamentId,
+        division_id: divisionId,
+        group_id: group.id,
+        team_a_id: null,
+        team_b_id: null,
+        status: "scheduled",
+        court_id: null,
+      });
     }
-  } else {
-    for (let i = 0; i < teamIds.length; i += 2) {
-      pushMatch(initialRound, teamIds[i] ?? null, teamIds[i + 1] ?? null);
-    }
-  }
-
-  if (tournamentSize === 4) {
-    pushMatch("final", null, null);
-    pushMatch("third_place", null, null);
-  }
-
-  if (tournamentSize === 8) {
-    for (let i = 0; i < 2; i += 1) {
-      pushMatch("semifinal", null, null);
-    }
-    pushMatch("final", null, null);
-    pushMatch("third_place", null, null);
-  }
-
-  if (tournamentSize === 16) {
-    for (let i = 0; i < 4; i += 1) {
-      pushMatch("quarterfinal", null, null);
-    }
-    for (let i = 0; i < 2; i += 1) {
-      pushMatch("semifinal", null, null);
-    }
-    pushMatch("final", null, null);
-    pushMatch("third_place", null, null);
-  }
+  });
 
   if (matchEntries.length === 0) {
     return { ok: false, error: "생성할 경기가 없습니다." };
@@ -504,7 +492,7 @@ export async function getBracketGenerationSummary(
   const { data: matches, error: matchesErr } = await supabase
     .from("matches")
     .select(
-      "id,division_id,group_id,round,team_a_id,team_b_id,groups(name,order),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name)"
+      "id,division_id,group_id,seed_a,seed_b,team_a_id,team_b_id,groups(id,name,order,type),team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name)"
     )
     .eq("tournament_id", tournamentId)
     .order("created_at", { ascending: true });
@@ -545,14 +533,17 @@ export async function getBracketGenerationSummary(
       teamAName: teamA?.team_name ?? "TBD",
       teamBName: teamB?.team_name ?? "TBD",
       isAssigned,
+      seedA: (row.seed_a as number | null) ?? null,
+      seedB: (row.seed_b as number | null) ?? null,
     };
 
-    if (row.group_id) {
+    const groupMeta = row.groups as
+      | { id: string; name: string; order: number; type: string }
+      | null;
+    if (groupMeta?.type !== "tournament") {
       summary.leagueMatchCount += 1;
-      const groupName =
-        (row.groups as { name: string; order: number } | null)?.name ?? "미지정 조";
-      const groupOrder =
-        (row.groups as { name: string; order: number } | null)?.order ?? 999;
+      const groupName = groupMeta?.name ?? "미지정 조";
+      const groupOrder = groupMeta?.order ?? 999;
       if (!groupBuckets.has(divisionId)) {
         groupBuckets.set(divisionId, new Map());
       }
@@ -564,16 +555,25 @@ export async function getBracketGenerationSummary(
     } else {
       summary.tournamentMatchCount += 1;
       if (!isAssigned) summary.hasUnassignedTournament = true;
-      const round = (row.round as string | null) ?? "tournament";
+      const roundName = groupMeta?.name ?? "tournament";
+      const roundId = groupMeta?.id ?? roundName;
+      const roundOrder = groupMeta?.order ?? 999;
       if (!tournamentBuckets.has(divisionId)) {
         tournamentBuckets.set(divisionId, new Map());
       }
-      const roundMap =
-        tournamentBuckets.get(divisionId) as Map<string, BracketTournamentRoundSummary>;
-      if (!roundMap.has(round)) {
-        roundMap.set(round, { round, matches: [] });
+      const roundMap = tournamentBuckets.get(divisionId) as Map<
+        string,
+        BracketTournamentRoundSummary
+      >;
+      if (!roundMap.has(roundId)) {
+        roundMap.set(roundId, {
+          groupId: roundId,
+          roundName,
+          roundOrder,
+          matches: [],
+        });
       }
-      roundMap.get(round)?.matches.push(matchSummary);
+      roundMap.get(roundId)?.matches.push(matchSummary);
     }
   });
 
@@ -588,7 +588,9 @@ export async function getBracketGenerationSummary(
       : [];
 
     const rounds = tournamentBuckets.get(divisionId);
-    summary.tournamentRounds = rounds ? [...rounds.values()] : [];
+    summary.tournamentRounds = rounds
+      ? [...rounds.values()].sort((a, b) => a.roundOrder - b.roundOrder)
+      : [];
   });
 
   return {

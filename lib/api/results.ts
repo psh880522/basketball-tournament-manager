@@ -38,7 +38,7 @@ export type LeagueMatchRow = {
   team_a: { id: string; team_name: string } | null;
   team_b: { id: string; team_name: string } | null;
   court: { id: string; name: string } | null;
-  group: { id: string; name: string; order: number } | null;
+  group: { id: string; name: string; order: number; type: string } | null;
 };
 
 export type LeagueStandingRow = {
@@ -56,7 +56,8 @@ export type LeagueStandingRow = {
 export type TournamentMatchRow = {
   id: string;
   division_id: string;
-  round: string | null;
+  group_id: string | null;
+  group: { id: string; name: string; order: number; type: string } | null;
   status: string;
   score_a: number | null;
   score_b: number | null;
@@ -151,7 +152,6 @@ async function getDivisionForSeeding(
 }
 
 const roundByTournamentSize: Record<number, string> = {
-  2: "final",
   4: "semifinal",
   8: "quarterfinal",
   16: "round_of_16",
@@ -188,17 +188,17 @@ export async function listLeagueMatchesByDivision(
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,division_id,group_id,court_id,scheduled_at,status,score_a,score_b,team_a_id,team_b_id,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name),group:groups!matches_group_id_fkey(id,name,order)"
+      "id,division_id,group_id,court_id,scheduled_at,status,score_a,score_b,team_a_id,team_b_id,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name),group:groups!matches_group_id_fkey!inner(id,name,order,type)"
     )
     .eq("division_id", divisionId)
-    .not("group_id", "is", null)
+    .eq("group.type", "league")
     .order("created_at", { ascending: true });
 
   const rows = (data as LeagueMatchRow[] | null) ?? null;
   const decorated = rows
     ? rows.map((row) => ({
         ...row,
-        stage_type: row.group_id ? "group" : "tournament",
+        stage_type: row.group?.type === "tournament" ? "tournament" : "group",
       }))
     : null;
 
@@ -219,10 +219,10 @@ export async function listLeagueMatchesForResult(
   let query = supabase
     .from("matches")
     .select(
-      "id,division_id,group_id,court_id,scheduled_at,status,score_a,score_b,team_a_id,team_b_id,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name),group:groups!matches_group_id_fkey(id,name,order)"
+      "id,division_id,group_id,court_id,scheduled_at,status,score_a,score_b,team_a_id,team_b_id,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name),group:groups!matches_group_id_fkey!inner(id,name,order,type)"
     )
     .eq("tournament_id", tournamentId)
-    .not("group_id", "is", null)
+    .eq("group.type", "league")
     .order("created_at", { ascending: true });
 
   if (filters?.divisionId) {
@@ -238,7 +238,7 @@ export async function listLeagueMatchesForResult(
   const decorated = rows
     ? rows.map((row) => ({
         ...row,
-        stage_type: row.group_id ? "group" : "tournament",
+        stage_type: row.group?.type === "tournament" ? "tournament" : "group",
       }))
     : null;
 
@@ -274,10 +274,10 @@ export async function listTournamentMatchesByDivision(
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id,division_id,round,status,score_a,score_b,scheduled_at,court_id,team_a_id,team_b_id,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name)"
+      "id,division_id,group_id,group:groups!matches_group_id_fkey!inner(id,name,order,type),status,score_a,score_b,scheduled_at,court_id,team_a_id,team_b_id,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name)"
     )
     .eq("division_id", divisionId)
-    .is("group_id", null)
+    .eq("group.type", "tournament")
     .order("created_at", { ascending: true });
 
   return {
@@ -296,20 +296,30 @@ export async function getTournamentBracketProgress(
   const matches = matchesResult.data ?? [];
   if (matches.length === 0) return { data: { rounds: [], finalCompleted: false }, error: null };
 
-  const roundsOrder = ["round_of_16", "quarterfinal", "semifinal", "final", "third_place"];
   const roundMap = new Map<string, TournamentMatchRow[]>();
-  roundsOrder.forEach((round) => roundMap.set(round, []));
+  const roundOrder = new Map<string, number>();
 
   matches.forEach((match) => {
-    const roundKey = match.round ?? "";
-    if (!roundMap.has(roundKey)) {
-      roundMap.set(roundKey, []);
+    const groupName = match.group?.name ?? "";
+    if (!groupName) return;
+    if (!roundMap.has(groupName)) {
+      roundMap.set(groupName, []);
     }
-    roundMap.get(roundKey)?.push(match);
+    roundMap.get(groupName)?.push(match);
+    if (!roundOrder.has(groupName)) {
+      roundOrder.set(groupName, match.group?.order ?? 999);
+    }
   });
 
   const progressRounds: TournamentProgressRound[] = [];
-  roundsOrder.forEach((round) => {
+  const orderedRounds = [...roundMap.keys()].sort((a, b) => {
+    const orderA = roundOrder.get(a) ?? 999;
+    const orderB = roundOrder.get(b) ?? 999;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.localeCompare(b);
+  });
+
+  orderedRounds.forEach((round) => {
     const roundMatches = roundMap.get(round) ?? [];
     if (roundMatches.length === 0) return;
 
@@ -388,7 +398,7 @@ export async function saveTournamentResult(input: {
   const { data: match, error: matchErr } = await supabase
     .from("matches")
     .select(
-      "id,division_id,group_id,round,team_a_id,team_b_id,team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name)"
+      "id,division_id,group_id,group:groups!matches_group_id_fkey!inner(id,name,order,type),team_a_id,team_b_id,team_a:teams!matches_team_a_id_fkey(team_name),team_b:teams!matches_team_b_id_fkey(team_name)"
     )
     .eq("id", matchId)
     .maybeSingle();
@@ -399,16 +409,16 @@ export async function saveTournamentResult(input: {
     id: string;
     division_id: string;
     group_id: string | null;
-    round: string | null;
+    group: { id: string; name: string; order: number; type: string } | null;
     team_a_id: string | null;
     team_b_id: string | null;
     team_a: { team_name: string } | null;
     team_b: { team_name: string } | null;
   };
-  if (matchRow.group_id) {
+  if (!matchRow.group || matchRow.group.type !== "tournament") {
     return { ok: false, error: "토너먼트 경기가 아닙니다." };
   }
-  if (!matchRow.round) {
+  if (!matchRow.group.name) {
     return { ok: false, error: "라운드 정보를 찾을 수 없습니다." };
   }
 
@@ -430,7 +440,7 @@ export async function saveTournamentResult(input: {
 
   if (updateErr) return { ok: false, error: updateErr.message };
 
-  const currentRound = matchRow.round;
+  const currentRound = matchRow.group.name;
   const nextRound = nextRoundMap[currentRound] ?? null;
 
   if (!nextRound) {
@@ -444,8 +454,7 @@ export async function saveTournamentResult(input: {
     .from("matches")
     .select("id")
     .eq("division_id", matchRow.division_id)
-    .is("group_id", null)
-    .eq("round", currentRound)
+    .eq("group_id", matchRow.group.id)
     .order("created_at", { ascending: true });
 
   if (currentErr) return { ok: false, error: currentErr.message };
@@ -456,12 +465,24 @@ export async function saveTournamentResult(input: {
     return { ok: false, error: "현재 경기 순서를 찾을 수 없습니다." };
   }
 
+  const { data: nextGroup, error: nextGroupErr } = await supabase
+    .from("groups")
+    .select("id")
+    .eq("division_id", matchRow.division_id)
+    .eq("type", "tournament")
+    .eq("name", nextRound)
+    .maybeSingle();
+
+  if (nextGroupErr) return { ok: false, error: nextGroupErr.message };
+  if (!nextGroup) {
+    return { ok: false, error: "다음 라운드 그룹을 찾을 수 없습니다." };
+  }
+
   const { data: nextMatches, error: nextErr } = await supabase
     .from("matches")
     .select("id,team_a_id,team_b_id")
     .eq("division_id", matchRow.division_id)
-    .is("group_id", null)
-    .eq("round", nextRound)
+    .eq("group_id", nextGroup.id)
     .order("created_at", { ascending: true });
 
   if (nextErr) return { ok: false, error: nextErr.message };
@@ -487,12 +508,22 @@ export async function saveTournamentResult(input: {
 
   let thirdPlaceMessage = "";
   if (currentRound === "semifinal" && loserTeamId) {
+    const { data: thirdGroup, error: thirdGroupErr } = await supabase
+      .from("groups")
+      .select("id")
+      .eq("division_id", matchRow.division_id)
+      .eq("type", "tournament")
+      .eq("name", "third_place")
+      .maybeSingle();
+
+    if (thirdGroupErr) return { ok: false, error: thirdGroupErr.message };
+    if (!thirdGroup) return { ok: false, error: "3/4위전 그룹을 찾을 수 없습니다." };
+
     const { data: thirdMatches, error: thirdErr } = await supabase
       .from("matches")
       .select("id,team_a_id,team_b_id")
       .eq("division_id", matchRow.division_id)
-      .is("group_id", null)
-      .eq("round", "third_place")
+      .eq("group_id", thirdGroup.id)
       .order("created_at", { ascending: true });
 
     if (thirdErr) return { ok: false, error: thirdErr.message };
@@ -673,9 +704,9 @@ export async function seedTournamentTeamsFromConfirmedStandings(
 
   const { data: existingMatches, error: existingErr } = await supabase
     .from("matches")
-    .select("id,team_a_id,team_b_id")
+    .select("id,team_a_id,team_b_id,group:groups!matches_group_id_fkey!inner(type)")
     .eq("division_id", divisionId)
-    .is("group_id", null);
+    .eq("group.type", "tournament");
 
   if (existingErr) return { ok: false, error: existingErr.message };
   const hasAssigned = (existingMatches ?? []).some(
@@ -686,12 +717,22 @@ export async function seedTournamentTeamsFromConfirmedStandings(
   }
 
   const firstRound = roundByTournamentSize[size];
+  const { data: firstGroup, error: firstGroupErr } = await supabase
+    .from("groups")
+    .select("id")
+    .eq("division_id", divisionId)
+    .eq("type", "tournament")
+    .eq("name", firstRound)
+    .maybeSingle();
+
+  if (firstGroupErr) return { ok: false, error: firstGroupErr.message };
+  if (!firstGroup) return { ok: false, error: "토너먼트 그룹이 없습니다." };
+
   const { data: roundMatches, error: roundErr } = await supabase
     .from("matches")
     .select("id,team_a_id,team_b_id,created_at")
     .eq("division_id", divisionId)
-    .is("group_id", null)
-    .eq("round", firstRound)
+    .eq("group_id", firstGroup.id)
     .order("created_at", { ascending: true });
 
   if (roundErr) return { ok: false, error: roundErr.message };

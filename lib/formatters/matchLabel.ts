@@ -21,7 +21,7 @@ type LeagueLabelInput = {
 };
 
 type TournamentLabelInput = {
-  round?: string | null;
+  groupName?: string | null;
   teamA: string;
   teamB: string;
   seedA?: number | null;
@@ -41,7 +41,7 @@ export function formatLeagueMatchLabel({
 }
 
 export function formatTournamentMatchLabel({
-  round,
+  groupName,
   teamA,
   teamB,
   seedA,
@@ -55,7 +55,7 @@ export function formatTournamentMatchLabel({
   const hasRealTeams = isRealTeam(teamA) && isRealTeam(teamB);
   if (hasRealTeams) return `${teamA} vs ${teamB}`;
 
-  const isInitialRound = Boolean(initialRound && round === initialRound);
+  const isInitialRound = Boolean(initialRound && groupName === initialRound);
   if (isInitialRound) {
     const derivedSeedA = roundIndex ? roundIndex : null;
     const derivedSeedB =
@@ -67,7 +67,7 @@ export function formatTournamentMatchLabel({
     }
   }
 
-  const needsFinalReference = round === "final" || round === "third_place";
+  const needsFinalReference = groupName === "final" || groupName === "third_place";
   let referenceTotal = previousRoundTotal ?? (needsFinalReference ? roundTotal : null);
   if (needsFinalReference && (!referenceTotal || referenceTotal < 2)) {
     referenceTotal = 2;
@@ -77,7 +77,7 @@ export function formatTournamentMatchLabel({
     const leftIndex = (roundIndex - 1) * 2 + 1;
     const rightIndex = leftIndex + 1;
     if (rightIndex <= referenceTotal) {
-      const role = round === "third_place" ? "패자" : "승자";
+      const role = groupName === "third_place" ? "패자" : "승자";
       return `${leftIndex}경기 ${role} vs ${rightIndex}경기 ${role}`;
     }
   }
@@ -93,9 +93,9 @@ export function formatBreakLabel(): string {
   return "휴식시간";
 }
 
-export function formatRoundLabel(round: string | null): string {
-  if (!round) return "토너먼트";
-  return ROUND_LABELS[round] ?? round;
+export function formatRoundLabel(groupName: string | null): string {
+  if (!groupName) return "토너먼트";
+  return ROUND_LABELS[groupName] ?? groupName;
 }
 
 export function getInitialTournamentRound(
@@ -115,12 +115,12 @@ export function getPreviousTournamentRound(round: string | null): string | null 
 }
 
 export function formatTournamentCategoryLabel(
-  round: string | null,
+  groupName: string | null,
   roundIndex: number | null,
   roundTotal: number | null
 ): string {
-  const label = formatRoundLabel(round);
-  if (round === "final" || round === "third_place") return label;
+  const label = formatRoundLabel(groupName);
+  if (groupName === "final" || groupName === "third_place") return label;
   if (!roundIndex || !roundTotal) return label;
   return `${label} ${roundIndex}경기`;
 }

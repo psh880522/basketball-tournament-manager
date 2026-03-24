@@ -740,7 +740,7 @@ export default function ResultForm({
                           {(() => {
                             const roundCounts = new Map<string, number>();
                             orderedMatches.forEach((match) => {
-                              const key = match.round ?? "tournament";
+                              const key = match.group?.name ?? "tournament";
                               roundCounts.set(key, (roundCounts.get(key) ?? 0) + 1);
                             });
                             const initialRound =
@@ -748,12 +748,12 @@ export default function ResultForm({
                             const roundIndexes = new Map<string, number>();
 
                             return orderedMatches.map((match) => {
-                              const key = match.round ?? "tournament";
+                              const key = match.group?.name ?? "tournament";
                               const nextIndex = (roundIndexes.get(key) ?? 0) + 1;
                               roundIndexes.set(key, nextIndex);
                               const roundTotal = roundCounts.get(key) ?? null;
                               const previousRound =
-                                getPreviousTournamentRound(match.round ?? null);
+                                getPreviousTournamentRound(match.group?.name ?? null);
                               const previousRoundTotal = previousRound
                                 ? roundCounts.get(previousRound) ?? null
                                 : null;
@@ -764,7 +764,7 @@ export default function ResultForm({
                                 ? divisionRanks[match.team_b_id] ?? null
                                 : null;
                               const matchLabel = formatTournamentMatchLabel({
-                                round: match.round,
+                                groupName: match.group?.name ?? null,
                                 teamA: match.team_a?.team_name ?? "TBD",
                                 teamB: match.team_b?.team_name ?? "TBD",
                                 seedA,
@@ -786,7 +786,7 @@ export default function ResultForm({
                                   </td>
                                   <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                                     {formatTournamentCategoryLabel(
-                                      match.round,
+                                      match.group?.name ?? null,
                                       nextIndex,
                                       roundTotal
                                     )}

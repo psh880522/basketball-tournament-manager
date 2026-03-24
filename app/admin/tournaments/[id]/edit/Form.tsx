@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FieldHint from "@/components/ui/FieldHint";
 import {
   type TournamentEditRow,
   type TournamentStatus,
@@ -40,11 +41,24 @@ export default function TournamentEditForm({
   const [location, setLocation] = useState(tournament.location ?? "");
   const [startDate, setStartDate] = useState(tournament.start_date ?? "");
   const [endDate, setEndDate] = useState(tournament.end_date ?? "");
+  const [maxTeams, setMaxTeams] = useState(
+    tournament.max_teams ? String(tournament.max_teams) : ""
+  );
   const [status, setStatus] = useState<TournamentStatus>(tournament.status);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isFinished = tournament.status === "finished";
+
+  const maxTeamsValue = useMemo(() => {
+    if (!maxTeams.trim()) return null;
+    const parsed = Number(maxTeams);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [maxTeams]);
+
+  const isMaxTeamsValid =
+    maxTeamsValue === null ||
+    (Number.isInteger(maxTeamsValue) && maxTeamsValue >= 2);
 
   useEffect(() => {
     if (!success) return;
@@ -69,6 +83,7 @@ export default function TournamentEditForm({
         start_date: startDate,
         end_date: endDate,
         status,
+        max_teams: maxTeamsValue,
       }).then((result) => {
         if (!result.ok) {
           setError(result.error);
@@ -149,11 +164,31 @@ export default function TournamentEditForm({
           )}
         </div>
 
+        <div className="space-y-1">
+          <label className="text-sm font-medium">최대 팀 수</label>
+          <input
+            type="number"
+            min={2}
+            className={`w-full rounded-md border px-3 py-2 text-sm ${
+              isMaxTeamsValid ? "border-gray-300" : "border-rose-400"
+            }`}
+            value={maxTeams}
+            onChange={(event) => setMaxTeams(event.target.value)}
+            placeholder="예: 16"
+          />
+          <FieldHint>비워두면 제한 없이 등록됩니다.</FieldHint>
+        </div>
+
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {!isMaxTeamsValid ? (
+          <p className="text-sm text-red-600">
+            최대 팀 수는 2 이상의 정수여야 합니다.
+          </p>
+        ) : null}
         {success ? <p className="text-sm text-green-600">{success}</p> : null}
 
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={isPending}>
+          <Button type="submit" disabled={isPending || !isMaxTeamsValid}>
             {isPending ? "저장 중..." : "저장"}
           </Button>
           <Link href="/admin">
