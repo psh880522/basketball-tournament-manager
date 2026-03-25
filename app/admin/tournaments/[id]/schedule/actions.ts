@@ -22,6 +22,12 @@ import {
   swapSlotMatchAssignments,
   assignMatchToEmptySlot,
   unassignMatchFromSlot,
+  addBreakSlot,
+  deleteBreakSlot,
+  updateSlotDuration,
+  updateSlotType,
+  reorderCourtDivisionSlots,
+  recalculateCourtSlotTimes,
 } from "@/lib/api/schedule-slots";
 import { revalidatePath } from "next/cache";
 
@@ -439,6 +445,106 @@ export async function unassignMatchFromSlotAction(
   if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
 
   const result = await unassignMatchFromSlot({ slotId });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function addBreakSlotAction(
+  tournamentId: string,
+  courtId: string,
+  divisionId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await addBreakSlot({ tournamentId, courtId, divisionId });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function deleteBreakSlotAction(
+  tournamentId: string,
+  slotId: string
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await deleteBreakSlot({ tournamentId, slotId });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function updateSlotDurationAction(
+  tournamentId: string,
+  slotId: string,
+  durationMinutes: number
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await updateSlotDuration({ tournamentId, slotId, durationMinutes });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function updateSlotTypeAction(
+  tournamentId: string,
+  slotId: string,
+  type: "group" | "tournament" | "break"
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await updateSlotType({ tournamentId, slotId, type });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function reorderCourtDivisionSlotsAction(
+  tournamentId: string,
+  courtId: string | null,
+  divisionId: string | null,
+  orderedSlotIds: string[]
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await reorderCourtDivisionSlots({
+    tournamentId,
+    courtId,
+    divisionId,
+    orderedSlotIds,
+  });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
+  }
+
+  return result;
+}
+
+export async function recalculateCourtSlotsAction(
+  tournamentId: string,
+  courtId: string | null
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await recalculateCourtSlotTimes({ tournamentId, courtId });
 
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);

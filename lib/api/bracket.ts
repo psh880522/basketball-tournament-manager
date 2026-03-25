@@ -534,8 +534,8 @@ export async function getBracketGenerationSummary(
     const summary = divisionMap.get(divisionId);
     if (!summary) return;
 
-    const teamA = row.team_a as { team_name: string } | null;
-    const teamB = row.team_b as { team_name: string } | null;
+    const teamA = (row.team_a as unknown) as { team_name: string } | null;
+    const teamB = (row.team_b as unknown) as { team_name: string } | null;
     const isAssigned = Boolean(row.team_a_id) && Boolean(row.team_b_id);
     const matchSummary: BracketMatchSummary = {
       id: row.id as string,
@@ -546,7 +546,7 @@ export async function getBracketGenerationSummary(
       seedB: (row.seed_b as number | null) ?? null,
     };
 
-    const groupMeta = row.groups as
+    const groupMeta = (row.groups as unknown) as
       | { id: string; name: string; order: number; type: string }
       | null;
     if (groupMeta?.type !== "tournament") {

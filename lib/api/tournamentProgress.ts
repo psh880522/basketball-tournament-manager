@@ -61,7 +61,6 @@ export async function getTournamentProgressState(
   if (!tournament) {
     console.log("[tournamentProgress] not found", {
       tournamentId,
-      userId,
     });
     return { data: null, error: "Tournament not found." };
   }

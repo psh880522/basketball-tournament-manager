@@ -241,7 +241,7 @@ const buildSteps = (
         variant: "primary",
       },
       {
-        label: "코트 설정",
+        label: "대회 수정",
         href: `/admin/tournaments/${tournamentId}/edit`,
         enabled: !isFinished,
         reason: isFinished ? "종료된 대회" : undefined,

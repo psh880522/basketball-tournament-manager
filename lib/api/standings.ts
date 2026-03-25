@@ -242,7 +242,7 @@ export async function listStandingsPageData(
                 sort_order: number;
                 standings_dirty: boolean;
             }[],
-            standings: (standings ?? []) as DivisionStandingsRow[],
+            standings: (standings ?? []) as unknown as DivisionStandingsRow[],
         },
         error: null,
     };

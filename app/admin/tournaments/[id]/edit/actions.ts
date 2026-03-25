@@ -24,6 +24,7 @@ type UpdateTournamentInput = {
   end_date: string;
   status: TournamentStatus;
   max_teams: number | null;
+  schedule_start_at: string | null;
 };
 
 type ActionResult = {
@@ -47,6 +48,7 @@ export async function updateTournamentAction(
     end_date: input.end_date,
     status: input.status,
     max_teams: input.max_teams,
+    schedule_start_at: input.schedule_start_at,
   });
 }
 

@@ -2,11 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getCourtsByTournament } from "@/lib/api/courts";
-import { getScheduleSlots } from "@/lib/api/schedule-slots";
+import {
+  getScheduleSlots,
+  getScheduleSlotsFlatByCourt,
+} from "@/lib/api/schedule-slots";
 import { getStandingsByDivision } from "@/lib/api/standings";
+import { getTournamentForEdit } from "@/lib/api/tournaments";
+import { getDivisionsByTournament } from "@/lib/api/divisions";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import ScheduleSlotsBoard from "./components/ScheduleSlotsBoard";
+import ScheduleSlotsFlatBoard from "./components/ScheduleSlotsFlatBoard";
 import ScheduleGenerateActions from "./components/ScheduleGenerateActions";
 import ScheduleSyncActions from "./components/ScheduleSyncActions";
 
@@ -92,34 +98,45 @@ export default async function SchedulePage({ params }: PageProps) {
           <header className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <h1 className="text-2xl font-semibold">스케줄 관리</h1>
-              <p className="text-sm text-gray-600">스케줄 슬롯을 확인하세요.</p>
+              <p className="text-sm text-gray-600">스케줄 을 확인하세요.</p>
             </div>
           </header>
 
           <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">스케줄 슬롯 조회</h2>
-              <span className="text-xs text-gray-400">읽기 전용</span>
-            </div>
-            <ScheduleSlotsBoard
-              slots={slotBoard.data}
-              error={slotBoard.error}
-              courts={courtsResult.data ?? []}
-              tournamentId={id}
-              divisionRanks={divisionRanks}
-              isEditable={false}
-            />
+            <Card className="space-y-3">
+              <h2 className="text-lg font-semibold">스케줄 조회</h2>
+              <p className="text-sm text-gray-500">코트 및 디비전별 경기 일정을 확인합니다.</p>
+              <ScheduleSlotsBoard
+                slots={slotBoard.data}
+                error={slotBoard.error}
+                courts={courtsResult.data ?? []}
+                tournamentId={id}
+                divisionRanks={divisionRanks}
+                isEditable={false}
+              />
+            </Card>
           </section>
         </div>
       </main>
     );
   }
 
-  const [courtsResult, slotBoard] = await Promise.all([
-    getCourtsByTournament(id),
-    getScheduleSlots(id),
-  ]);
+  const [courtsResult, slotBoard, flatSlotsResult, tournamentResult, divisionsResult] =
+    await Promise.all([
+      getCourtsByTournament(id),
+      getScheduleSlots(id),
+      getScheduleSlotsFlatByCourt(id),
+      getTournamentForEdit(id),
+      getDivisionsByTournament(id),
+    ]);
   const divisionRanks = await buildDivisionRanks(slotBoard);
+
+  const courts = courtsResult.data ?? [];
+  const scheduleStartAt = tournamentResult.data?.schedule_start_at ?? null;
+  const divisions = (divisionsResult.data ?? []).map((d) => ({
+    id: d.id,
+    name: d.name,
+  }));
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -127,7 +144,7 @@ export default async function SchedulePage({ params }: PageProps) {
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold">스케줄 관리</h1>
-            <p className="text-sm text-gray-600">스케줄 슬롯을 확인하세요.</p>
+            <p className="text-sm text-gray-600">스케줄 을 확인하세요.</p>
           </div>
           <Link href={`/admin/tournaments/${id}/edit`}>
             <Button variant="secondary">대회 수정</Button>
@@ -135,22 +152,27 @@ export default async function SchedulePage({ params }: PageProps) {
         </header>
 
         <section className="space-y-3">
-          <ScheduleGenerateActions tournamentId={id} />
+          <ScheduleGenerateActions
+            tournamentId={id}
+            scheduleStartAt={scheduleStartAt}
+            courts={courts}
+            divisions={divisions}
+          />
           <ScheduleSyncActions tournamentId={id} />
         </section>
 
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">스케줄 슬롯 조회</h2>
-          </div>
-          <ScheduleSlotsBoard
-            slots={slotBoard.data}
-            error={slotBoard.error}
-            courts={courtsResult.data ?? []}
-            tournamentId={id}
-            divisionRanks={divisionRanks}
-            isEditable
-          />
+          <Card className="space-y-3">
+            <h2 className="text-lg font-semibold">스케줄 조회</h2>
+            <p className="text-sm text-gray-500">코트 및 디비전별 슬롯을 확인하고 순서·소요시간·코트를 직접 편집합니다.</p>
+            <ScheduleSlotsFlatBoard
+              groups={flatSlotsResult.data ?? []}
+              courts={courts}
+              tournamentId={id}
+              scheduleStartAt={scheduleStartAt}
+              isEditable
+            />
+          </Card>
         </section>
       </div>
     </main>

@@ -811,7 +811,7 @@ export async function updateMatchSeedAction(input: {
 
 ### 6-B. `schedule-slots.ts`의 광범위한 round 의존성
 
-`seedTournamentMatchSlotsFromBracket` 함수(스케줄 슬롯 자동 생성 기능)가 `round` 기반으로 경기를 정렬하고 있다. 변경 후에는 `groups.order`를 기준으로 정렬해야 하며, 이 정렬 로직이 잘못되면 스케줄 페이지의 슬롯 순서가 망가질 수 있다. **schedule 페이지까지 통합 테스트 필요.**
+`seedTournamentMatchSlotsFromBracket` 함수(스케줄  자동 생성 기능)가 `round` 기반으로 경기를 정렬하고 있다. 변경 후에는 `groups.order`를 기준으로 정렬해야 하며, 이 정렬 로직이 잘못되면 스케줄 페이지의 슬롯 순서가 망가질 수 있다. **schedule 페이지까지 통합 테스트 필요.**
 
 ### 6-C. `third_place`와 `final`의 그룹 이름 기반 조회
 

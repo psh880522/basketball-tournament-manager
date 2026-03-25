@@ -49,6 +49,11 @@ export default function TournamentEditForm({
     tournament.max_teams ? String(tournament.max_teams) : ""
   );
   const [status, setStatus] = useState<TournamentStatus>(tournament.status);
+  const [scheduleStartAt, setScheduleStartAt] = useState(
+    tournament.schedule_start_at
+      ? new Date(tournament.schedule_start_at).toISOString().slice(0, 16)
+      : ""
+  );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -88,6 +93,9 @@ export default function TournamentEditForm({
         end_date: endDate,
         status,
         max_teams: maxTeamsValue,
+        schedule_start_at: scheduleStartAt
+          ? new Date(scheduleStartAt).toISOString()
+          : null,
       }).then((result) => {
         if (!result.ok) {
           setError(result.error);
@@ -181,6 +189,17 @@ export default function TournamentEditForm({
             placeholder="예: 16"
           />
           <FieldHint>비워두면 제한 없이 등록됩니다.</FieldHint>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">대회 시작 시간</label>
+          <input
+            type="datetime-local"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            value={scheduleStartAt}
+            onChange={(event) => setScheduleStartAt(event.target.value)}
+          />
+          <FieldHint>대회 시작 시간 기준으로 스케줄의 시간을 자동 계산합니다.</FieldHint>
         </div>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}

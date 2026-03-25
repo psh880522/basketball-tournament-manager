@@ -27,6 +27,7 @@ export type TournamentEditRow = {
   end_date: string | null;
   status: TournamentStatus;
   max_teams: number | null;
+  schedule_start_at: string | null;
 };
 
 export type PublicTournamentRow = {
@@ -57,6 +58,7 @@ type TournamentUpdatePayload = {
   end_date: string;
   status: TournamentStatus;
   max_teams: number | null;
+  schedule_start_at: string | null;
 };
 
 const tournamentStatuses: TournamentStatus[] = [
@@ -146,7 +148,7 @@ export async function getTournamentForEdit(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status,max_teams")
+    .select("id,name,location,start_date,end_date,status,max_teams,schedule_start_at")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -275,6 +277,7 @@ export async function updateTournament(
       end_date: payload.end_date,
       status: payload.status,
       max_teams: payload.max_teams,
+      schedule_start_at: payload.schedule_start_at,
     })
     .eq("id", tournamentId);
 

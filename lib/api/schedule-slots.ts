@@ -43,6 +43,7 @@ export type ScheduleSlot = {
   stage_type: string | null;
   start_at: string | null;
   end_at: string | null;
+  duration_minutes: number | null;
   court_id: string | null;
   division_id: string | null;
   match_id: string | null;
@@ -73,6 +74,17 @@ export type ScheduleSlotGroupOption = {
   division_id: string;
   name: string;
   order: number;
+};
+
+// 편집 가능한 단일 테이블용 flat 타입
+export type ScheduleSlotFlatDivisionGroup = {
+  division: { id: string; name: string; sort_order: number } | null;
+  slots: ScheduleSlot[]; // sort_order 오름차순
+};
+
+export type ScheduleSlotFlatCourtGroup = {
+  court: { id: string; name: string } | null;
+  divisions: ScheduleSlotFlatDivisionGroup[]; // division.sort_order 오름차순
 };
 
 const GROUP_LABEL_SEPARATOR = "::";
@@ -132,7 +144,7 @@ export async function getScheduleSlots(
   const { data, error } = await supabase
     .from("schedule_slots")
     .select(
-      "id,slot_type,stage_type,start_at,end_at,court_id,division_id,match_id,label,sort_order,divisions(id,name),courts(id,name),matches!schedule_slots_match_id_fkey(id,score_a,score_b,group_id,seed_a,seed_b,groups(id,name,order,type),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name))"
+      "id,slot_type,stage_type,start_at,end_at,duration_minutes,court_id,division_id,match_id,label,sort_order,divisions(id,name),courts(id,name),matches!schedule_slots_match_id_fkey(id,score_a,score_b,group_id,seed_a,seed_b,groups(id,name,order,type),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name))"
     )
     .eq("tournament_id", tournamentId)
     .order("court_id", { ascending: true })
@@ -364,6 +376,7 @@ export async function getScheduleSlots(
       stage_type: (row.stage_type as string | null) ?? null,
       start_at: (row.start_at as string | null) ?? null,
       end_at: (row.end_at as string | null) ?? null,
+      duration_minutes: (row.duration_minutes as number | null) ?? null,
       court_id: (row.court_id as string | null) ?? null,
       division_id: (row.division_id as string | null) ?? null,
       match_id: (row.match_id as string | null) ?? null,
@@ -922,7 +935,7 @@ export async function generateScheduleSlots(input: {
 
   if (existingErr) return { ok: false, error: existingErr.message };
   if ((existingCount ?? 0) > 0) {
-    return { ok: false, error: "이미 스케줄 슬롯이 존재합니다." };
+    return { ok: false, error: "이미 스케줄 이 존재합니다." };
   }
 
   const { data: divisions, error: divisionsErr } = await supabase
@@ -976,6 +989,7 @@ export async function generateScheduleSlots(input: {
     start_at: string | null;
     end_at: string | null;
     sort_order: number;
+    duration_minutes: number | null;
   }[] = [];
 
   const divisionIds = [...divisionOrder.keys()];
@@ -1001,7 +1015,7 @@ export async function generateScheduleSlots(input: {
     let missingGroupCount = 0;
 
     groupMatches.forEach((match) => {
-      const groupMeta = match.groups as
+      const groupMeta = (match.groups as unknown) as
         | { name: string; order: number; type: string }
         | null;
       const groupName = groupMeta?.name ?? null;
@@ -1040,7 +1054,7 @@ export async function generateScheduleSlots(input: {
 
   const initialRoundByDivision = new Map<string, { name: string; order: number }>();
   (matches ?? []).forEach((match) => {
-    const groupMeta = match.groups as
+    const groupMeta = (match.groups as unknown) as
       | { name: string; order: number; type: string }
       | null;
     if (!groupMeta || groupMeta.type !== "tournament") return;
@@ -1117,7 +1131,7 @@ export async function generateScheduleSlots(input: {
 
       groupMatches.forEach((match) => {
         const groupName =
-          (match.groups as { name: string; order: number } | null)?.name ?? null;
+          ((match.groups as unknown) as { name: string; order: number } | null)?.name ?? null;
         if (!groupName) return;
         if (!matchesByGroup.has(groupName)) matchesByGroup.set(groupName, []);
         matchesByGroup.get(groupName)?.push(match);
@@ -1154,6 +1168,7 @@ export async function generateScheduleSlots(input: {
             start_at: startAt.toISOString(),
             end_at: endAt.toISOString(),
             sort_order: currentCourtOrder,
+            duration_minutes: matchDurationMinutes,
           });
           currentCourtOrder += 1;
           hasGroupSlots = true;
@@ -1184,6 +1199,7 @@ export async function generateScheduleSlots(input: {
           start_at: startAt.toISOString(),
           end_at: endAt.toISOString(),
           sort_order: currentCourtOrder,
+          duration_minutes: matchDurationMinutes,
         });
         currentCourtOrder += 1;
         hasTournamentSlots = true;
@@ -1209,6 +1225,7 @@ export async function generateScheduleSlots(input: {
           start_at: startAt.toISOString(),
           end_at: endAt.toISOString(),
           sort_order: currentCourtOrder,
+          duration_minutes: breakDurationMinutes,
         });
         currentCourtOrder += 1;
       }
@@ -1345,7 +1362,7 @@ async function getGroupSlotsByDivision(divisionId: string) {
   if (error) return { data: null, error: error.message };
 
   const rows = (data ?? []).map((row) => {
-    const match = row.matches as { groups: { name: string } | null } | null;
+    const match = (row.matches as unknown) as { groups: { name: string } | null } | null;
     const groupKey =
       match?.groups?.name ??
       (row.slot_type !== "match"
@@ -1474,7 +1491,7 @@ export async function updateSlotCourt(input: {
 
   const { data: slot, error: slotErr } = await supabase
     .from("schedule_slots")
-    .select("id,tournament_id")
+    .select("id,tournament_id,court_id,division_id")
     .eq("id", slotId)
     .maybeSingle();
 
@@ -1496,18 +1513,47 @@ export async function updateSlotCourt(input: {
     if (!court) return { ok: false, error: "코트를 찾을 수 없습니다." };
   }
 
-  const { data, error } = await supabase
+  const prevCourtId = (slot.court_id as string | null) ?? null;
+  const divisionId = (slot.division_id as string | null) ?? null;
+
+  // 새 코트의 해당 division 내 최대 sort_order 조회
+  let maxOrderQuery = supabase
     .from("schedule_slots")
-    .update({ court_id: courtId })
-    .eq("id", slotId)
+    .select("sort_order")
     .eq("tournament_id", tournamentId)
-    .select("id")
-    .maybeSingle();
+    .order("sort_order", { ascending: false });
 
-  if (error) return { ok: false, error: error.message };
-  if (!data) return { ok: false, error: "슬롯을 찾을 수 없습니다." };
+  if (courtId) {
+    maxOrderQuery = maxOrderQuery.eq("court_id", courtId);
+  } else {
+    maxOrderQuery = maxOrderQuery.is("court_id", null);
+  }
+  if (divisionId) {
+    maxOrderQuery = maxOrderQuery.eq("division_id", divisionId);
+  } else {
+    maxOrderQuery = maxOrderQuery.is("division_id", null);
+  }
 
-  return { ok: true };
+  const { data: maxRows } = await maxOrderQuery.limit(1);
+  const newSortOrder = ((maxRows?.[0]?.sort_order as number | null) ?? -1) + 1;
+
+  // court_id + sort_order 업데이트
+  const { error: updateErr } = await supabase
+    .from("schedule_slots")
+    .update({ court_id: courtId, sort_order: newSortOrder })
+    .eq("id", slotId)
+    .eq("tournament_id", tournamentId);
+
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  // 이전 코트 재계산 (코트가 실제로 변경된 경우만)
+  if (prevCourtId !== courtId) {
+    const prevResult = await recalculateCourtSlotTimes({ tournamentId, courtId: prevCourtId });
+    if (!prevResult.ok) return prevResult;
+  }
+
+  // 새 코트 재계산
+  return recalculateCourtSlotTimes({ tournamentId, courtId });
 }
 
 export async function swapSlotMatchAssignments(input: {
@@ -1776,7 +1822,7 @@ export async function generateScheduleTimes(input: {
 
   const sortedSlots = (slots ?? [])
     .map((slot) => {
-      const match = slot.matches as { groups: { name: string; order: number } | null } | null;
+      const match = (slot.matches as unknown) as { groups: { name: string; order: number } | null } | null;
       const groupKey =
         slot.stage_type === "group"
           ? match?.groups?.name ?? parseGroupKeyFromLabel(slot.label ?? null)
@@ -1950,7 +1996,7 @@ export async function validateScheduleBeforeSync(
     return { isValid: false, errors: [error.message], warnings: [] };
   }
 
-  const rows = (slots ?? []) as {
+  const rows = (slots ?? []) as unknown as {
     id: string;
     slot_type: string;
     match_id: string | null;
@@ -1970,7 +2016,7 @@ export async function validateScheduleBeforeSync(
   if (rows.length === 0) {
     return {
       isValid: false,
-      errors: ["동기화 가능한 스케줄 슬롯이 없습니다."],
+      errors: ["동기화 가능한 스케줄 이 없습니다."],
       warnings,
     };
   }
@@ -2158,4 +2204,544 @@ export async function regenerateScheduleBoard(input: {
     matchDurationMinutes,
     breakDurationMinutes,
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 새로운 단일 테이블(flat) 관련 함수들
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getScheduleSlotsFlatByCourt(
+  tournamentId: string
+): Promise<ApiResult<ScheduleSlotFlatCourtGroup[]>> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("schedule_slots")
+    .select(
+      "id,slot_type,stage_type,start_at,end_at,duration_minutes,court_id,division_id,match_id,label,sort_order,divisions(id,name,sort_order),courts(id,name),matches!schedule_slots_match_id_fkey(id,score_a,score_b,group_id,seed_a,seed_b,groups(id,name,order,type),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name))"
+    )
+    .eq("tournament_id", tournamentId)
+    .order("sort_order", { ascending: true });
+
+  if (error) return { data: null, error: error.message };
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+
+  // court → division → slots 계층으로 그룹화
+  const courtMap = new Map<
+    string,
+    {
+      court: { id: string; name: string } | null;
+      divisionMap: Map<
+        string,
+        {
+          division: { id: string; name: string; sort_order: number } | null;
+          slots: ScheduleSlot[];
+        }
+      >;
+    }
+  >();
+  const courtOrder: string[] = [];
+
+  rows.forEach((row) => {
+    const courtRaw = row.courts as { id: string; name: string } | null;
+    const divisionRaw = row.divisions as
+      | { id: string; name: string; sort_order: number }
+      | null;
+    const matchRaw = row.matches as {
+      id: string;
+      score_a: number | null;
+      score_b: number | null;
+      group_id: string | null;
+      seed_a: number | null;
+      seed_b: number | null;
+      groups: { id: string; name: string; order: number; type: string } | null;
+      team_a: { id: string; team_name: string } | null;
+      team_b: { id: string; team_name: string } | null;
+    } | null;
+
+    const courtKey = (row.court_id as string | null) ?? "__unassigned__";
+    const divisionKey = (row.division_id as string | null) ?? "__unassigned__";
+
+    if (!courtMap.has(courtKey)) {
+      courtMap.set(courtKey, {
+        court: courtRaw,
+        divisionMap: new Map(),
+      });
+      courtOrder.push(courtKey);
+    }
+
+    const courtEntry = courtMap.get(courtKey)!;
+    if (!courtEntry.divisionMap.has(divisionKey)) {
+      courtEntry.divisionMap.set(divisionKey, {
+        division: divisionRaw,
+        slots: [],
+      });
+    }
+
+    const slot: ScheduleSlot = {
+      id: row.id as string,
+      slot_type: row.slot_type as string,
+      stage_type: (row.stage_type as string | null) ?? null,
+      start_at: (row.start_at as string | null) ?? null,
+      end_at: (row.end_at as string | null) ?? null,
+      duration_minutes: (row.duration_minutes as number | null) ?? null,
+      court_id: (row.court_id as string | null) ?? null,
+      division_id: (row.division_id as string | null) ?? null,
+      match_id: (row.match_id as string | null) ?? null,
+      label: (row.label as string | null) ?? null,
+      sort_order: (row.sort_order as number) ?? 0,
+      group_key: matchRaw?.groups?.name ?? null,
+      match: matchRaw
+        ? {
+            id: matchRaw.id,
+            groupName: matchRaw.groups?.name ?? null,
+            groupOrder: matchRaw.groups?.order ?? null,
+            seedA: matchRaw.seed_a ?? null,
+            seedB: matchRaw.seed_b ?? null,
+            team_a_id: matchRaw.team_a?.id ?? null,
+            team_b_id: matchRaw.team_b?.id ?? null,
+            team_a: matchRaw.team_a?.team_name ?? null,
+            team_b: matchRaw.team_b?.team_name ?? null,
+            score_a: matchRaw.score_a ?? null,
+            score_b: matchRaw.score_b ?? null,
+            group_key: matchRaw.groups?.name ?? null,
+          }
+        : null,
+    };
+
+    courtEntry.divisionMap.get(divisionKey)!.slots.push(slot);
+  });
+
+  const result: ScheduleSlotFlatCourtGroup[] = courtOrder.map((courtKey) => {
+    const courtEntry = courtMap.get(courtKey)!;
+    const divisions = [...courtEntry.divisionMap.values()]
+      .sort((a, b) => {
+        const orderA = a.division?.sort_order ?? 999;
+        const orderB = b.division?.sort_order ?? 999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.division?.name ?? "").localeCompare(b.division?.name ?? "");
+      })
+      .map((divEntry) => ({
+        division: divEntry.division,
+        slots: [...divEntry.slots].sort((a, b) => a.sort_order - b.sort_order),
+      }));
+
+    return {
+      court: courtEntry.court,
+      divisions,
+    };
+  });
+
+  return { data: result, error: null };
+}
+
+export async function addBreakSlot(input: {
+  tournamentId: string;
+  courtId: string;
+  divisionId: string;
+}): Promise<ActionResult> {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return auth;
+
+  const { tournamentId, courtId, divisionId } = input;
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+  if (!courtId) return { ok: false, error: "코트를 선택하세요." };
+  if (!divisionId) return { ok: false, error: "디비전을 선택하세요." };
+
+  const supabase = await createSupabaseServerClient();
+
+  // 해당 court + division 의 최대 sort_order 조회
+  const { data: maxRow, error: maxErr } = await supabase
+    .from("schedule_slots")
+    .select("sort_order")
+    .eq("tournament_id", tournamentId)
+    .eq("court_id", courtId)
+    .eq("division_id", divisionId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (maxErr) return { ok: false, error: maxErr.message };
+
+  const nextSortOrder = ((maxRow?.sort_order as number | null) ?? -1) + 1;
+
+  const { error: insertErr } = await supabase.from("schedule_slots").insert({
+    tournament_id: tournamentId,
+    court_id: courtId,
+    division_id: divisionId,
+    slot_type: "break",
+    stage_type: null,
+    match_id: null,
+    label: "휴식시간",
+    duration_minutes: 0,
+    sort_order: nextSortOrder,
+  });
+
+  if (insertErr) return { ok: false, error: insertErr.message };
+
+  return { ok: true };
+}
+
+export async function deleteBreakSlot(input: {
+  tournamentId: string;
+  slotId: string;
+}): Promise<ActionResult> {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return auth;
+
+  const { tournamentId, slotId } = input;
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+  if (!slotId) return { ok: false, error: "슬롯 정보가 없습니다." };
+
+  const supabase = await createSupabaseServerClient();
+
+  // slot_type이 break인지 확인 (보안: 비-break 슬롯 삭제 방지)
+  const { data: slot, error: slotErr } = await supabase
+    .from("schedule_slots")
+    .select("id,slot_type,tournament_id,court_id")
+    .eq("id", slotId)
+    .maybeSingle();
+
+  if (slotErr) return { ok: false, error: slotErr.message };
+  if (!slot) return { ok: false, error: "슬롯을 찾을 수 없습니다." };
+  if (slot.tournament_id !== tournamentId) {
+    return { ok: false, error: "슬롯이 대회에 속하지 않습니다." };
+  }
+  if (slot.slot_type !== "break") {
+    return { ok: false, error: "휴식 슬롯만 삭제할 수 있습니다." };
+  }
+
+  const courtId = slot.court_id as string | null;
+
+  const { error: deleteErr } = await supabase
+    .from("schedule_slots")
+    .delete()
+    .eq("id", slotId);
+
+  if (deleteErr) return { ok: false, error: deleteErr.message };
+
+  return recalculateCourtSlotTimes({ tournamentId, courtId });
+}
+
+export async function updateSlotDuration(input: {
+  tournamentId: string;
+  slotId: string;
+  durationMinutes: number;
+}): Promise<ActionResult> {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return auth;
+
+  const { tournamentId, slotId, durationMinutes } = input;
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+  if (!slotId) return { ok: false, error: "슬롯 정보가 없습니다." };
+  if (!Number.isFinite(durationMinutes) || durationMinutes < 0) {
+    return { ok: false, error: "소요시간은 0분 이상이어야 합니다." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  // slotId의 court_id, division_id 조회
+  const { data: slot, error: slotErr } = await supabase
+    .from("schedule_slots")
+    .select("id,tournament_id,court_id,division_id")
+    .eq("id", slotId)
+    .maybeSingle();
+
+  if (slotErr) return { ok: false, error: slotErr.message };
+  if (!slot) return { ok: false, error: "슬롯을 찾을 수 없습니다." };
+  if (slot.tournament_id !== tournamentId) {
+    return { ok: false, error: "슬롯이 대회에 속하지 않습니다." };
+  }
+
+  // duration_minutes 업데이트
+  const { error: updateErr } = await supabase
+    .from("schedule_slots")
+    .update({ duration_minutes: durationMinutes })
+    .eq("id", slotId);
+
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  // 해당 코트의 모든 슬롯 시간 재계산
+  return recalculateCourtSlotTimes({
+    tournamentId,
+    courtId: (slot.court_id as string | null) ?? null,
+  });
+}
+
+export async function updateSlotType(input: {
+  tournamentId: string;
+  slotId: string;
+  type: "group" | "tournament" | "break";
+}): Promise<ActionResult> {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return auth;
+
+  const { tournamentId, slotId, type } = input;
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+  if (!slotId) return { ok: false, error: "슬롯 정보가 없습니다." };
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: slot, error: slotErr } = await supabase
+    .from("schedule_slots")
+    .select("id,tournament_id,slot_type")
+    .eq("id", slotId)
+    .maybeSingle();
+
+  if (slotErr) return { ok: false, error: slotErr.message };
+  if (!slot) return { ok: false, error: "슬롯을 찾을 수 없습니다." };
+  if (slot.tournament_id !== tournamentId) {
+    return { ok: false, error: "슬롯이 대회에 속하지 않습니다." };
+  }
+
+  // type 매핑
+  const updatePayload: {
+    slot_type: string;
+    stage_type: string | null;
+    match_id?: null;
+  } =
+    type === "group"
+      ? { slot_type: "match", stage_type: "group" }
+      : type === "tournament"
+        ? { slot_type: "match", stage_type: "tournament" }
+        : { slot_type: "break", stage_type: null, match_id: null };
+
+  const { error: updateErr } = await supabase
+    .from("schedule_slots")
+    .update(updatePayload)
+    .eq("id", slotId);
+
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  return { ok: true };
+}
+
+export async function recalculateCourtDivisionSlotTimes(input: {
+  tournamentId: string;
+  courtId: string | null;
+  divisionId: string | null;
+}): Promise<ActionResult> {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return auth;
+
+  const { tournamentId, courtId, divisionId } = input;
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const supabase = await createSupabaseServerClient();
+
+  // tournament.schedule_start_at 조회
+  const { data: tournament, error: tournamentErr } = await supabase
+    .from("tournaments")
+    .select("schedule_start_at")
+    .eq("id", tournamentId)
+    .maybeSingle();
+
+  if (tournamentErr) return { ok: false, error: tournamentErr.message };
+  if (!tournament?.schedule_start_at) {
+    return { ok: false, error: "대회 시작 시간이 설정되지 않았습니다." };
+  }
+
+  // 해당 court + division의 슬롯을 sort_order 오름차순으로 조회
+  let query = supabase
+    .from("schedule_slots")
+    .select("id,duration_minutes,sort_order")
+    .eq("tournament_id", tournamentId)
+    .order("sort_order", { ascending: true });
+
+  if (courtId) {
+    query = query.eq("court_id", courtId);
+  } else {
+    query = query.is("court_id", null);
+  }
+
+  if (divisionId) {
+    query = query.eq("division_id", divisionId);
+  } else {
+    query = query.is("division_id", null);
+  }
+
+  const { data: slots, error: slotsErr } = await query;
+  if (slotsErr) return { ok: false, error: slotsErr.message };
+
+  let cursor = new Date(tournament.schedule_start_at as string);
+
+  for (const slot of slots ?? []) {
+    const durationMinutes = (slot.duration_minutes as number | null) ?? 0;
+    const startAt = new Date(cursor);
+    const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+
+    const { error: updateErr } = await supabase
+      .from("schedule_slots")
+      .update({ start_at: startAt.toISOString(), end_at: endAt.toISOString() })
+      .eq("id", slot.id);
+
+    if (updateErr) return { ok: false, error: updateErr.message };
+
+    cursor = endAt;
+  }
+
+  return { ok: true };
+}
+
+export async function recalculateCourtSlotTimes(input: {
+  tournamentId: string;
+  courtId: string | null;
+}): Promise<ActionResult> {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return auth;
+
+  const { tournamentId, courtId } = input;
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const supabase = await createSupabaseServerClient();
+
+  // tournament.schedule_start_at 조회
+  const { data: tournament, error: tournamentErr } = await supabase
+    .from("tournaments")
+    .select("schedule_start_at")
+    .eq("id", tournamentId)
+    .maybeSingle();
+
+  if (tournamentErr) return { ok: false, error: tournamentErr.message };
+  if (!tournament?.schedule_start_at) {
+    return { ok: false, error: "대회 시작 시간이 설정되지 않았습니다." };
+  }
+
+  // 해당 코트에 있는 division_id 목록 조회
+  let divIdQuery = supabase
+    .from("schedule_slots")
+    .select("division_id")
+    .eq("tournament_id", tournamentId);
+
+  if (courtId) {
+    divIdQuery = divIdQuery.eq("court_id", courtId);
+  } else {
+    divIdQuery = divIdQuery.is("court_id", null);
+  }
+
+  const { data: divRows, error: divRowsErr } = await divIdQuery;
+  if (divRowsErr) return { ok: false, error: divRowsErr.message };
+
+  // 고유 division_id 목록 (null 포함)
+  const uniqueDivisionIds = [
+    ...new Set((divRows ?? []).map((r) => r.division_id as string | null)),
+  ];
+  const nonNullDivisionIds = uniqueDivisionIds.filter((id): id is string => id !== null);
+  const hasNullDivision = uniqueDivisionIds.some((id) => id === null);
+
+  // divisions 테이블에서 sort_order 조회 → 오름차순 정렬
+  let orderedDivisionIds: (string | null)[] = [];
+  if (nonNullDivisionIds.length > 0) {
+    const { data: divisions, error: divisionsErr } = await supabase
+      .from("divisions")
+      .select("id, sort_order")
+      .in("id", nonNullDivisionIds)
+      .order("sort_order", { ascending: true });
+
+    if (divisionsErr) return { ok: false, error: divisionsErr.message };
+    orderedDivisionIds = (divisions ?? []).map((d) => d.id as string);
+  }
+
+  // null division은 마지막 (NULLS LAST)
+  if (hasNullDivision) {
+    orderedDivisionIds.push(null);
+  }
+
+  let cursor = new Date(tournament.schedule_start_at as string);
+
+  for (const divisionId of orderedDivisionIds) {
+    let slotsQuery = supabase
+      .from("schedule_slots")
+      .select("id, duration_minutes")
+      .eq("tournament_id", tournamentId)
+      .order("sort_order", { ascending: true });
+
+    if (courtId) {
+      slotsQuery = slotsQuery.eq("court_id", courtId);
+    } else {
+      slotsQuery = slotsQuery.is("court_id", null);
+    }
+
+    if (divisionId) {
+      slotsQuery = slotsQuery.eq("division_id", divisionId);
+    } else {
+      slotsQuery = slotsQuery.is("division_id", null);
+    }
+
+    const { data: slots, error: slotsErr } = await slotsQuery;
+    if (slotsErr) return { ok: false, error: slotsErr.message };
+
+    for (const slot of slots ?? []) {
+      const durationMs = ((slot.duration_minutes as number | null) ?? 0) * 60 * 1000;
+      const startAt = new Date(cursor);
+      const endAt = new Date(startAt.getTime() + durationMs);
+
+      const { error: updateErr } = await supabase
+        .from("schedule_slots")
+        .update({ start_at: startAt.toISOString(), end_at: endAt.toISOString() })
+        .eq("id", slot.id);
+
+      if (updateErr) return { ok: false, error: updateErr.message };
+
+      cursor = endAt;
+    }
+  }
+
+  return { ok: true };
+}
+
+export async function reorderCourtDivisionSlots(input: {
+  tournamentId: string;
+  courtId: string | null;
+  divisionId: string | null;
+  orderedSlotIds: string[];
+}): Promise<ActionResult> {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return auth;
+
+  const { tournamentId, courtId, divisionId, orderedSlotIds } = input;
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+  if (!orderedSlotIds.length) return { ok: false, error: "변경할 슬롯이 없습니다." };
+
+  const supabase = await createSupabaseServerClient();
+
+  // 해당 court + division의 슬롯 목록 조회 후 검증
+  let query = supabase
+    .from("schedule_slots")
+    .select("id")
+    .eq("tournament_id", tournamentId);
+
+  if (courtId) {
+    query = query.eq("court_id", courtId);
+  } else {
+    query = query.is("court_id", null);
+  }
+
+  if (divisionId) {
+    query = query.eq("division_id", divisionId);
+  } else {
+    query = query.is("division_id", null);
+  }
+
+  const { data: existingSlots, error: existingErr } = await query;
+  if (existingErr) return { ok: false, error: existingErr.message };
+
+  const existingIdSet = new Set((existingSlots ?? []).map((s) => s.id as string));
+  const orderedIdSet = new Set(orderedSlotIds);
+
+  if (orderedSlotIds.length !== existingIdSet.size || orderedIdSet.size !== orderedSlotIds.length) {
+    return { ok: false, error: "슬롯 순서가 올바르지 않습니다." };
+  }
+
+  for (const slotId of orderedSlotIds) {
+    if (!existingIdSet.has(slotId)) {
+      return { ok: false, error: "슬롯이 해당 코트·디비전에 속하지 않습니다." };
+    }
+  }
+
+  const reorderResult = await updateSlotSortOrders(orderedSlotIds);
+  if (!reorderResult.ok) return reorderResult;
+
+  return recalculateCourtSlotTimes({ tournamentId, courtId });
 }
