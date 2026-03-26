@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { DayPicker } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
+import "react-day-picker/style.css";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FieldHint from "@/components/ui/FieldHint";
@@ -14,8 +17,6 @@ import { createTournamentAction } from "./actions";
 type FormState = {
   name: string;
   location: string;
-  start_date: string;
-  end_date: string;
   max_teams: string;
   start_time: string;
   description: string;
@@ -41,12 +42,18 @@ type CourtDraft = {
 const initialState: FormState = {
   name: "",
   location: "",
-  start_date: "",
-  end_date: "",
   max_teams: "",
   start_time: "",
   description: "",
 };
+
+function toDateStr(d: Date | undefined): string {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function NewTournamentForm() {
   const router = useRouter();
@@ -59,6 +66,20 @@ export default function NewTournamentForm() {
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [posterPreview, setPosterPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+        setCalendarOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [calendarOpen]);
 
   const maxTeamsValue = useMemo(() => {
     if (!form.max_teams.trim()) return null;
@@ -138,6 +159,10 @@ export default function NewTournamentForm() {
     event.preventDefault();
     setMessage(null);
 
+    if (!dateRange?.from) {
+      setMessage({ tone: "error", text: "대회 기간을 선택해 주세요." });
+      return;
+    }
     if (!isMaxTeamsValid) {
       setMessage({ tone: "error", text: "최대 팀 수는 2 이상의 정수여야 합니다." });
       return;
@@ -162,8 +187,8 @@ export default function NewTournamentForm() {
       const formData = new FormData();
       formData.set("name", form.name);
       formData.set("location", form.location);
-      formData.set("start_date", form.start_date);
-      formData.set("end_date", form.end_date);
+      formData.set("start_date", toDateStr(dateRange?.from));
+      formData.set("end_date", toDateStr(dateRange?.to ?? dateRange?.from));
       formData.set("start_time", form.start_time);
       formData.set("description", form.description);
       formData.set("max_teams", form.max_teams);
@@ -195,7 +220,7 @@ export default function NewTournamentForm() {
           )}
         </div>
         <div className="flex gap-2">
-          <Button type="submit" disabled={isPending || !isMaxTeamsValid || invalidDivisionIndex >= 0 || invalidCourtIndex >= 0}>
+          <Button type="submit" disabled={isPending || !dateRange?.from || !isMaxTeamsValid || invalidDivisionIndex >= 0 || invalidCourtIndex >= 0}>
             {isPending ? "생성 중..." : "대회 생성"}
           </Button>
           <Button type="button" variant="secondary" onClick={() => router.push("/admin")} disabled={isPending}>
@@ -245,22 +270,51 @@ export default function NewTournamentForm() {
           <input id="location" value={form.location} onChange={(e) => handleChange("location", e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="예: 서울 체육관" />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1">
-            <label htmlFor="start_date" className="text-sm font-medium">시작일</label>
-            <input id="start_date" type="date" value={form.start_date} onChange={(e) => handleChange("start_date", e.target.value)} required className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+            <p className="mb-1 text-sm font-medium">대회 날짜</p>
+            <div className="relative" ref={calendarRef}>
+              <button
+                type="button"
+                onClick={() => setCalendarOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm"
+              >
+                <span>
+                  {dateRange?.from
+                    ? `${toDateStr(dateRange.from)} ~ ${dateRange.to ? toDateStr(dateRange.to) : "종료일 선택"}`
+                    : "날짜 선택"}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {calendarOpen && (
+                <div className="absolute left-0 top-full z-10 mt-1 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+                  <DayPicker
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={(range) => {
+                      setDateRange(range);
+                      if (range?.from && range?.to) setCalendarOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <FieldHint>시작일과 종료일을 선택하세요.</FieldHint>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">시작 시간</p>
+              <input
+                type="time"
+                value={form.start_time}
+                onChange={(e) => handleChange("start_time", e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+              <FieldHint>시작일 기준 스케줄 시간이 자동 계산됩니다.</FieldHint>
+            </div>
           </div>
-          <div className="space-y-1">
-            <label htmlFor="end_date" className="text-sm font-medium">종료일</label>
-            <input id="end_date" type="date" value={form.end_date} onChange={(e) => handleChange("end_date", e.target.value)} required className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <FieldHint>하루짜리 대회는 시작일과 동일하게 입력하세요.</FieldHint>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <label htmlFor="start_time" className="text-sm font-medium">시작 시간</label>
-          <input id="start_time" type="time" value={form.start_time} onChange={(e) => handleChange("start_time", e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          <FieldHint>시작일 기준으로 스케줄 시간이 자동 계산됩니다. (선택)</FieldHint>
         </div>
 
         <div className="space-y-1">

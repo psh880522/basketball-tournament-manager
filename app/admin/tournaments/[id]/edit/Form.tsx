@@ -25,7 +25,17 @@ import {
   updateCourtAction,
   deleteCourtAction,
 } from "./actions";
+import { DayPicker } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
+import "react-day-picker/style.css";
 
+function toDateStr(d: Date | undefined): string {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 type TournamentEditFormProps = {
   tournament: TournamentEditRow;
@@ -37,8 +47,12 @@ export default function TournamentEditForm({
   const router = useRouter();
   const [name, setName] = useState(tournament.name ?? "");
   const [location, setLocation] = useState(tournament.location ?? "");
-  const [startDate, setStartDate] = useState(tournament.start_date ?? "");
-  const [endDate, setEndDate] = useState(tournament.end_date ?? "");
+  const [dateRange, setDateRange] = useState<DateRange>(() => ({
+    from: tournament.start_date ? new Date(tournament.start_date + "T00:00:00") : undefined,
+    to: tournament.end_date ? new Date(tournament.end_date + "T00:00:00") : undefined,
+  }));
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const [description, setDescription] = useState(tournament.description ?? "");
   const [startTime, setStartTime] = useState(() => {
     if (!tournament.schedule_start_at) return "";
@@ -58,6 +72,17 @@ export default function TournamentEditForm({
     return () => window.clearTimeout(timeout);
   }, [router, success]);
 
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+        setCalendarOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [calendarOpen]);
+
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -68,11 +93,11 @@ export default function TournamentEditForm({
         tournamentId: tournament.id,
         name: name.trim(),
         location: location.trim() ? location.trim() : null,
-        start_date: startDate,
-        end_date: endDate,
+        start_date: toDateStr(dateRange.from),
+        end_date: toDateStr(dateRange.to ?? dateRange.from),
         max_teams: tournament.max_teams,
         schedule_start_at: startTime
-          ? new Date(`${startDate}T${startTime}:00+09:00`).toISOString()
+          ? new Date(`${toDateStr(dateRange.from)}T${startTime}:00+09:00`).toISOString()
           : null,
         description: description.trim() || null,
       }).then((result) => {
@@ -108,38 +133,51 @@ export default function TournamentEditForm({
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">시작일</label>
-            <input
-              type="date"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
-              required
-            />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="mb-1 text-sm font-medium">대회 날짜</p>
+              <div className="relative" ref={calendarRef}>
+                <button
+                  type="button"
+                  onClick={() => setCalendarOpen((prev) => !prev)}
+                  className="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <span>
+                    {dateRange.from
+                      ? `${toDateStr(dateRange.from)} ~ ${dateRange.to ? toDateStr(dateRange.to) : "종료일 선택"}`
+                      : "날짜 선택"}
+                  </span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                {calendarOpen && (
+                  <div className="absolute left-0 top-full z-10 mt-1 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+                    <DayPicker
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={(range) => {
+                        setDateRange(range ?? { from: undefined, to: undefined });
+                        if (range?.from && range?.to) setCalendarOpen(false);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <FieldHint>시작일과 종료일을 선택하세요.</FieldHint>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">시작 시간</p>
+              <input
+                type="time"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+              />
+              <FieldHint>시작일 기준 스케줄 시간이 자동 계산됩니다. (선택)</FieldHint>
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">종료일</label>
-            <input
-              type="date"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium">대회 시작 시간</label>
-          <input
-            type="time"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={startTime}
-            onChange={(event) => setStartTime(event.target.value)}
-          />
-          <FieldHint>시작일 기준 스케줄 시간이 자동 계산됩니다. (선택)</FieldHint>
         </div>
 
         <div className="space-y-1">
@@ -174,7 +212,7 @@ export default function TournamentEditForm({
 }
 
 
-/* ????????????????? Divisions Section ????????????????? */
+/* ─────────────────── Divisions Section ─────────────────── */
 
 type DivisionsSectionProps = {
   tournamentId: string;
@@ -313,7 +351,7 @@ function AddDivisionForm({
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="?? 怨좊벑遺, ?쇰컲遺"
+          placeholder="예: 남자부, 여자부"
           autoFocus
           required
         />
@@ -355,7 +393,7 @@ function AddDivisionForm({
       )}
       {!isTournamentSizeValid && (
         <span className="text-xs text-red-500 self-center">
-          토너먼트 크기瑜?미설정?섏꽭??
+          올바른 토너먼트 크기를 선택하세요
         </span>
       )}
       <Button
@@ -371,7 +409,7 @@ function AddDivisionForm({
   );
 }
 
-/* ??? Division item with inline edit ??? */
+/* Division item with inline edit */
 
 function DivisionItem({
   division,
@@ -495,7 +533,7 @@ function DivisionItem({
           )}
           {!isTournamentSizeValid && (
             <span className="text-xs text-red-500">
-              토너먼트 크기瑜?미설정?섏꽭??
+              올바른 토너먼트 크기를 선택하세요
             </span>
           )}
           <Button
@@ -559,7 +597,7 @@ function DivisionItem({
   );
 }
 
-/* ????????????????? Courts Section ????????????????? */
+/* ─────────────────── Courts Section ─────────────────── */
 
 type CourtsSectionProps = {
   tournamentId: string;
@@ -605,7 +643,7 @@ export function CourtsSection({
       )}
 
       {courts.length === 0 ? (
-        <p className="text-sm text-gray-500">?깅줉??코트媛 ?놁뒿?덈떎.</p>
+        <p className="text-sm text-gray-500">등록된 코트가 없습니다.</p>
       ) : (
         <ul className="divide-y divide-gray-100">
           {courts.map((court) => (
@@ -691,7 +729,7 @@ function AddCourtForm({
   );
 }
 
-/* ??? Court item ??? */
+/* Court item */
 
 function CourtItem({
   court,
