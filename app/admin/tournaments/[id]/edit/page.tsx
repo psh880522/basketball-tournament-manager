@@ -6,7 +6,7 @@ import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getCourtsByTournament } from "@/lib/api/courts";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import TournamentEditForm, { DivisionsSection, CourtsSection } from "./Form";
+import TournamentEditForm, { PosterSection, SettingsSection } from "./Form";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -91,15 +91,14 @@ export default async function TournamentEditPage({ params }: PageProps) {
           </Link>
         </header>
 
+        <PosterSection tournamentId={id} initialPosterUrl={data.poster_url ?? null} />
+
         <TournamentEditForm tournament={data} />
 
-        <DivisionsSection
+        <SettingsSection
           tournamentId={id}
+          initialMaxTeams={data.max_teams}
           initialDivisions={divisions ?? []}
-        />
-
-        <CourtsSection
-          tournamentId={id}
           initialCourts={courts ?? []}
         />
       </div>

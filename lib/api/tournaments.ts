@@ -28,6 +28,8 @@ export type TournamentEditRow = {
   status: TournamentStatus;
   max_teams: number | null;
   schedule_start_at: string | null;
+  description: string | null;
+  poster_url: string | null;
 };
 
 export type PublicTournamentRow = {
@@ -56,9 +58,9 @@ type TournamentUpdatePayload = {
   location: string | null;
   start_date: string;
   end_date: string;
-  status: TournamentStatus;
   max_teams: number | null;
   schedule_start_at: string | null;
+  description: string | null;
 };
 
 const tournamentStatuses: TournamentStatus[] = [
@@ -148,7 +150,7 @@ export async function getTournamentForEdit(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status,max_teams,schedule_start_at")
+    .select("id,name,location,start_date,end_date,status,max_teams,schedule_start_at,description,poster_url")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -162,22 +164,22 @@ async function ensureOrganizer(): Promise<ActionResult> {
   const result = await getUserWithRole();
 
   if (result.status === "unauthenticated") {
-    return { ok: false, error: "濡쒓렇?占쎌씠 ?占쎌슂?占쎈땲??" };
+    return { ok: false, error: "로그인이 필요합니다." };
   }
 
   if (result.status === "error") {
     return {
       ok: false,
-      error: result.error ?? "?占쎌슜???占쎈낫占?遺덈윭?占쏙옙? 紐삵뻽?占쎈땲??",
+      error: result.error ?? "사용자 정보를 불러오지 못했습니다.",
     };
   }
 
   if (result.status === "empty") {
-    return { ok: false, error: "?占쎈줈?占쎌씠 ?占쎌뒿?占쎈떎." };
+    return { ok: false, error: "프로필이 없습니다." };
   }
 
   if (result.role !== "organizer") {
-    return { ok: false, error: "沅뚰븳???占쎌뒿?占쎈떎." };
+    return { ok: false, error: "권한이 없습니다." };
   }
 
   return { ok: true };
@@ -232,15 +234,11 @@ export async function updateTournament(
   if (!authResult.ok) return authResult;
 
   if (!payload.name.trim()) {
-    return { ok: false, error: "?占?占쎈챸???占쎈젰??二쇱꽭??" };
+    return { ok: false, error: "대회명은 필수입니다." };
   }
 
   if (!payload.start_date || !payload.end_date) {
-    return { ok: false, error: "?占쎌옉?占쎄낵 醫낅즺?占쎌쓣 ?占쎈젰??二쇱꽭??" };
-  }
-
-  if (!isTournamentStatus(payload.status)) {
-    return { ok: false, error: "?占쎈せ???占쏀깭 媛믪엯?占쎈떎." };
+    return { ok: false, error: "시작일과 종료일을 입력해 주세요." };
   }
 
   if (payload.max_teams !== null) {
@@ -250,23 +248,6 @@ export async function updateTournament(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data: current, error: currentError } = await supabase
-    .from("tournaments")
-    .select("status")
-    .eq("id", tournamentId)
-    .maybeSingle();
-
-  if (currentError) {
-    return { ok: false, error: currentError.message };
-  }
-
-  if (!current) {
-    return { ok: false, error: "?占?占쏙옙? 李얠쓣 ???占쎌뒿?占쎈떎." };
-  }
-
-  if (current.status === "finished" && payload.status !== "finished") {
-    return { ok: false, error: "醫낅즺???占?占쎈뒗 ?占쏀깭占?蹂寃쏀븷 ???占쎌뒿?占쎈떎." };
-  }
 
   const { error } = await supabase
     .from("tournaments")
@@ -275,9 +256,9 @@ export async function updateTournament(
       location: payload.location,
       start_date: payload.start_date,
       end_date: payload.end_date,
-      status: payload.status,
       max_teams: payload.max_teams,
       schedule_start_at: payload.schedule_start_at,
+      description: payload.description,
     })
     .eq("id", tournamentId);
 
@@ -285,6 +266,20 @@ export async function updateTournament(
     return { ok: false, error: error.message };
   }
 
+  return { ok: true };
+}
+
+export async function updateTournamentPosterUrl(
+  tournamentId: string,
+  posterUrl: string | null
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ poster_url: posterUrl })
+    .eq("id", tournamentId);
+
+  if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 

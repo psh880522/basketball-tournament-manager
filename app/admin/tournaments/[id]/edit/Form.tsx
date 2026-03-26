@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FieldHint from "@/components/ui/FieldHint";
@@ -10,14 +10,14 @@ import {
   TOURNAMENT_SIZE_LABELS,
   TOURNAMENT_SIZE_OPTIONS,
 } from "@/lib/constants/tournament";
-import {
-  type TournamentEditRow,
-  type TournamentStatus,
-} from "@/lib/api/tournaments";
+import { type TournamentEditRow } from "@/lib/api/tournaments";
 import type { DivisionRow } from "@/lib/api/divisions";
 import type { Court } from "@/lib/api/courts";
-import { updateTournamentAction } from "./actions";
 import {
+  updateTournamentAction,
+  updateMaxTeamsAction,
+  uploadPosterAction,
+  deletePosterAction,
   createDivisionAction,
   updateDivisionAction,
   deleteDivisionAction,
@@ -26,15 +26,9 @@ import {
   deleteCourtAction,
 } from "./actions";
 
+
 type TournamentEditFormProps = {
   tournament: TournamentEditRow;
-};
-
-const statusLabels: Record<TournamentStatus, string> = {
-  draft: "준비중",
-  open: "모집중",
-  closed: "진행중",
-  finished: "완료",
 };
 
 export default function TournamentEditForm({
@@ -45,37 +39,22 @@ export default function TournamentEditForm({
   const [location, setLocation] = useState(tournament.location ?? "");
   const [startDate, setStartDate] = useState(tournament.start_date ?? "");
   const [endDate, setEndDate] = useState(tournament.end_date ?? "");
-  const [maxTeams, setMaxTeams] = useState(
-    tournament.max_teams ? String(tournament.max_teams) : ""
-  );
-  const [status, setStatus] = useState<TournamentStatus>(tournament.status);
-  const [scheduleStartAt, setScheduleStartAt] = useState(
-    tournament.schedule_start_at
-      ? new Date(tournament.schedule_start_at).toISOString().slice(0, 16)
-      : ""
-  );
+  const [description, setDescription] = useState(tournament.description ?? "");
+  const [startTime, setStartTime] = useState(() => {
+    if (!tournament.schedule_start_at) return "";
+    const kstMs =
+      new Date(tournament.schedule_start_at).getTime() + 9 * 60 * 60 * 1000;
+    return new Date(kstMs).toISOString().slice(11, 16);
+  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const isFinished = tournament.status === "finished";
-
-  const maxTeamsValue = useMemo(() => {
-    if (!maxTeams.trim()) return null;
-    const parsed = Number(maxTeams);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [maxTeams]);
-
-  const isMaxTeamsValid =
-    maxTeamsValue === null ||
-    (Number.isInteger(maxTeamsValue) && maxTeamsValue >= 2);
 
   useEffect(() => {
     if (!success) return;
-
     const timeout = window.setTimeout(() => {
       router.push("/admin");
     }, 600);
-
     return () => window.clearTimeout(timeout);
   }, [router, success]);
 
@@ -91,11 +70,11 @@ export default function TournamentEditForm({
         location: location.trim() ? location.trim() : null,
         start_date: startDate,
         end_date: endDate,
-        status,
-        max_teams: maxTeamsValue,
-        schedule_start_at: scheduleStartAt
-          ? new Date(scheduleStartAt).toISOString()
+        max_teams: tournament.max_teams,
+        schedule_start_at: startTime
+          ? new Date(`${startDate}T${startTime}:00+09:00`).toISOString()
           : null,
+        description: description.trim() || null,
       }).then((result) => {
         if (!result.ok) {
           setError(result.error);
@@ -107,7 +86,8 @@ export default function TournamentEditForm({
   };
 
   return (
-    <Card className="space-y-6">
+    <Card className="space-y-4">
+      <h2 className="text-base font-semibold">기본 정보</h2>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">
           <label className="text-sm font-medium">대회명</label>
@@ -152,66 +132,34 @@ export default function TournamentEditForm({
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium">상태</label>
-          <select
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={status}
-            onChange={(event) => setStatus(event.target.value as TournamentStatus)}
-            disabled={isFinished}
-          >
-            {(Object.keys(statusLabels) as TournamentStatus[]).map((value) => (
-              <option key={value} value={value}>
-                {statusLabels[value]}
-              </option>
-            ))}
-          </select>
-          {isFinished ? (
-            <p className="text-xs text-gray-500">
-              종료된 대회는 상태를 변경할 수 없습니다.
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500">
-              종료 상태로 변경 시 되돌릴 수 없습니다.
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium">최대 팀 수</label>
-          <input
-            type="number"
-            min={2}
-            className={`w-full rounded-md border px-3 py-2 text-sm ${
-              isMaxTeamsValid ? "border-gray-300" : "border-rose-400"
-            }`}
-            value={maxTeams}
-            onChange={(event) => setMaxTeams(event.target.value)}
-            placeholder="예: 16"
-          />
-          <FieldHint>비워두면 제한 없이 등록됩니다.</FieldHint>
-        </div>
-
-        <div className="space-y-1">
           <label className="text-sm font-medium">대회 시작 시간</label>
           <input
-            type="datetime-local"
+            type="time"
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            value={scheduleStartAt}
-            onChange={(event) => setScheduleStartAt(event.target.value)}
+            value={startTime}
+            onChange={(event) => setStartTime(event.target.value)}
           />
-          <FieldHint>대회 시작 시간 기준으로 스케줄의 시간을 자동 계산합니다.</FieldHint>
+          <FieldHint>시작일 기준 스케줄 시간이 자동 계산됩니다. (선택)</FieldHint>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">설명</label>
+          <textarea
+            className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm"
+            rows={5}
+            maxLength={2000}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="공지사항, 규칙 등을 자유롭게 작성하세요."
+          />
+          <FieldHint>{description.length} / 2000자</FieldHint>
         </div>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        {!isMaxTeamsValid ? (
-          <p className="text-sm text-red-600">
-            최대 팀 수는 2 이상의 정수여야 합니다.
-          </p>
-        ) : null}
         {success ? <p className="text-sm text-green-600">{success}</p> : null}
 
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={isPending || !isMaxTeamsValid}>
+        <div className="flex flex-wrap gap-2 border-t pt-4">
+          <Button type="submit" disabled={isPending}>
             {isPending ? "저장 중..." : "저장"}
           </Button>
           <Link href="/admin">
@@ -225,7 +173,8 @@ export default function TournamentEditForm({
   );
 }
 
-/* ───────────────── Divisions Section ───────────────── */
+
+/* ????????????????? Divisions Section ????????????????? */
 
 type DivisionsSectionProps = {
   tournamentId: string;
@@ -241,9 +190,9 @@ export function DivisionsSection({
   const [showAdd, setShowAdd] = useState(false);
 
   return (
-    <Card className="space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Divisions</h2>
+        <h2 className="text-sm font-semibold">디비전</h2>
         <Button
           variant="secondary"
           onClick={() => {
@@ -294,11 +243,9 @@ export function DivisionsSection({
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }
-
-/* ─── Add form ─── */
 
 function AddDivisionForm({
   tournamentId,
@@ -366,7 +313,7 @@ function AddDivisionForm({
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="예: 고등부, 일반부"
+          placeholder="?? 怨좊벑遺, ?쇰컲遺"
           autoFocus
           required
         />
@@ -395,7 +342,7 @@ function AddDivisionForm({
           value={tournamentSize}
           onChange={(e) => setTournamentSize(e.target.value)}
         >
-          <option value="">선택</option>
+          <option value="">미설정</option>
           {TOURNAMENT_SIZE_OPTIONS.map((size) => (
             <option key={size} value={String(size)}>
               {TOURNAMENT_SIZE_LABELS[size]}
@@ -408,7 +355,7 @@ function AddDivisionForm({
       )}
       {!isTournamentSizeValid && (
         <span className="text-xs text-red-500 self-center">
-          토너먼트 크기를 선택하세요.
+          토너먼트 크기瑜?미설정?섏꽭??
         </span>
       )}
       <Button
@@ -424,7 +371,7 @@ function AddDivisionForm({
   );
 }
 
-/* ─── Division item with inline edit ─── */
+/* ??? Division item with inline edit ??? */
 
 function DivisionItem({
   division,
@@ -535,7 +482,7 @@ function DivisionItem({
               value={tournamentSize}
               onChange={(e) => setTournamentSize(e.target.value)}
             >
-              <option value="">선택</option>
+              <option value="">미설정</option>
               {TOURNAMENT_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={String(size)}>
                   {TOURNAMENT_SIZE_LABELS[size]}
@@ -548,7 +495,7 @@ function DivisionItem({
           )}
           {!isTournamentSizeValid && (
             <span className="text-xs text-red-500">
-              토너먼트 크기를 선택하세요.
+              토너먼트 크기瑜?미설정?섏꽭??
             </span>
           )}
           <Button
@@ -586,8 +533,8 @@ function DivisionItem({
       <div className="space-y-0.5">
         <p className="text-sm font-medium">{division.name}</p>
         <p className="text-xs text-gray-400">
-          그룹 크기: {division.group_size ?? "-"} · 토너먼트 크기:{" "}
-          {division.tournament_size ?? "-"} · 정렬:{" "}
+          그룹 크기: {division.group_size ?? "-"} 토너먼트 크기:{" "}
+          {division.tournament_size ?? "-"} 순서:{" "}
           {division.sort_order}
         </p>
       </div>
@@ -612,7 +559,7 @@ function DivisionItem({
   );
 }
 
-/* ───────────────── Courts Section ───────────────── */
+/* ????????????????? Courts Section ????????????????? */
 
 type CourtsSectionProps = {
   tournamentId: string;
@@ -628,9 +575,9 @@ export function CourtsSection({
   const [showAdd, setShowAdd] = useState(false);
 
   return (
-    <Card className="space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Courts</h2>
+        <h2 className="text-sm font-semibold">코트</h2>
         <Button
           variant="secondary"
           onClick={() => {
@@ -658,7 +605,7 @@ export function CourtsSection({
       )}
 
       {courts.length === 0 ? (
-        <p className="text-sm text-gray-500">등록된 코트가 없습니다.</p>
+        <p className="text-sm text-gray-500">?깅줉??코트媛 ?놁뒿?덈떎.</p>
       ) : (
         <ul className="divide-y divide-gray-100">
           {courts.map((court) => (
@@ -681,11 +628,9 @@ export function CourtsSection({
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }
-
-/* ─── Add court form ─── */
 
 function AddCourtForm({
   tournamentId,
@@ -746,7 +691,7 @@ function AddCourtForm({
   );
 }
 
-/* ─── Court item ─── */
+/* ??? Court item ??? */
 
 function CourtItem({
   court,
@@ -814,7 +759,7 @@ function CourtItem({
             required
           />
           <label className="flex items-center gap-1 text-sm text-gray-600">
-            정렬
+            순서
             <input
               type="number"
               className="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
@@ -847,7 +792,7 @@ function CourtItem({
       <div className="space-y-0.5">
         <p className="text-sm font-medium">{court.name}</p>
         <p className="text-xs text-gray-400">
-          정렬: {court.display_order ?? "-"}
+          순서: {court.display_order ?? "-"}
         </p>
       </div>
       <div className="flex gap-2">
@@ -868,5 +813,246 @@ function CourtItem({
         </Button>
       </div>
     </li>
+  );
+}
+
+/* ───────────────── Settings Section ───────────────── */
+
+type SettingsSectionProps = {
+  tournamentId: string;
+  initialMaxTeams: number | null;
+  initialDivisions: DivisionRow[];
+  initialCourts: Court[];
+};
+
+export function SettingsSection({
+  tournamentId,
+  initialMaxTeams,
+  initialDivisions,
+  initialCourts,
+}: SettingsSectionProps) {
+  const [maxTeams, setMaxTeams] = useState(
+    initialMaxTeams ? String(initialMaxTeams) : ""
+  );
+  const [maxTeamsError, setMaxTeamsError] = useState<string | null>(null);
+  const [maxTeamsSuccess, setMaxTeamsSuccess] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const maxTeamsValue = useMemo(() => {
+    if (!maxTeams.trim()) return null;
+    const parsed = Number(maxTeams);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [maxTeams]);
+
+  const isMaxTeamsValid =
+    maxTeamsValue === null ||
+    (Number.isInteger(maxTeamsValue) && maxTeamsValue >= 2);
+
+  const handleSaveMaxTeams = () => {
+    if (!isMaxTeamsValid) return;
+    setMaxTeamsError(null);
+    setMaxTeamsSuccess(null);
+    startTransition(async () => {
+      const result = await updateMaxTeamsAction(tournamentId, maxTeamsValue);
+      if (!result.ok) {
+        setMaxTeamsError(result.error);
+        return;
+      }
+      setMaxTeamsSuccess("저장됐습니다.");
+      window.setTimeout(() => setMaxTeamsSuccess(null), 2000);
+    });
+  };
+
+  return (
+    <Card className="space-y-4">
+      <h2 className="text-base font-semibold">설정</h2>
+
+      {/* 최대 팀 수 */}
+      <div className="space-y-1">
+        <label className="text-sm font-medium">최대 팀 수</label>
+        <div className="flex gap-2">
+          <input
+            type="number"
+            min={2}
+            className={`flex-1 rounded-md border px-3 py-2 text-sm ${
+              isMaxTeamsValid ? "border-gray-300" : "border-rose-400"
+            }`}
+            value={maxTeams}
+            onChange={(event) => {
+              setMaxTeams(event.target.value);
+              setMaxTeamsSuccess(null);
+            }}
+            placeholder="예: 16"
+          />
+          <Button
+            type="button"
+            onClick={handleSaveMaxTeams}
+            disabled={isPending || !isMaxTeamsValid}
+          >
+            {isPending ? "저장 중..." : "저장"}
+          </Button>
+        </div>
+        <FieldHint>비워두면 제한 없이 등록됩니다.</FieldHint>
+        {!isMaxTeamsValid && (
+          <p className="text-sm text-red-600">
+            최대 팀 수는 2 이상의 정수여야 합니다.
+          </p>
+        )}
+        {maxTeamsError && (
+          <p className="text-sm text-red-600">{maxTeamsError}</p>
+        )}
+        {maxTeamsSuccess && (
+          <p className="text-sm text-green-600">{maxTeamsSuccess}</p>
+        )}
+      </div>
+
+      {/* 디비전 */}
+      <div className="pt-4">
+        <DivisionsSection
+          tournamentId={tournamentId}
+          initialDivisions={initialDivisions}
+        />
+      </div>
+
+      {/* 코트 */}
+      <div className="pt-4">
+        <CourtsSection
+          tournamentId={tournamentId}
+          initialCourts={initialCourts}
+        />
+      </div>
+    </Card>
+  );
+}
+
+/* ───────────────── Poster Section ───────────────── */
+
+type PosterSectionProps = {
+  tournamentId: string;
+  initialPosterUrl: string | null;
+};
+
+export function PosterSection({
+  tournamentId,
+  initialPosterUrl,
+}: PosterSectionProps) {
+  const [posterUrl, setPosterUrl] = useState<string | null>(initialPosterUrl);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    setError(null);
+    if (file) {
+      const objectUrl = URL.createObjectURL(file);
+      setPreview(objectUrl);
+    } else {
+      setPreview(null);
+    }
+  };
+
+  const handleUpload = () => {
+    if (!selectedFile) return;
+    const formData = new FormData();
+    formData.append("poster", selectedFile);
+
+    startTransition(async () => {
+      const result = await uploadPosterAction(tournamentId, formData);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setPosterUrl(result.posterUrl);
+      setSelectedFile(null);
+      setPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    });
+  };
+
+  const handleDelete = () => {
+    if (!window.confirm("포스터를 삭제하시겠습니까?")) return;
+
+    startTransition(async () => {
+      const result = await deletePosterAction(tournamentId);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setPosterUrl(null);
+      setSelectedFile(null);
+      setPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    });
+  };
+
+  const displayUrl = preview ?? posterUrl;
+
+  return (
+    <Card className="space-y-4">
+      <h2 className="text-lg font-semibold">포스터</h2>
+
+      {displayUrl ? (
+        <div className="relative mx-auto w-full max-w-xs">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={displayUrl}
+            alt="대회 포스터"
+            className="w-full rounded-md border border-gray-200 object-cover"
+          />
+        </div>
+      ) : (
+        <div className="mx-auto flex h-40 w-full max-w-xs items-center justify-center rounded-md border border-dashed border-gray-300 text-sm text-gray-400">
+          포스터 없음
+        </div>
+      )}
+
+      <div className="flex justify-center flex-wrap gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isPending}
+        >
+          이미지 선택
+        </Button>
+        {selectedFile && (
+          <Button
+            type="button"
+            onClick={handleUpload}
+            disabled={isPending}
+          >
+            {isPending ? "업로드 중..." : "업로드"}
+          </Button>
+        )}
+        {posterUrl && !selectedFile && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-red-600 hover:text-red-700"
+            onClick={handleDelete}
+            disabled={isPending}
+          >
+            {isPending ? "삭제 중..." : "포스터 삭제"}
+          </Button>
+        )}
+      </div>
+
+      {selectedFile && (
+        <p className="text-xs text-gray-500">선택된 파일: {selectedFile.name}</p>
+      )}
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </Card>
   );
 }

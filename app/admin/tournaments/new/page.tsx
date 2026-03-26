@@ -39,15 +39,7 @@ export default async function NewTournamentPage() {
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="mx-auto max-w-3xl space-y-6">
-        <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">대회 생성</h1>
-          <p className="text-sm text-gray-600">
-            대회 기본 정보를 입력하세요.
-          </p>
-        </header>
-        <Card>
-          <NewTournamentForm />
-        </Card>
+        <NewTournamentForm />
       </div>
     </main>
   );
