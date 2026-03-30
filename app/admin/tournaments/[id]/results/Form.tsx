@@ -189,7 +189,7 @@ export default function ResultEntryForm({
             href={`/admin/tournaments/${tournamentId}/bracket`}
             className="text-blue-600 underline text-sm"
           >
-            조/경기 생성 페이지로 이동
+            경기 생성 페이지로 이동
           </a>
         </div>
       ) : (

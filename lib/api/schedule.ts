@@ -113,7 +113,7 @@ export async function generateSchedule(input: {
 
   if (matchErr) return { ok: false, error: matchErr.message };
   if (!allMatches || allMatches.length === 0) {
-    return { ok: false, error: "먼저 조/경기 생성을 완료하세요." };
+    return { ok: false, error: "먼저 경기 생성을 완료하세요." };
   }
 
   // 4) Group matches by division and sort within

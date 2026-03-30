@@ -287,7 +287,7 @@ const resolveNextAction = (
   if (state === "MATCH_GENERATION") {
     const disabled = summary.approvedTeams < 2;
     return {
-      label: "조/경기 생성하기",
+      label: "경기 생성하기",
       url: `/admin/tournaments/${tournamentId}/bracket`,
       disabled,
       reason: disabled ? "승인 팀 2팀 이상 필요" : null,
@@ -301,7 +301,7 @@ const resolveNextAction = (
       url: `/admin/tournaments/${tournamentId}/schedule`,
       disabled,
       reason: summary.totalMatches === 0
-        ? "먼저 조/경기 생성을 완료하세요"
+        ? "먼저 경기 생성을 완료하세요"
         : summary.courtsCount === 0
         ? "코트를 먼저 추가하세요"
         : null,

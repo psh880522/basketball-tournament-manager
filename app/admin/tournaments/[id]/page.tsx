@@ -198,7 +198,7 @@ const buildSteps = (
     status: matchCreatedDone ? "done" : matchCreatedActive ? "active" : "pending",
     actions: [
       {
-        label: "조/경기 생성",
+        label: "경기 생성",
         href: `/admin/tournaments/${tournamentId}/bracket`,
         enabled: !isFinished && approvedTeams >= 2,
         reason: isFinished
@@ -225,7 +225,7 @@ const buildSteps = (
   const scheduleReason = isFinished
     ? "종료된 대회"
     : totalMatches === 0
-    ? "먼저 조/경기 생성을 완료하세요"
+    ? "먼저 경기 생성을 완료하세요"
     : courtsCount === 0
     ? "코트를 먼저 추가하세요"
     : undefined;
@@ -269,6 +269,13 @@ const buildSteps = (
           : undefined,
         variant: "primary",
       },
+      {
+        label: "결과 보기",
+        href: `/tournament/${tournamentId}`,
+        enabled: true,
+        reason: undefined,
+        variant: "secondary",
+      },
     ],
   });
 
@@ -284,13 +291,6 @@ const buildSteps = (
         reason: isFinished ? "이미 종료됨" : undefined,
         variant: "primary",
         isFinishAction: true,
-      },
-      {
-        label: "결과 보기",
-        href: `/tournament/${tournamentId}`,
-        enabled: isFinished,
-        reason: !isFinished ? "대회 진행 중" : undefined,
-        variant: "secondary",
       },
     ],
   });

@@ -103,7 +103,7 @@ export async function assertTournamentStepAllowed(
     }
 
     if ((groupsResult.count ?? 0) > 0 && (groupMatchesResult.count ?? 0) > 0) {
-      return { ok: false, error: "이미 조/경기가 생성되었습니다." };
+      return { ok: false, error: "이미 경기가 생성되었습니다." };
     }
 
     return { ok: true };
@@ -121,7 +121,7 @@ export async function assertTournamentStepAllowed(
     }
 
     if ((groupMatchesResult.count ?? 0) === 0) {
-      return { ok: false, error: "먼저 조/경기를 생성하세요." };
+      return { ok: false, error: "먼저 경기 생성을 완료하세요." };
     }
 
     return { ok: true };

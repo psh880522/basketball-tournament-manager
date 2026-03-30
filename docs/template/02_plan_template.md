@@ -1,4 +1,8 @@
-`docs/ai-history/01-research/YYYYMMDD_기능명_Research.md` 문서를 잘 검토했어. 이제 이 정보를 바탕으로 구현을 위한 상세 계획을 세워줘.
+`docs/ai-history/01-research/20260327_경기목록테이블레이아웃통일_Research.md` 문서를 잘 검토했어. 이제 이 정보를 바탕으로 구현을 위한 상세 계획을 세워줘.
+
+matches에 적용후 추가 적용해야할 페이지
+- bracket
+- result
 
 **수행할 작업:**
 1. 구현해야 할 기능에 대한 상세 설명.
