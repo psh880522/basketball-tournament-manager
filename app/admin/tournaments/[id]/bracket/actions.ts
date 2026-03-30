@@ -71,7 +71,7 @@ export async function generateDivisionMatches(
   }
 
   /* guard: organizer + tournament owner
-     overwrite=true 시 guard의 "이미 조/경기 존재" 체크를 건너뛰기 위해
+     overwrite=true 시 guard의 "이미 경기 존재" 체크를 건너뛰기 위해
      별도 stepKey("ASSIGN_COURT")로 organizer+tournament 유효성만 확인 */
   const guard = await assertTournamentStepAllowed({
     tournamentId,

@@ -168,6 +168,18 @@ function buildMatchLabel(
   });
 }
 
+function buildMatchParts(
+  slot: ScheduleSlot,
+  meta: TournamentSlotMeta | null
+): { left: string; right: string | null } {
+  const label = buildMatchLabel(slot, meta);
+  if (slot.slot_type !== "match") return { left: label, right: null };
+  if (label === "-" || label === "경기 미배정") return { left: label, right: null };
+  const idx = label.indexOf(" vs ");
+  if (idx === -1) return { left: label, right: null };
+  return { left: label.slice(0, idx), right: label.slice(idx + 4) };
+}
+
 type SortableSlotRowProps = {
   slot: ScheduleSlot;
   courts: Court[];
@@ -279,14 +291,16 @@ function SortableSlotRow({
           className={`text-xs px-1.5 py-0.5 rounded ${
             isBreak
               ? "bg-amber-100 text-amber-700"
-              : "bg-blue-100 text-blue-700"
+              : slot.stage_type === "tournament"
+                ? "bg-blue-100 text-blue-700"
+                : "bg-emerald-100 text-emerald-700"
           }`}
         >
           {isBreak
             ? "휴식"
             : slot.stage_type === "tournament"
               ? "토너먼트"
-              : "조별"}
+              : "리그"}
         </span>
       </td>
 
@@ -326,9 +340,28 @@ function SortableSlotRow({
       </td>
 
       {/* 경기 */}
-      <td className="px-2 py-1 text-xs text-gray-700">
-        {buildMatchLabel(slot, meta)}
-      </td>
+      {(() => {
+        if (isBreak) {
+          const label = slot.label ?? "휴식시간";
+          return (
+            <>
+              <td className="px-2 py-1 text-xs text-gray-400" />
+              <td className="px-2 py-1 text-xs text-gray-500">{label}</td>
+              <td className="px-2 py-1 text-xs text-gray-400" />
+            </>
+          );
+        }
+        const parts = buildMatchParts(slot, meta);
+        return (
+          <>
+            <td className="px-2 py-1 text-xs text-gray-700">{parts.left}</td>
+            <td className="px-2 py-1 text-xs text-gray-400">
+              {parts.right != null ? "vs" : ""}
+            </td>
+            <td className="px-2 py-1 text-xs text-gray-700">{parts.right ?? ""}</td>
+          </>
+        );
+      })()}
 
       {/* 삭제 (break only) */}
       <td className="px-2 py-1 w-12">
@@ -405,7 +438,7 @@ function FlatScheduleTable({
         items={slots.map((s) => s.id)}
         strategy={verticalListSortingStrategy}
       >
-        <table className="w-full table-auto text-left">
+        <table className="w-full table-auto text-center">
           <thead>
             <tr className="border-b text-xs text-gray-500">
               {isEditable && <th className="px-2 py-1 w-8" />}
@@ -414,7 +447,9 @@ function FlatScheduleTable({
               <th className="px-2 py-1">구분</th>
               <th className="px-2 py-1">시간</th>
               <th className="px-2 py-1">소요(분)</th>
-              <th className="px-2 py-1">경기</th>
+              <th className="px-2 py-1">팀명</th>
+              <th className="px-2 py-1">vs</th>
+              <th className="px-2 py-1">팀명</th>
               {isEditable && <th className="px-2 py-1" />}
             </tr>
           </thead>

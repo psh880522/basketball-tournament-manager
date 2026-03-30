@@ -51,7 +51,7 @@ export default async function BracketPage({ params }: PageProps) {
   }
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <main className="mx-auto max-w-4xl p-6">
       <BracketConsoleForm tournamentId={id} summary={summary} />
     </main>
   );

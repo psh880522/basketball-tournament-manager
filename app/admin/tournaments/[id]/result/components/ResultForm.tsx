@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import {
-  formatLeagueMatchLabel,
   formatTournamentCategoryLabel,
   formatTournamentMatchLabel,
 } from "@/lib/formatters/matchLabel";
@@ -451,7 +450,7 @@ export default function ResultForm({
 
   return (
     <div className="space-y-4">
-      <section className="space-y-3">
+      <Card className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">리그 결과 입력</h2>
@@ -464,25 +463,21 @@ export default function ResultForm({
             <p className="mb-2">리그 경기가 없습니다.</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {leagueCourts.map((court) => (
-              <Card key={court.key} className="space-y-3">
+              <Card key={court.key} className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-gray-700">
-                    🏀 {court.label}
-                  </h3>
-                  <span className="text-xs text-gray-400">
-                    {court.totalMatches}경기
-                  </span>
+                  <span className="font-semibold text-sm">🏀 {court.label}</span>
+                  <span className="ml-auto text-xs text-gray-400">{court.totalMatches}경기</span>
                 </div>
 
-                <Card className="bg-slate-50">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-slate-700">
-                      {divisionName}
-                    </h4>
-                  </div>
-                  <div className="overflow-x-auto rounded-lg border bg-white">
+                <div className="divide-y divide-gray-100">
+                  <div className="space-y-1 pt-2">
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-sm font-medium text-gray-700">{divisionName}</span>
+                      <span className="ml-auto text-xs text-gray-400">{court.totalMatches}경기</span>
+                    </div>
+                  <div className="overflow-x-auto">
                     {(() => {
                       const orderedMatches = [...court.matches].sort((a, b) => {
                         const aTime = a.scheduled_at ? Date.parse(a.scheduled_at) : Infinity;
@@ -492,59 +487,50 @@ export default function ResultForm({
                       });
 
                       return (
-                    <table className="w-full table-fixed text-sm">
+                    <table className="w-full table-fixed text-center text-sm">
                       <colgroup>
-                        <col className="w-28" />
-                        <col className="w-24" />
-                        <col className="w-auto" />
-                        <col className="w-16" />
-                        <col className="w-8" />
-                        <col className="w-16" />
-                        <col className="w-24" />
-                        <col className="w-20" />
+                        <col className="w-20" />{/* 시간 */}
+                        <col className="w-20" />{/* 유형 */}
+                        <col className="w-16" />{/* 구분 */}
+                        <col className="w-16" />{/* 점수A */}
+                        <col />{/* 팀명A */}
+                        <col className="w-10" />{/* vs */}
+                        <col />{/* 팀명B */}
+                        <col className="w-16" />{/* 점수B */}
+                        <col className="w-20" />{/* 상태 */}
+                        <col className="w-16" />{/* 저장 */}
                       </colgroup>
-                      <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
+                      <thead className="border-b text-xs text-gray-500">
                         <tr>
-                          <th className="px-3 py-2">시간</th>
-                          <th className="px-3 py-2">구분</th>
-                          <th className="px-3 py-2">경기</th>
-                          <th className="px-3 py-2 text-center" colSpan={3}>
-                            스코어
-                          </th>
-                          <th className="px-3 py-2 text-center">상태</th>
-                          <th className="px-3 py-2 text-center">저장</th>
+                          <th className="px-2 py-1">시간</th>
+                          <th className="px-2 py-1">유형</th>
+                          <th className="px-2 py-1">구분</th>
+                          <th className="px-2 py-1">점수</th>
+                          <th className="px-2 py-1">팀명</th>
+                          <th className="px-2 py-1">vs</th>
+                          <th className="px-2 py-1">팀명</th>
+                          <th className="px-2 py-1">점수</th>
+                          <th className="px-2 py-1">상태</th>
+                          <th className="px-2 py-1">저장</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {orderedMatches.map((match) => (
                           <tr key={match.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                            <td className="px-2 py-1 text-gray-600 whitespace-nowrap">
                               {formatTime(match.scheduled_at)}
                             </td>
-                            <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                            <td className="px-2 py-1">
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">조별</span>
+                            </td>
+                            <td className="px-2 py-1 text-gray-600">
                               {match.group?.name ?? "-"}
                             </td>
-                            <td
-                              className="px-3 py-2 whitespace-nowrap truncate"
-                              title={formatLeagueMatchLabel({
-                                groupName: match.group?.name,
-                                teamA: match.team_a?.team_name ?? "TBD",
-                                teamB: match.team_b?.team_name ?? "TBD",
-                              })}
-                            >
-                              <span className="font-medium">
-                                {formatLeagueMatchLabel({
-                                  groupName: match.group?.name,
-                                  teamA: match.team_a?.team_name ?? "TBD",
-                                  teamB: match.team_b?.team_name ?? "TBD",
-                                })}
-                              </span>
-                            </td>
-                            <td className="px-1 py-2 text-center">
+                            <td className="px-1 py-1">
                               <input
                                 type="number"
                                 min={0}
-                                className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                className="w-12 border rounded px-1.5 py-1 text-center text-sm"
                                 value={scores[match.id]?.scoreA ?? ""}
                                 onChange={(event) =>
                                   handleScoreChange(match.id, "scoreA", event.target.value)
@@ -553,12 +539,18 @@ export default function ResultForm({
                                 placeholder="0"
                               />
                             </td>
-                            <td className="px-1 py-2 text-gray-400 text-center">:</td>
-                            <td className="px-1 py-2 text-center">
+                            <td className="px-2 py-1 font-medium text-gray-800 truncate" title={match.team_a?.team_name ?? "TBD"}>
+                              {match.team_a?.team_name ?? "TBD"}
+                            </td>
+                            <td className="px-2 py-1 text-xs text-gray-400">vs</td>
+                            <td className="px-2 py-1 font-medium text-gray-800 truncate" title={match.team_b?.team_name ?? "TBD"}>
+                              {match.team_b?.team_name ?? "TBD"}
+                            </td>
+                            <td className="px-1 py-1">
                               <input
                                 type="number"
                                 min={0}
-                                className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                className="w-12 border rounded px-1.5 py-1 text-center text-sm"
                                 value={scores[match.id]?.scoreB ?? ""}
                                 onChange={(event) =>
                                   handleScoreChange(match.id, "scoreB", event.target.value)
@@ -567,27 +559,17 @@ export default function ResultForm({
                                 placeholder="0"
                               />
                             </td>
-                            <td className="px-3 py-2 text-center">
-                              <span
-                                className={`inline-block text-xs px-2 py-0.5 rounded ${statusClass(
-                                  rowStatus[match.id] ?? match.status
-                                )}`}
-                              >
+                            <td className="px-2 py-1">
+                              <span className={`inline-block text-xs px-2 py-0.5 rounded ${statusClass(rowStatus[match.id] ?? match.status)}`}>
                                 {statusLabel(rowStatus[match.id] ?? match.status)}
                               </span>
                               {rowMessages[match.id] && (
-                                <div
-                                  className={`mt-0.5 text-xs ${
-                                    rowMessages[match.id]?.tone === "error"
-                                      ? "text-red-500"
-                                      : "text-green-600"
-                                  }`}
-                                >
+                                <div className={`mt-0.5 text-xs ${rowMessages[match.id]?.tone === "error" ? "text-red-500" : "text-green-600"}`}>
                                   {rowMessages[match.id]?.text}
                                 </div>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-center whitespace-nowrap">
+                            <td className="px-2 py-1">
                               <button
                                 type="button"
                                 className="inline-flex items-center justify-center px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
@@ -604,7 +586,8 @@ export default function ResultForm({
                       );
                     })()}
                   </div>
-                </Card>
+                  </div>
+                </div>
               </Card>
             ))}
           </div>
@@ -614,7 +597,7 @@ export default function ResultForm({
           <p className="text-sm text-gray-500">권한이 없습니다.</p>
         )}
 
-      </section>
+      </Card>
 
       <Card className="space-y-4">
         <div>
@@ -627,29 +610,35 @@ export default function ResultForm({
         {standings.length === 0 ? (
           <Card className="text-sm text-gray-500">순위 데이터가 없습니다.</Card>
         ) : (
-          <div className="overflow-x-auto rounded border border-gray-200 bg-white">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600">
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-center text-sm">
+              <colgroup>
+                <col className="w-16" />{/* 순위 */}
+                <col />{/* 팀명 */}
+                <col className="w-14" />{/* 승 */}
+                <col className="w-14" />{/* 패 */}
+                <col className="w-16" />{/* 득점 */}
+                <col className="w-16" />{/* 실점 */}
+              </colgroup>
+              <thead className="border-b text-xs text-gray-500">
                 <tr>
-                  <th className="px-3 py-2 text-left">순위</th>
-                  <th className="px-3 py-2 text-left">팀명</th>
-                  <th className="px-3 py-2 text-right">승</th>
-                  <th className="px-3 py-2 text-right">패</th>
-                  <th className="px-3 py-2 text-right">득점</th>
-                  <th className="px-3 py-2 text-right">실점</th>
+                  <th className="px-2 py-1">순위</th>
+                  <th className="px-2 py-1">팀명</th>
+                  <th className="px-2 py-1">승</th>
+                  <th className="px-2 py-1">패</th>
+                  <th className="px-2 py-1">득점</th>
+                  <th className="px-2 py-1">실점</th>
                 </tr>
               </thead>
               <tbody>
                 {standings.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100">
-                    <td className="px-3 py-2">{row.rank}</td>
-                    <td className="px-3 py-2">
-                      {row.teams?.team_name ?? "-"}
-                    </td>
-                    <td className="px-3 py-2 text-right">{row.wins}</td>
-                    <td className="px-3 py-2 text-right">{row.losses}</td>
-                    <td className="px-3 py-2 text-right">{row.points_for}</td>
-                    <td className="px-3 py-2 text-right">{row.points_against}</td>
+                  <tr key={row.id} className="border-b hover:bg-gray-50">
+                    <td className="px-2 py-2 text-gray-600">{row.rank}</td>
+                    <td className="px-2 py-2 font-medium text-gray-800">{row.teams?.team_name ?? "-"}</td>
+                    <td className="px-2 py-2 text-gray-600">{row.wins}</td>
+                    <td className="px-2 py-2 text-gray-600">{row.losses}</td>
+                    <td className="px-2 py-2 text-gray-600">{row.points_for}</td>
+                    <td className="px-2 py-2 text-gray-600">{row.points_against}</td>
                   </tr>
                 ))}
               </tbody>
@@ -699,13 +688,24 @@ export default function ResultForm({
         {preview.length === 0 ? (
           <Card className="text-sm text-gray-500">미리보기 데이터가 없습니다.</Card>
         ) : (
-          <div className="overflow-x-auto rounded border border-gray-200 bg-white">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600">
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-center text-sm">
+              <colgroup>
+                <col className="w-20" />{/* 구분 */}
+                <col className="w-16" />{/* 시드A */}
+                <col />{/* 팀명A */}
+                <col className="w-10" />{/* vs */}
+                <col />{/* 팀명B */}
+                <col className="w-16" />{/* 시드B */}
+              </colgroup>
+              <thead className="border-b text-xs text-gray-500">
                 <tr>
-                  <th className="px-3 py-2 text-left">구분</th>
-                  <th className="px-3 py-2 text-left">순위(시드)</th>
-                  <th className="px-3 py-2 text-left">경기</th>
+                  <th className="px-2 py-1">구분</th>
+                  <th className="px-2 py-1">시드</th>
+                  <th className="px-2 py-1">팀명</th>
+                  <th className="px-2 py-1">vs</th>
+                  <th className="px-2 py-1">팀명</th>
+                  <th className="px-2 py-1">시드</th>
                 </tr>
               </thead>
               <tbody>
@@ -721,13 +721,14 @@ export default function ResultForm({
                           : "final"
                       ]
                     : "토너먼트";
-                  const seedLabel = `${row.seedA}위 vs ${row.seedB}위`;
-                  const matchLabel = `${row.teamAName ?? "TBD"} vs ${row.teamBName ?? "TBD"}`;
                   return (
-                    <tr key={`${row.seedA}-${row.seedB}`} className="border-t border-gray-100">
-                      <td className="px-3 py-2">{roundLabel}</td>
-                      <td className="px-3 py-2">{seedLabel}</td>
-                      <td className="px-3 py-2">{matchLabel}</td>
+                    <tr key={`${row.seedA}-${row.seedB}`} className="border-b hover:bg-gray-50">
+                      <td className="px-2 py-1 text-gray-600">{roundLabel}</td>
+                      <td className="px-2 py-1 text-gray-500">{row.seedA}위</td>
+                      <td className="px-2 py-1 font-medium text-gray-800 truncate">{row.teamAName ?? "TBD"}</td>
+                      <td className="px-2 py-1 text-xs text-gray-400">vs</td>
+                      <td className="px-2 py-1 font-medium text-gray-800 truncate">{row.teamBName ?? "TBD"}</td>
+                      <td className="px-2 py-1 text-gray-500">{row.seedB}위</td>
                     </tr>
                   );
                 })}
@@ -771,7 +772,7 @@ export default function ResultForm({
         )}
       </Card>
 
-      <section className="space-y-3">
+      <Card className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">토너먼트 결과 입력</h2>
@@ -784,25 +785,21 @@ export default function ResultForm({
             <p className="mb-2">토너먼트 경기가 없습니다.</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {tournamentCourts.map((court) => (
-              <Card key={court.key} className="space-y-3">
+              <Card key={court.key} className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-gray-700">
-                    🏀 {court.label}
-                  </h3>
-                  <span className="text-xs text-gray-400">
-                    {court.totalMatches}경기
-                  </span>
+                  <span className="font-semibold text-sm">🏀 {court.label}</span>
+                  <span className="ml-auto text-xs text-gray-400">{court.totalMatches}경기</span>
                 </div>
 
-                <Card className="bg-slate-50">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-slate-700">
-                      {divisionName}
-                    </h4>
-                  </div>
-                  <div className="overflow-x-auto rounded-lg border bg-white">
+                <div className="divide-y divide-gray-100">
+                  <div className="space-y-1 pt-2">
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-sm font-medium text-gray-700">{divisionName}</span>
+                      <span className="ml-auto text-xs text-gray-400">{court.totalMatches}경기</span>
+                    </div>
+                  <div className="overflow-x-auto">
                     {(() => {
                       const orderedMatches = [...court.matches].sort((a, b) => {
                         const aTime = a.scheduled_at ? Date.parse(a.scheduled_at) : Infinity;
@@ -812,29 +809,31 @@ export default function ResultForm({
                       });
 
                       return (
-                      <table className="w-full table-fixed text-sm">
+                      <table className="w-full table-fixed text-center text-sm">
                         <colgroup>
-                          <col className="w-24" />
-                          <col className="w-28" />
-                          <col className="w-auto" />
-                          <col className="w-24" />
-                          <col className="w-16" />
-                          <col className="w-8" />
-                          <col className="w-16" />
-                          <col className="w-24" />
-                          <col className="w-20" />
+                          <col className="w-20" />{/* 시간 */}
+                          <col className="w-20" />{/* 유형 */}
+                          <col className="w-20" />{/* 구분 */}
+                          <col className="w-16" />{/* 점수A */}
+                          <col />{/* 팀명A */}
+                          <col className="w-10" />{/* vs */}
+                          <col />{/* 팀명B */}
+                          <col className="w-16" />{/* 점수B */}
+                          <col className="w-20" />{/* 상태 */}
+                          <col className="w-16" />{/* 저장 */}
                         </colgroup>
-                        <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
+                        <thead className="border-b text-xs text-gray-500">
                           <tr>
-                            <th className="px-3 py-2">시간</th>
-                            <th className="px-3 py-2">구분</th>
-                            <th className="px-3 py-2">경기</th>
-                            <th className="px-3 py-2">코트</th>
-                            <th className="px-3 py-2 text-center" colSpan={3}>
-                              스코어
-                            </th>
-                            <th className="px-3 py-2 text-center">상태</th>
-                            <th className="px-3 py-2 text-center">저장</th>
+                            <th className="px-2 py-1">시간</th>
+                            <th className="px-2 py-1">유형</th>
+                            <th className="px-2 py-1">구분</th>
+                            <th className="px-2 py-1">점수</th>
+                            <th className="px-2 py-1">팀명</th>
+                            <th className="px-2 py-1">vs</th>
+                            <th className="px-2 py-1">팀명</th>
+                            <th className="px-2 py-1">점수</th>
+                            <th className="px-2 py-1">상태</th>
+                            <th className="px-2 py-1">저장</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -862,6 +861,9 @@ export default function ResultForm({
                                 initialRound,
                                 previousRoundTotal,
                               });
+                              const vsIdx = matchLabel.indexOf(" vs ");
+                              const labelA = vsIdx !== -1 ? matchLabel.slice(0, vsIdx) : matchLabel;
+                              const labelB = vsIdx !== -1 ? matchLabel.slice(vsIdx + 4) : null;
                               const canEditTournamentScore =
                                 isOrganizer &&
                                 isAssignedTeam(match.team_a?.team_name) &&
@@ -869,81 +871,63 @@ export default function ResultForm({
 
                               return (
                                 <tr key={match.id} className="hover:bg-gray-50">
-                                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                                  <td className="px-2 py-1 text-gray-600 whitespace-nowrap">
                                     {formatTime(match.scheduled_at)}
                                   </td>
-                                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                                  <td className="px-2 py-1">
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">토너먼트</span>
+                                  </td>
+                                  <td className="px-2 py-1 text-gray-600 whitespace-nowrap">
                                     {formatTournamentCategoryLabel(
                                       match.group?.name ?? null,
                                       roundIndex,
                                       roundTotal
                                     )}
                                   </td>
-                                  <td
-                                    className="px-3 py-2 whitespace-nowrap truncate"
-                                    title={matchLabel}
-                                  >
-                                    <span className="font-medium">{matchLabel}</span>
-                                  </td>
-                                  <td className="px-3 py-2 text-gray-600">
-                                    {match.court?.name ?? "미배정"}
-                                  </td>
-                                  <td className="px-1 py-2 text-center">
+                                  <td className="px-1 py-1">
                                     <input
                                       type="number"
                                       min={0}
-                                      className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                      className="w-12 border rounded px-1.5 py-1 text-center text-sm"
                                       value={tournamentScores[match.id]?.scoreA ?? ""}
                                       onChange={(event) =>
-                                        handleTournamentScoreChange(
-                                          match.id,
-                                          "scoreA",
-                                          event.target.value
-                                        )
+                                        handleTournamentScoreChange(match.id, "scoreA", event.target.value)
                                       }
                                       disabled={!canEditTournamentScore || isSaving}
                                       placeholder="0"
                                     />
                                   </td>
-                                  <td className="px-1 py-2 text-gray-400 text-center">:</td>
-                                  <td className="px-1 py-2 text-center">
+                                  <td className="px-2 py-1 font-medium text-gray-800 truncate" title={labelA}>
+                                    {labelA}
+                                  </td>
+                                  <td className="px-2 py-1 text-xs text-gray-400">vs</td>
+                                  <td className="px-2 py-1 font-medium text-gray-800 truncate" title={labelB ?? ""}>
+                                    {labelB ?? "-"}
+                                  </td>
+                                  <td className="px-1 py-1">
                                     <input
                                       type="number"
                                       min={0}
-                                      className="w-14 border rounded px-1.5 py-1 text-center text-sm"
+                                      className="w-12 border rounded px-1.5 py-1 text-center text-sm"
                                       value={tournamentScores[match.id]?.scoreB ?? ""}
                                       onChange={(event) =>
-                                        handleTournamentScoreChange(
-                                          match.id,
-                                          "scoreB",
-                                          event.target.value
-                                        )
+                                        handleTournamentScoreChange(match.id, "scoreB", event.target.value)
                                       }
                                       disabled={!canEditTournamentScore || isSaving}
                                       placeholder="0"
                                     />
                                   </td>
-                                  <td className="px-3 py-2 text-center">
-                                    <span
-                                      className={`inline-block text-xs px-2 py-0.5 rounded ${statusClass(
-                                        match.status
-                                      )}`}
-                                    >
+                                  <td className="px-2 py-1">
+                                    <span className={`inline-block text-xs px-2 py-0.5 rounded ${statusClass(match.status)}`}>
                                       {statusLabel(match.status)}
                                     </span>
                                     {tournamentRowMessages[match.id] && (
-                                      <div
-                                        className={`mt-0.5 text-xs ${
-                                          tournamentRowMessages[match.id]?.tone === "error"
-                                            ? "text-red-500"
-                                            : "text-green-600"
-                                        }`}
-                                      >
+                                      <div className={`mt-0.5 text-xs ${tournamentRowMessages[match.id]?.tone === "error" ? "text-red-500" : "text-green-600"}`}>
                                         {tournamentRowMessages[match.id]?.text}
                                       </div>
                                     )}
                                   </td>
-                                  <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  <td className="px-2 py-1">
                                     <button
                                       type="button"
                                       className="inline-flex items-center justify-center px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
@@ -961,7 +945,8 @@ export default function ResultForm({
                       );
                     })()}
                   </div>
-                </Card>
+                  </div>
+                </div>
               </Card>
             ))}
           </div>
@@ -970,7 +955,7 @@ export default function ResultForm({
         {!isOrganizer && (
           <p className="text-sm text-gray-500">권한이 없습니다.</p>
         )}
-      </section>
+      </Card>
 
     </div>
   );

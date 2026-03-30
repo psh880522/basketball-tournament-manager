@@ -272,10 +272,11 @@ export async function getLeagueStandings(
 }
 
 export async function listTournamentMatchesByDivision(
-  divisionId: string
+  divisionId: string,
+  options?: { courtId?: string }
 ): Promise<ApiResult<TournamentMatchRow[]>> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("matches")
     .select(
       "id,division_id,group_id,seed_a,seed_b,group:groups!matches_group_id_fkey!inner(id,name,order,type),status,score_a,score_b,scheduled_at,court_id,team_a_id,team_b_id,winner_team_id,created_at,team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts!matches_court_id_fkey(id,name)"
@@ -283,6 +284,12 @@ export async function listTournamentMatchesByDivision(
     .eq("division_id", divisionId)
     .eq("group.type", "tournament")
     .order("created_at", { ascending: true });
+
+  if (options?.courtId) {
+    query = query.eq("court_id", options.courtId);
+  }
+
+  const { data, error } = await query;
 
   return {
     data: data as TournamentMatchRow[] | null,

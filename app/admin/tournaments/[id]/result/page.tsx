@@ -10,6 +10,7 @@ import {
   listTournamentMatchesByDivision,
 } from "@/lib/api/results";
 import ResultForm from "./components/ResultForm";
+import ResultFilters from "./Filters";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -62,7 +63,9 @@ export default async function TournamentResultPage({
       divisionId: selectedDivision.id,
       courtId: selectedCourtId || undefined,
     }),
-    listTournamentMatchesByDivision(selectedDivision.id),
+    listTournamentMatchesByDivision(selectedDivision.id, {
+      courtId: selectedCourtId || undefined,
+    }),
   ]);
 
   const isConfirmed =
@@ -70,7 +73,7 @@ export default async function TournamentResultPage({
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto max-w-4xl space-y-6">
         <header className="space-y-1">
           <h1 className="text-2xl font-semibold">리그 결과 관리</h1>
           <p className="text-sm text-gray-600">
@@ -78,45 +81,12 @@ export default async function TournamentResultPage({
           </p>
         </header>
 
-        <section>
-          <form method="get" className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">디비전</label>
-              <select
-                name="divisionId"
-                defaultValue={selectedDivision.id}
-                className="rounded border border-gray-200 px-2 py-1 text-sm"
-              >
-                {divisions.map((division) => (
-                  <option key={division.id} value={division.id}>
-                    {division.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">코트</label>
-              <select
-                name="courtId"
-                defaultValue={selectedCourtId}
-                className="rounded border border-gray-200 px-2 py-1 text-sm"
-              >
-                <option value="">전체</option>
-                {courts.map((court) => (
-                  <option key={court.id} value={court.id}>
-                    {court.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              className="rounded border border-gray-200 px-3 py-2 text-sm"
-            >
-              조회
-            </button>
-          </form>
-        </section>
+        <ResultFilters
+          tournamentId={tournamentId}
+          divisions={divisions.map((d) => ({ id: d.id, name: d.name }))}
+          courts={courts.map((c) => ({ id: c.id, name: c.name }))}
+          current={{ divisionId: selectedDivisionId, courtId: selectedCourtId }}
+        />
 
         {standingsResult.error ? (
           <Card className="text-sm text-red-600">{standingsResult.error}</Card>
