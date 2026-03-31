@@ -76,7 +76,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           includeDeleted={includeDeleted}
           tournaments={data ?? []}
           error={error}
-          role={result.role}
+          role={result.role!}
         />
       </div>
     </main>
