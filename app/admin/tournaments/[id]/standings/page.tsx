@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { listStandingsPageData } from "@/lib/api/standings";
 import StandingsForm from "./Form";
 
@@ -162,7 +162,7 @@ export default async function TournamentStandingsPage({
       </main>
     );
   }
-  if (userResult.role !== "organizer") redirect("/dashboard");
+  if (!isOperationRole(userResult.role)) redirect("/dashboard");
 
   const { id: tournamentId } = await params;
   const sp = await searchParams;

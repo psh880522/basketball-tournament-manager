@@ -10,6 +10,7 @@ import {
   type AdminTournamentListRow,
   type TournamentStatus,
 } from "@/lib/api/tournaments";
+import { type Role } from "@/src/lib/auth/roles";
 import {
   changeTournamentStatusAction,
   restoreTournamentAction,
@@ -20,6 +21,7 @@ type TournamentListProps = {
   includeDeleted: boolean;
   tournaments: AdminTournamentListRow[];
   error: string | null;
+  role: Role;
 };
 
 const statusLabels: Record<TournamentStatus, string> = {
@@ -67,7 +69,9 @@ export default function TournamentList({
   includeDeleted,
   tournaments,
   error,
+  role,
 }: TournamentListProps) {
+  const isOrganizer = role === "organizer";
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pendingMode, setPendingMode] = useState<
@@ -263,13 +267,18 @@ export default function TournamentList({
                   ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Link href={`/admin/tournaments/${tournament.id}`}>
+                  <Link href={isOrganizer
+                    ? `/admin/tournaments/${tournament.id}`
+                    : `/admin/tournaments/${tournament.id}/result`
+                  }>
                     <Button variant="secondary">운영</Button>
                   </Link>
+                  {isOrganizer && (
                   <Link href={`/admin/tournaments/${tournament.id}/edit`}>
                     <Button variant="ghost">수정</Button>
                   </Link>
-                  {!isFinished ? (
+                  )}
+                  {isOrganizer && !isFinished ? (
                     <div className="flex items-center gap-2">
                       <select
                         className="rounded-md border border-gray-300 px-2 py-2 text-sm"
@@ -297,7 +306,7 @@ export default function TournamentList({
                       </Button>
                     </div>
                   ) : null}
-                  {tournament.deleted_at ? (
+                  {isOrganizer && (tournament.deleted_at ? (
                     <Button
                       variant="ghost"
                       disabled={isRestoring}
@@ -313,7 +322,7 @@ export default function TournamentList({
                     >
                       {isDeleting ? "삭제 중..." : "삭제"}
                     </Button>
-                  )}
+                  ))}
                 </div>
               </div>
             </Card>

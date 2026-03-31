@@ -54,12 +54,12 @@ export default function TeamSection({
                 <p className="font-medium">{team.team_name}</p>
                 <Badge
                   className={
-                    team.role_in_team === "manager"
+                    team.role_in_team === "captain"
                       ? "bg-blue-100 text-blue-700"
                       : "bg-gray-100 text-gray-700"
                   }
                 >
-                  {team.role_in_team === "manager" ? "매니저" : "선수"}
+                  {team.role_in_team === "captain" ? "주장" : "선수"}
                 </Badge>
               </div>
               <Link href={`/teams/${team.team_id}`}>

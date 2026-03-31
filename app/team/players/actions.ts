@@ -64,7 +64,7 @@ export async function createPlayer(input: CreateInput): Promise<ActionResult> {
     return { ok: false, error: userResult.error ?? "Auth error." };
   }
 
-  if (userResult.role !== "team_manager" || !userResult.user) {
+  if (!userResult.user) {
     return { ok: false, error: "Forbidden." };
   }
 
@@ -116,7 +116,7 @@ export async function updatePlayer(input: UpdateInput): Promise<ActionResult> {
     return { ok: false, error: userResult.error ?? "Auth error." };
   }
 
-  if (userResult.role !== "team_manager" || !userResult.user) {
+  if (!userResult.user) {
     return { ok: false, error: "Forbidden." };
   }
 
@@ -162,7 +162,7 @@ export async function deletePlayer(input: DeleteInput): Promise<ActionResult> {
     return { ok: false, error: userResult.error ?? "Auth error." };
   }
 
-  if (userResult.role !== "team_manager") {
+  if (!userResult.user) {
     return { ok: false, error: "Forbidden." };
   }
 

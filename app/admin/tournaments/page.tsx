@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { getOrganizerTournaments } from "@/src/lib/supabase/server";
 
 async function AdminTournamentsContent() {
@@ -17,7 +17,7 @@ async function AdminTournamentsContent() {
     return <p>No profile found for this account.</p>;
   }
 
-  if (userResult.role !== "organizer") redirect("/dashboard");
+  if (!isOperationRole(userResult.role)) redirect("/dashboard");
 
   const organizerId = userResult.user?.id;
 

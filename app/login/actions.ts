@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUserRole, signInWithPassword as signIn } from "@/lib/api/auth";
+import { isOperationRole } from "@/src/lib/auth/roles";
 
 type ActionResult =
   | { ok: true }
@@ -34,7 +35,7 @@ export async function signInWithPassword(
     return { ok: false, error: roleResult.error };
   }
 
-  const nextPath = roleResult.role === "organizer" ? "/admin" : "/dashboard";
+  const nextPath = isOperationRole(roleResult.role) ? "/admin" : "/dashboard";
   redirect(nextPath);
   return { ok: true };
 }

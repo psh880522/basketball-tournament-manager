@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { getTournamentProgressState } from "@/lib/api/tournamentProgress";
 import {
   changeTournamentStatus,
@@ -621,7 +621,7 @@ export default async function TournamentDashboardPage({
     );
   }
 
-  if (userResult.role !== "organizer") redirect("/dashboard");
+  if (!isOperationRole(userResult.role)) redirect("/dashboard");
 
   const { id } = await params;
   const messages = await searchParams;

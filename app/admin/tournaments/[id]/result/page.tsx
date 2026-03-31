@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import Card from "@/components/ui/Card";
 import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getCourtsByTournament } from "@/lib/api/courts";
@@ -30,6 +30,7 @@ export default async function TournamentResultPage({
   if (userResult.status === "empty") {
     return <Card className="text-sm text-gray-500">프로필이 없습니다.</Card>;
   }
+  if (!isOperationRole(userResult.role)) redirect("/dashboard");
 
   const { id: tournamentId } = await params;
   const resolvedSearchParams = await searchParams;
@@ -108,7 +109,7 @@ export default async function TournamentResultPage({
           tournamentId={tournamentId}
           divisionId={selectedDivision.id}
           divisionName={selectedDivision.name}
-          isOrganizer={userResult.role === "organizer"}
+          isOrganizer={isOperationRole(userResult.role)}
           standingsDirty={selectedDivision.standings_dirty}
           isConfirmed={isConfirmed}
           tournamentSize={selectedDivision.tournament_size}

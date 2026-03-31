@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { setDivisionStandingsDirty } from "@/lib/api/divisions";
 import { replaceDivisionStandings } from "@/lib/api/standings";
 import {
@@ -117,9 +117,9 @@ type TeamStats = {
   points_diff: number;
 };
 
-async function requireOrganizer(): Promise<ActionResult> {
+async function requireOperationRole(): Promise<ActionResult> {
   const auth = await getUserWithRole();
-  if (auth.status !== "ready" || auth.role !== "organizer") {
+  if (auth.status !== "ready" || !isOperationRole(auth.role)) {
     return { ok: false, error: "권한이 없습니다." };
   }
   return { ok: true };
@@ -388,7 +388,7 @@ export async function saveTournamentResult(input: {
   scoreA: number;
   scoreB: number;
 }): Promise<ActionResult> {
-  const auth = await requireOrganizer();
+  const auth = await requireOperationRole();
   if (!auth.ok) return auth;
 
   const { matchId, scoreA, scoreB } = input;
@@ -436,7 +436,7 @@ export async function saveTournamentResult(input: {
   const winnerTeamId = scoreA > scoreB ? matchRow.team_a_id : matchRow.team_b_id;
   const loserTeamId = scoreA > scoreB ? matchRow.team_b_id : matchRow.team_a_id;
   if (!winnerTeamId) {
-    return { ok: false, error: "승자 팀을 찾을 수 없습니다." };
+    return { ok: false, error: "승자를 찾을 수 없습니다." };
   }
 
   const { error: updateErr } = await supabase
@@ -458,7 +458,7 @@ export async function saveTournamentResult(input: {
     if (currentRound === "final") {
       return { ok: true, message: "우승 팀이 확정되었습니다." };
     }
-    return { ok: true, message: "저장 완료" };
+    return { ok: true, message: "저장완료" };
   }
 
   const { data: roundGroups, error: roundGroupsErr } = await supabase
@@ -625,7 +625,7 @@ export async function saveTournamentResult(input: {
 export async function confirmLeagueStandings(
   divisionId: string
 ): Promise<ActionResult> {
-  const auth = await requireOrganizer();
+  const auth = await requireOperationRole();
   if (!auth.ok) return auth;
 
   if (!divisionId) {
@@ -639,7 +639,7 @@ export async function confirmLeagueStandings(
   }
 
   if (divisionResult.data.standings_dirty) {
-    return { ok: false, error: "순위 재계산이 필요합니다." };
+    return { ok: false, error: "순위 계산이 필요합니다." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -652,7 +652,7 @@ export async function confirmLeagueStandings(
 
   if (standingsErr) return { ok: false, error: standingsErr.message };
   if (!standings || standings.length === 0) {
-    return { ok: false, error: "확정할 순위가 없습니다." };
+    return { ok: false, error: "확정된 순위가 없습니다." };
   }
 
   return { ok: true };
@@ -727,7 +727,7 @@ export async function getTournamentSeedingPreview(
 export async function seedTournamentTeamsFromConfirmedStandings(
   divisionId: string
 ): Promise<ActionResult> {
-  const auth = await requireOrganizer();
+  const auth = await requireOperationRole();
   if (!auth.ok) return auth;
 
   if (!divisionId) {
@@ -743,7 +743,7 @@ export async function seedTournamentTeamsFromConfirmedStandings(
   const { standings_dirty, tournament_size } = divisionResult.data;
 
   if (standings_dirty) {
-    return { ok: false, error: "순위 재계산이 필요합니다." };
+    return { ok: false, error: "순위 계산이 필요합니다." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -855,7 +855,7 @@ export async function saveLeagueResult(input: {
   scoreA: number;
   scoreB: number;
 }): Promise<ActionResult> {
-  const auth = await requireOrganizer();
+  const auth = await requireOperationRole();
   if (!auth.ok) return auth;
 
   const { matchId, scoreA, scoreB } = input;
@@ -907,7 +907,7 @@ export async function saveLeagueResult(input: {
 export async function calculateLeagueStandings(
   divisionId: string
 ): Promise<ActionResult> {
-  const auth = await requireOrganizer();
+  const auth = await requireOperationRole();
   if (!auth.ok) return auth;
 
   if (!divisionId) {

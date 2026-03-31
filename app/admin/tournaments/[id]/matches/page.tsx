@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { listTournamentMatches } from "@/lib/api/matches";
 import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getCourtsByTournament } from "@/lib/api/courts";
@@ -86,7 +86,7 @@ export default async function TournamentMatchesPage({
       </main>
     );
   }
-  if (userResult.role !== "organizer") redirect("/dashboard");
+  if (!isOperationRole(userResult.role)) redirect("/dashboard");
 
   const { id } = await params;
   const sp = await searchParams;

@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
-export type Role = "organizer" | "team_manager" | "player" | "spectator";
+export type Role = "organizer" | "manager" | "player";
 
 type AuthUser = {
   id: string;
@@ -80,7 +80,17 @@ export async function getUserWithRole(): Promise<UserWithRoleResult> {
   return {
     status: "ready",
     user: userData.user as unknown as AuthUser,
-    role: profile.role,
+    role: (profile as ProfileRow).role,
     error: null,
   };
+}
+
+/** 현장 운영 역할(organizer + manager) 여부 확인 */
+export function isOperationRole(role: Role | null): boolean {
+  return role === "organizer" || role === "manager";
+}
+
+/** organizer 전용 기능 여부 확인 */
+export function isOrganizerRole(role: Role | null): boolean {
+  return role === "organizer";
 }

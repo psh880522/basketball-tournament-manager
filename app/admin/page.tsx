@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { listAdminTournaments } from "@/lib/api/tournaments";
 import Button from "@/components/ui/Button";
 import TournamentList from "./TournamentList";
@@ -49,7 +49,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     );
   }
 
-  if (result.role !== "organizer") redirect("/dashboard");
+  if (!isOperationRole(result.role)) redirect("/dashboard");
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const includeDeleted = resolveIncludeDeleted(
@@ -76,6 +76,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           includeDeleted={includeDeleted}
           tournaments={data ?? []}
           error={error}
+          role={result.role}
         />
       </div>
     </main>

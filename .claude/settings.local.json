@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(ls -ld \"d:\\\\program\\\\project\\\\basketball-tournament-manager\\\\components\\\\layout\"\" 2>&1 || echo \"NOT_EXISTS \")",
+      "Bash(npx supabase:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase link --project-ref gayxzmhabgzddskhrpjc --password \"DkBuGDYVp2p7XjDB\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase migration list)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db execute --file supabase/migrations/0205_role_system_v2.sql)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --db-url \"postgresql://postgres:DkBuGDYVp2p7XjDB@db.gayxzmhabgzddskhrpjc.supabase.co:5432/postgres\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --help)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked -f supabase/migrations/0205_role_system_v2.sql)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked \"SELECT policyname, cmd, qual, with_check FROM pg_policies WHERE tablename = ''objects'' AND schemaname = ''storage''\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked -f supabase/migrations/0206_rls_manager_role.sql)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked -f supabase/migrations/0207_team_members_captain.sql)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked -f supabase/migrations/0208_teams_rls_player.sql)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(echo \"=== $f ===\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked -f \"$f\")",
+      "Bash(done)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked \"SELECT grantee, privilege_type FROM information_schema.role_table_grants WHERE table_schema=''public'' AND table_name=''user_profiles''\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3cf634bbbbfd7c9122c432b1523766992b5c333a\" npx supabase db query --linked -f supabase/migrations/0212_user_profiles_view_fix.sql)"
+    ]
+  }
+}

@@ -159,10 +159,10 @@ export default async function TournamentStandingsPage({
   }
 
   const isOrganizer = userResult.status === "ready" && userResult.role === "organizer";
-  const isTeamManager = userResult.status === "ready" && userResult.role === "team_manager";
+  const isLoggedIn = userResult.status === "ready";
   const canViewAsSpectator = isClosed;
 
-  if (!isOrganizer && !isTeamManager && !canViewAsSpectator) {
+  if (!isOrganizer && !isLoggedIn && !canViewAsSpectator) {
     return (
       <main style={{ padding: 24 }}>
         <h1>Standings</h1>

@@ -1,6 +1,6 @@
 "use server";
 
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { saveMatchResult } from "@/lib/api/matches";
 import { revalidatePath } from "next/cache";
 
@@ -20,7 +20,7 @@ export async function saveMatchScoreAction(
   if (auth.status === "error" || auth.status === "empty") {
     return { ok: false, error: "인증 오류가 발생했습니다." };
   }
-  if (auth.role !== "organizer") {
+  if (!isOperationRole(auth.role)) {
     return { ok: false, error: "권한이 없습니다." };
   }
 
@@ -54,7 +54,7 @@ export async function completeMatchAction(
   if (auth.status === "error" || auth.status === "empty") {
     return { ok: false, error: "인증 오류가 발생했습니다." };
   }
-  if (auth.role !== "organizer") {
+  if (!isOperationRole(auth.role)) {
     return { ok: false, error: "권한이 없습니다." };
   }
 

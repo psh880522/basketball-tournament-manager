@@ -32,9 +32,8 @@ async function TournamentDetail({ id }: { id: string }) {
   const divisions = divisionsResult.data ?? [];
   const isLoggedIn = userResult.status === "ready";
   const isOrganizer = userResult.status === "ready" && userResult.role === "organizer";
-  const isTeamManager = userResult.status === "ready" && userResult.role === "team_manager";
 
-  const teamApplicationResult = isTeamManager && userResult.user
+  const teamApplicationResult = isLoggedIn && userResult.user
     ? await getTeamApplicationByTournamentAndCaptain(id, userResult.user.id)
     : { data: null, error: null };
 

@@ -27,9 +27,8 @@ async function TeamContent() {
     );
   }
 
-  if (result.role !== "organizer" && result.role !== "team_manager") {
-    redirect("/dashboard");
-  }
+  // 로그인 사용자 전체 접근 허용 (팀 생성은 player도 가능)
+
 
   const userId = result.user?.id;
 

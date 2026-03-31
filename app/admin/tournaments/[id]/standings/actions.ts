@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { listCompletedMatchesByDivision } from "@/lib/api/matches";
 import { replaceDivisionStandings } from "@/lib/api/standings";
 import { setDivisionStandingsDirty } from "@/lib/api/divisions";
@@ -32,7 +32,7 @@ export async function calculateDivisionStandings(
   if (auth.status === "error" || auth.status === "empty") {
     redirect(buildRedirectUrl(tournamentId, divisionId, "인증 오류가 발생했습니다."));
   }
-  if (auth.role !== "organizer") redirect("/dashboard");
+  if (!isOperationRole(auth.role)) redirect("/dashboard");
 
   const matchesResult = await listCompletedMatchesByDivision(divisionId);
   if (matchesResult.error) {

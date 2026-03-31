@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { listMyTeams } from "@/lib/api/teams";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
     );
   }
 
-  if (result.role === "organizer") {
+  if (isOperationRole(result.role)) {
     redirect("/admin");
   }
 

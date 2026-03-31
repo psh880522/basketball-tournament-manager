@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 
 type GuardResult =
   | { ok: true }
@@ -23,6 +23,13 @@ type GuardInput = {
   currentRound?: string;
 };
 
+// manager도 수행 가능한 단계 (organizer + manager 허용)
+const MANAGER_ALLOWED_STEPS: TournamentGuardStep[] = [
+  "SUBMIT_RESULT",
+  "RECALC_STANDINGS",
+];
+
+
 export async function assertTournamentStepAllowed(
   input: GuardInput
 ): Promise<GuardResult> {
@@ -40,8 +47,19 @@ export async function assertTournamentStepAllowed(
     return { ok: false, error: userResult.error ?? "Auth error." };
   }
 
-  if (userResult.role !== "organizer") {
-    return { ok: false, error: "Forbidden." };
+  // stepKey에 따라 권한 분기
+  const isManagerAllowed = MANAGER_ALLOWED_STEPS.includes(input.stepKey);
+
+  if (isManagerAllowed) {
+    // organizer + manager 허용
+    if (!isOperationRole(userResult.role)) {
+      return { ok: false, error: "Forbidden." };
+    }
+  } else {
+    // organizer 전용
+    if (userResult.role !== "organizer") {
+      return { ok: false, error: "Forbidden." };
+    }
   }
 
   const supabase = await createSupabaseServerClient();

@@ -66,7 +66,7 @@ export async function listMyManagedTeams(): Promise<{
     .from("team_members")
     .select("team_id, teams(team_name)")
     .eq("user_id", user.id)
-    .eq("role_in_team", "manager")
+    .eq("role_in_team", "captain")
     .order("created_at", { ascending: false });
 
   if (error) return { data: null, error: error.message };

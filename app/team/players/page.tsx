@@ -30,7 +30,8 @@ export default async function TeamPlayersPage() {
     return <p>No profile found for this account.</p>;
   }
 
-  if (userResult.role !== "team_manager") redirect("/dashboard");
+  // 역할 체크 제거 — 팀 captain 여부는 getCaptainTeams + DB RLS에서 처리
+
 
   if (!userResult.user) {
     return <p>Missing user identity.</p>;
