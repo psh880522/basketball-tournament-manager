@@ -5,6 +5,7 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import EmptyState from "@/components/ui/EmptyState";
 import CreateTeamForm from "./Form";
 import type { MyTeamRow } from "@/lib/api/teams";
 
@@ -41,7 +42,7 @@ export default function TeamSection({
       {/* 빈 상태 */}
       {!fetchError && teams.length === 0 && (
         <Card className="py-8 text-center">
-          <p className="text-sm text-gray-500">아직 팀이 없습니다. 팀을 만들어보세요.</p>
+          <EmptyState message="아직 팀이 없습니다. 팀을 만들어보세요." />
         </Card>
       )}
 

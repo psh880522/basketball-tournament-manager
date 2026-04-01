@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import { finishTournamentAction } from "./actions";
 import { STEP_DESCRIPTIONS } from "./StepDescriptions";
 
@@ -156,11 +157,15 @@ function FinishButton({
   messages?: { finishError?: string; finishSuccess?: string };
 }) {
   const [isPending, startTransition] = useTransition();
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleFinish = () => {
     if (!action.enabled) return;
-    if (!window.confirm("대회를 종료하시겠습니까?")) return;
+    setShowConfirm(true);
+  };
 
+  const doFinish = () => {
+    setShowConfirm(false);
     startTransition(async () => {
       const formData = new FormData();
       formData.set("tournamentId", tournamentId);
@@ -171,6 +176,13 @@ function FinishButton({
 
   return (
     <div>
+      {showConfirm && (
+        <ConfirmModal
+          message="대회를 종료하시겠습니까?"
+          onConfirm={doFinish}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
       <Button
         variant={action.variant}
         disabled={!action.enabled || isPending}

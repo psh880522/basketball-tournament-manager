@@ -1,9 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
+import type { ApiResult } from "@/lib/types/api";
 
 export type TournamentProgressState =
   | "TEAM_APPROVAL"
@@ -59,163 +55,125 @@ export async function getTournamentProgressState(
   }
 
   if (!tournament) {
-    console.log("[tournamentProgress] not found", {
-      tournamentId,
-    });
     return { data: null, error: "Tournament not found." };
   }
 
-  const { data: divisions, error: divisionsError } = await supabase
+  // groups count depends on division IDs — chain it as a single promise
+  const groupsCountPromise = supabase
     .from("divisions")
     .select("id")
-    .eq("tournament_id", tournamentId);
-
-  if (divisionsError) {
-    return { data: null, error: divisionsError.message };
-  }
-
-  const divisionIds = (divisions ?? []).map((division) => division.id);
-
-  const approvedTeamsResult = await supabase
-    .from("tournament_team_applications")
-    .select("id", { count: "exact", head: true })
     .eq("tournament_id", tournamentId)
-    .eq("status", "approved");
+    .then(({ data, error }) => {
+      if (error) return { count: 0, error: error.message };
+      return countGroupsByDivisionIds((data ?? []).map((d) => d.id));
+    });
 
-  if (approvedTeamsResult.error) {
-    return { data: null, error: approvedTeamsResult.error.message };
-  }
+  const [
+    approvedTeamsResult,
+    totalTeamsResult,
+    groupMatchesResult,
+    completedGroupMatchesResult,
+    standingsResult,
+    totalMatchesResult,
+    completedMatchesResult,
+    tournamentMatchesResult,
+    finalCompletedResult,
+    finalExistsResult,
+    courtsCountResult,
+    scheduledMatchesResult,
+    groupsCount,
+  ] = await Promise.all([
+    supabase
+      .from("tournament_team_applications")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "approved"),
+    supabase
+      .from("tournament_team_applications")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId),
+    supabase
+      .from("matches")
+      .select("id,group:groups!matches_group_id_fkey!inner(type)", {
+        count: "exact",
+        head: true,
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("group.type", "league"),
+    supabase
+      .from("matches")
+      .select("id,group:groups!matches_group_id_fkey!inner(type)", {
+        count: "exact",
+        head: true,
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("group.type", "league")
+      .eq("status", "completed"),
+    supabase
+      .from("standings")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId),
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId),
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "completed"),
+    supabase
+      .from("matches")
+      .select("id,group:groups!matches_group_id_fkey!inner(type)", {
+        count: "exact",
+        head: true,
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("group.type", "tournament"),
+    supabase
+      .from("matches")
+      .select("id,group:groups!matches_group_id_fkey!inner(name,type)", {
+        count: "exact",
+        head: true,
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("group.type", "tournament")
+      .eq("group.name", "final")
+      .eq("status", "completed"),
+    supabase
+      .from("matches")
+      .select("id,group:groups!matches_group_id_fkey!inner(name,type)", {
+        count: "exact",
+        head: true,
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("group.type", "tournament")
+      .eq("group.name", "final"),
+    supabase
+      .from("courts")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId),
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId)
+      .not("scheduled_at", "is", null),
+    groupsCountPromise,
+  ]);
 
-  const totalTeamsResult = await supabase
-    .from("tournament_team_applications")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", tournamentId);
-
-  if (totalTeamsResult.error) {
-    return { data: null, error: totalTeamsResult.error.message };
-  }
-
-  const groupsCount = await countGroupsByDivisionIds(divisionIds);
-
-  if (groupsCount.error) {
-    return { data: null, error: groupsCount.error };
-  }
-
-  const groupMatchesResult = await supabase
-    .from("matches")
-    .select("id,group:groups!matches_group_id_fkey!inner(type)", {
-      count: "exact",
-      head: true,
-    })
-    .eq("tournament_id", tournamentId)
-    .eq("group.type", "league");
-
-  if (groupMatchesResult.error) {
-    return { data: null, error: groupMatchesResult.error.message };
-  }
-
-  const completedGroupMatchesResult = await supabase
-    .from("matches")
-    .select("id,group:groups!matches_group_id_fkey!inner(type)", {
-      count: "exact",
-      head: true,
-    })
-    .eq("tournament_id", tournamentId)
-    .eq("group.type", "league")
-    .eq("status", "completed");
-
-  if (completedGroupMatchesResult.error) {
-    return { data: null, error: completedGroupMatchesResult.error.message };
-  }
-
-  const standingsResult = await supabase
-    .from("standings")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", tournamentId);
-
-  if (standingsResult.error) {
-    return { data: null, error: standingsResult.error.message };
-  }
-
-  const totalMatchesResult = await supabase
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", tournamentId);
-
-  if (totalMatchesResult.error) {
-    return { data: null, error: totalMatchesResult.error.message };
-  }
-
-  const completedMatchesResult = await supabase
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", tournamentId)
-    .eq("status", "completed");
-
-  if (completedMatchesResult.error) {
-    return { data: null, error: completedMatchesResult.error.message };
-  }
-
-  const tournamentMatchesResult = await supabase
-    .from("matches")
-    .select("id,group:groups!matches_group_id_fkey!inner(type)", {
-      count: "exact",
-      head: true,
-    })
-    .eq("tournament_id", tournamentId)
-    .eq("group.type", "tournament");
-
-  if (tournamentMatchesResult.error) {
-    return { data: null, error: tournamentMatchesResult.error.message };
-  }
-
-  const finalCompletedResult = await supabase
-    .from("matches")
-    .select("id,group:groups!matches_group_id_fkey!inner(name,type)", {
-      count: "exact",
-      head: true,
-    })
-    .eq("tournament_id", tournamentId)
-    .eq("group.type", "tournament")
-    .eq("group.name", "final")
-    .eq("status", "completed");
-
-  if (finalCompletedResult.error) {
-    return { data: null, error: finalCompletedResult.error.message };
-  }
-
-  const finalExistsResult = await supabase
-    .from("matches")
-    .select("id,group:groups!matches_group_id_fkey!inner(name,type)", {
-      count: "exact",
-      head: true,
-    })
-    .eq("tournament_id", tournamentId)
-    .eq("group.type", "tournament")
-    .eq("group.name", "final");
-
-  if (finalExistsResult.error) {
-    return { data: null, error: finalExistsResult.error.message };
-  }
-
-  const courtsCountResult = await supabase
-    .from("courts")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", tournamentId);
-
-  if (courtsCountResult.error) {
-    return { data: null, error: courtsCountResult.error.message };
-  }
-
-  const scheduledMatchesResult = await supabase
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", tournamentId)
-    .not("scheduled_at", "is", null);
-
-  if (scheduledMatchesResult.error) {
-    return { data: null, error: scheduledMatchesResult.error.message };
-  }
+  if (approvedTeamsResult.error) return { data: null, error: approvedTeamsResult.error.message };
+  if (totalTeamsResult.error) return { data: null, error: totalTeamsResult.error.message };
+  if (groupMatchesResult.error) return { data: null, error: groupMatchesResult.error.message };
+  if (completedGroupMatchesResult.error) return { data: null, error: completedGroupMatchesResult.error.message };
+  if (standingsResult.error) return { data: null, error: standingsResult.error.message };
+  if (totalMatchesResult.error) return { data: null, error: totalMatchesResult.error.message };
+  if (completedMatchesResult.error) return { data: null, error: completedMatchesResult.error.message };
+  if (tournamentMatchesResult.error) return { data: null, error: tournamentMatchesResult.error.message };
+  if (finalCompletedResult.error) return { data: null, error: finalCompletedResult.error.message };
+  if (finalExistsResult.error) return { data: null, error: finalExistsResult.error.message };
+  if (courtsCountResult.error) return { data: null, error: courtsCountResult.error.message };
+  if (scheduledMatchesResult.error) return { data: null, error: scheduledMatchesResult.error.message };
+  if (groupsCount.error) return { data: null, error: groupsCount.error };
 
   const summary: ProgressSummary = {
     approvedTeams: approvedTeamsResult.count ?? 0,
@@ -236,7 +194,6 @@ export async function getTournamentProgressState(
 
   const state = resolveState(summary);
   const nextAction = resolveNextAction(tournamentId, state, summary);
-
 
   return {
     data: {

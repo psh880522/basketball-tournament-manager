@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import {
   type AdminTournamentListRow,
   type TournamentStatus,
@@ -84,6 +85,7 @@ export default function TournamentList({
     Object.fromEntries(tournaments.map((tournament) => [tournament.id, tournament.status]))
   );
   const [, startTransition] = useTransition();
+  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const toggleHref = includeDeleted ? "/admin" : "/admin?includeDeleted=1";
   const toggleLabel = includeDeleted ? "삭제된 대회 숨기기" : "삭제된 대회 보기";
 
@@ -119,30 +121,29 @@ export default function TournamentList({
   };
 
   const handleDelete = (tournamentId: string) => {
-    const shouldDelete = window.confirm("정말 이 대회를 숨김 처리할까요?");
+    setConfirmModal({
+      message: "정말 이 대회를 숨김 처리할까요?",
+      onConfirm: () => {
+        setConfirmModal(null);
+        setRowErrors((prev) => ({ ...prev, [tournamentId]: null }));
+        setPendingId(tournamentId);
+        setPendingMode("delete");
 
-    if (!shouldDelete) return;
-
-    setRowErrors((prev) => ({ ...prev, [tournamentId]: null }));
-    setPendingId(tournamentId);
-    setPendingMode("delete");
-
-    startTransition(() => {
-      softDeleteTournamentAction(tournamentId)
-        .then((result) => {
-          if (!result.ok) {
-            setRowErrors((prev) => ({
-              ...prev,
-              [tournamentId]: result.error,
-            }));
-            return;
-          }
-          router.refresh();
-        })
-        .finally(() => {
-          setPendingId(null);
-          setPendingMode(null);
+        startTransition(() => {
+          softDeleteTournamentAction(tournamentId)
+            .then((result) => {
+              if (!result.ok) {
+                setRowErrors((prev) => ({ ...prev, [tournamentId]: result.error }));
+                return;
+              }
+              router.refresh();
+            })
+            .finally(() => {
+              setPendingId(null);
+              setPendingMode(null);
+            });
         });
+      },
     });
   };
 
@@ -177,35 +178,43 @@ export default function TournamentList({
 
     const confirmMessage = getConfirmMessage(tournament.status, nextStatus);
 
-    if (confirmMessage && !window.confirm(confirmMessage)) {
-      return;
+    const proceed = () => {
+      setRowErrors((prev) => ({ ...prev, [tournament.id]: null }));
+      setPendingId(tournament.id);
+      setPendingMode("status");
+
+      startTransition(() => {
+        changeTournamentStatusAction(tournament.id, nextStatus)
+          .then((result) => {
+            if (!result.ok) {
+              setRowErrors((prev) => ({ ...prev, [tournament.id]: result.error }));
+              return;
+            }
+            router.refresh();
+          })
+          .finally(() => {
+            setPendingId(null);
+            setPendingMode(null);
+          });
+      });
+    };
+
+    if (confirmMessage) {
+      setConfirmModal({ message: confirmMessage, onConfirm: () => { setConfirmModal(null); proceed(); } });
+    } else {
+      proceed();
     }
-
-    setRowErrors((prev) => ({ ...prev, [tournament.id]: null }));
-    setPendingId(tournament.id);
-    setPendingMode("status");
-
-    startTransition(() => {
-      changeTournamentStatusAction(tournament.id, nextStatus)
-        .then((result) => {
-          if (!result.ok) {
-            setRowErrors((prev) => ({
-              ...prev,
-              [tournament.id]: result.error,
-            }));
-            return;
-          }
-          router.refresh();
-        })
-        .finally(() => {
-          setPendingId(null);
-          setPendingMode(null);
-        });
-    });
   };
 
   return (
     <section className="space-y-4">
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-gray-600">총 {tournaments.length}개</div>
         <Link href={toggleHref}>

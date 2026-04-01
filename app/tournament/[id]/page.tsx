@@ -64,7 +64,6 @@ async function TournamentDetail({ id }: { id: string }) {
       : "대회 준비중입니다";
 
   const applyHref = isLoggedIn ? `/tournament/${id}/apply` : "/login";
-  const standingsHref = `/tournament/${id}/standings`;
   const adminHref = `/admin/tournaments/${id}`;
 
   const statusCopy = teamApplication
@@ -185,14 +184,6 @@ async function TournamentDetail({ id }: { id: string }) {
             <button type="button" disabled style={{ padding: "10px 16px", marginTop: 8 }}>
               참가 거절됨
             </button>
-          ) : null}
-
-          {tournament.status === "closed" && !teamApplication ? (
-            <Link href={standingsHref}>
-              <button type="button" style={{ padding: "10px 16px", marginTop: 8 }}>
-                대회 현황 보기
-              </button>
-            </Link>
           ) : null}
 
           {tournament.status === "draft" && isOrganizer ? (

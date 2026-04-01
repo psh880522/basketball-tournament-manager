@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import EmptyState from "@/components/ui/EmptyState";
 import { DayPicker } from "react-day-picker";
 import type { DateRange } from "react-day-picker";
 import "react-day-picker/style.css";
@@ -346,7 +347,7 @@ export default function NewTournamentForm() {
             </Button>
           </div>
           {divisions.length === 0 ? (
-            <p className="text-sm text-gray-500">등록된 디비전이 없습니다.</p>
+            <EmptyState message="등록된 디비전이 없습니다." />
           ) : (
             <div className="space-y-3">
               {divisions.map((division, index) => {
@@ -398,7 +399,7 @@ export default function NewTournamentForm() {
             </Button>
           </div>
           {courts.length === 0 ? (
-            <p className="text-sm text-gray-500">등록된 코트가 없습니다.</p>
+            <EmptyState message="등록된 코트가 없습니다." />
           ) : (
             <div className="space-y-3">
               {courts.map((court, index) => (

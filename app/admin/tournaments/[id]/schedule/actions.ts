@@ -1,7 +1,6 @@
 "use server";
 
 import { generateSchedule, bulkSaveSchedule } from "@/lib/api/schedule";
-import { createScheduleSlot } from "@/lib/api/scheduleSlots";
 import {
   clearSchedule,
   clearScheduleSync,
@@ -68,30 +67,6 @@ export async function bulkSaveScheduleAction(
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
   }
-  return result;
-}
-
-export async function createScheduleSlotAction(
-  tournamentId: string,
-  slotType: "break" | "maintenance" | "buffer",
-  startAt: string,
-  endAt: string,
-  label?: string
-): Promise<ActionResult> {
-  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
-
-  const result = await createScheduleSlot({
-    tournamentId,
-    slotType,
-    startAt,
-    endAt,
-    label,
-  });
-
-  if (result.ok) {
-    revalidatePath(`/admin/tournaments/${tournamentId}/schedule`);
-  }
-
   return result;
 }
 

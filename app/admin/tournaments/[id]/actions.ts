@@ -1,15 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
-import { finishTournament } from "@/lib/api/tournaments";
-
-type ActionResult =
-  | { ok: true }
-  | {
-      ok: false;
-      error: string;
-    };
+import { changeTournamentStatus } from "@/lib/api/tournaments";
 
 export async function finishTournamentAction(
   formData: FormData
@@ -25,27 +17,10 @@ export async function finishTournamentAction(
     return redirectWithError(tournamentId, "종료 확인이 필요합니다.");
   }
 
-  const userResult = await getUserWithRole();
+  const result = await changeTournamentStatus(tournamentId, "finished");
 
-  if (userResult.status === "unauthenticated") {
-    return redirectWithError(tournamentId, "Login required.");
-  }
-
-  if (userResult.status === "error") {
-    return redirectWithError(
-      tournamentId,
-      userResult.error ?? "Auth error."
-    );
-  }
-
-  if (userResult.role !== "organizer") {
-    return redirectWithError(tournamentId, "Forbidden.");
-  }
-
-  const updated = await finishTournament(tournamentId);
-
-  if (updated.error) {
-    return redirectWithError(tournamentId, updated.error);
+  if (!result.ok) {
+    return redirectWithError(tournamentId, result.error);
   }
 
   return redirectWithSuccess(tournamentId);

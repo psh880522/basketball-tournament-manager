@@ -1,13 +1,8 @@
-import { getUserWithRole } from "@/src/lib/auth/roles";
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import { requireOrganizer } from "@/src/lib/auth/guards";
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
 export type TournamentStatus = "draft" | "open" | "closed" | "finished";
-
-export type TournamentAdminRow = {
-  id: string;
-  name: string;
-  status: TournamentStatus;
-};
 
 export type AdminTournamentListRow = {
   id: string;
@@ -41,18 +36,6 @@ export type PublicTournamentRow = {
   status: TournamentStatus;
 };
 
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
-type ActionResult = {
-  ok: true;
-} | {
-  ok: false;
-  error: string;
-};
-
 type TournamentUpdatePayload = {
   name: string;
   location: string | null;
@@ -76,21 +59,6 @@ export function isTournamentStatus(value: string): value is TournamentStatus {
 
 export function getTournamentStatuses(): TournamentStatus[] {
   return [...tournamentStatuses];
-}
-
-export async function getAdminTournaments(): Promise<
-  ApiResult<TournamentAdminRow[]>
-> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .select("id,name,status")
-    .order("name", { ascending: true });
-
-  return {
-    data,
-    error: error ? error.message : null,
-  };
 }
 
 const adminStatusOrder: Record<TournamentStatus, number> = {
@@ -160,35 +128,10 @@ export async function getTournamentForEdit(
   };
 }
 
-async function ensureOrganizer(): Promise<ActionResult> {
-  const result = await getUserWithRole();
-
-  if (result.status === "unauthenticated") {
-    return { ok: false, error: "로그인이 필요합니다." };
-  }
-
-  if (result.status === "error") {
-    return {
-      ok: false,
-      error: result.error ?? "사용자 정보를 불러오지 못했습니다.",
-    };
-  }
-
-  if (result.status === "empty") {
-    return { ok: false, error: "프로필이 없습니다." };
-  }
-
-  if (result.role !== "organizer") {
-    return { ok: false, error: "권한이 없습니다." };
-  }
-
-  return { ok: true };
-}
-
 export async function softDeleteTournament(
   tournamentId: string
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -208,7 +151,7 @@ export async function softDeleteTournament(
 export async function restoreTournament(
   tournamentId: string
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -229,7 +172,7 @@ export async function updateTournament(
   tournamentId: string,
   payload: TournamentUpdatePayload
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -273,6 +216,8 @@ export async function updateTournamentPosterUrl(
   tournamentId: string,
   posterUrl: string | null
 ): Promise<ActionResult> {
+  const authResult = await requireOrganizer();
+  if (!authResult.ok) return authResult;
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
     .from("tournaments")
@@ -287,7 +232,7 @@ export async function changeTournamentStatus(
   tournamentId: string,
   nextStatus: TournamentStatus
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -303,13 +248,13 @@ export async function changeTournamentStatus(
   }
 
   if (!data) {
-    return { ok: false, error: "?占?占쏙옙? 李얠쓣 ???占쎌뒿?占쎈떎." };
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
   const currentStatus = data.status;
 
   if (currentStatus === "finished") {
-    return { ok: false, error: "醫낅즺???占?占쎈뒗 蹂寃쏀븷 ???占쎌뒿?占쎈떎." };
+    return { ok: false, error: "종료된 대회는 변경할 수 없습니다." };
   }
 
   if (currentStatus === nextStatus) {
@@ -317,13 +262,13 @@ export async function changeTournamentStatus(
   }
 
   if (!isTournamentStatus(nextStatus)) {
-    return { ok: false, error: "?占쎈せ???占쏀깭 媛믪엯?占쎈떎." };
+    return { ok: false, error: "유효하지 않은 상태입니다." };
   }
 
   if (nextStatus !== "finished") {
     const allowed = ["draft", "open", "closed"].includes(nextStatus);
     if (!allowed) {
-      return { ok: false, error: "?占쎌슜?占쏙옙? ?占쏙옙? ?占쏀깭 ?占쎌씠?占쎈땲??" };
+      return { ok: false, error: "허용되지 않는 상태 전환입니다." };
     }
   }
 
@@ -417,37 +362,3 @@ export async function getPublicTournamentById(
   };
 }
 
-export async function updateTournamentStatus(
-  tournamentId: string,
-  status: TournamentStatus
-): Promise<ApiResult<TournamentAdminRow>> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .update({ status })
-    .eq("id", tournamentId)
-    .select("id,name,status")
-    .single();
-
-  return {
-    data,
-    error: error ? error.message : null,
-  };
-}
-
-export async function finishTournament(
-  tournamentId: string
-): Promise<ApiResult<TournamentAdminRow>> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .update({ status: "finished" })
-    .eq("id", tournamentId)
-    .select("id,name,status")
-    .single();
-
-  return {
-    data,
-    error: error ? error.message : null,
-  };
-}

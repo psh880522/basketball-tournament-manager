@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import { listStandingsPageData } from "@/lib/api/standings";
 import StandingsForm from "./Form";
+import EmptyState from "@/components/ui/EmptyState";
+import Table from "@/components/ui/Table";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -40,7 +42,7 @@ async function StandingsContent({
   const standings = standingsResult.data?.standings ?? [];
 
   if (divisions.length === 0) {
-    return <p className="text-gray-500">디비전이 없습니다.</p>;
+    return <EmptyState message="디비전이 없습니다." />;
   }
 
   const message = searchParams?.divisionId
@@ -95,42 +97,32 @@ async function StandingsContent({
             ) : null}
 
             {rows.length === 0 ? (
-              <p className="text-sm text-gray-500">완료된 경기가 없습니다.</p>
+              <EmptyState message="완료된 경기가 없습니다." />
             ) : (
-              <div className="overflow-x-auto rounded-lg border bg-white">
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
-                    <tr>
-                      <th className="px-3 py-2">순위</th>
-                      <th className="px-3 py-2">팀</th>
-                      <th className="px-3 py-2 text-center">승</th>
-                      <th className="px-3 py-2 text-center">패</th>
-                      <th className="px-3 py-2 text-center">득점</th>
-                      <th className="px-3 py-2 text-center">실점</th>
-                      <th className="px-3 py-2 text-center">득실</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {rows.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2">{row.rank}</td>
-                        <td className="px-3 py-2">
-                          {row.teams?.team_name ?? "-"}
-                        </td>
-                        <td className="px-3 py-2 text-center">{row.wins}</td>
-                        <td className="px-3 py-2 text-center">{row.losses}</td>
-                        <td className="px-3 py-2 text-center">{row.points_for}</td>
-                        <td className="px-3 py-2 text-center">
-                          {row.points_against}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {row.points_diff}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <Table.Head>
+                  <Table.HeadCell>순위</Table.HeadCell>
+                  <Table.HeadCell>팀</Table.HeadCell>
+                  <Table.HeadCell className="text-center">승</Table.HeadCell>
+                  <Table.HeadCell className="text-center">패</Table.HeadCell>
+                  <Table.HeadCell className="text-center">득점</Table.HeadCell>
+                  <Table.HeadCell className="text-center">실점</Table.HeadCell>
+                  <Table.HeadCell className="text-center">득실</Table.HeadCell>
+                </Table.Head>
+                <Table.Body>
+                  {rows.map((row) => (
+                    <Table.Row key={row.id}>
+                      <Table.Cell>{row.rank}</Table.Cell>
+                      <Table.Cell>{row.teams?.team_name ?? "-"}</Table.Cell>
+                      <Table.Cell className="text-center">{row.wins}</Table.Cell>
+                      <Table.Cell className="text-center">{row.losses}</Table.Cell>
+                      <Table.Cell className="text-center">{row.points_for}</Table.Cell>
+                      <Table.Cell className="text-center">{row.points_against}</Table.Cell>
+                      <Table.Cell className="text-center">{row.points_diff}</Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table>
             )}
           </section>
         );

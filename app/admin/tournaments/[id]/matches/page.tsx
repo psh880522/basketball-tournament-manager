@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
+import EmptyState from "@/components/ui/EmptyState";
 import { listTournamentMatches } from "@/lib/api/matches";
 import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getCourtsByTournament } from "@/lib/api/courts";
 import { getStandingsByDivision } from "@/lib/api/standings";
-import { listScheduleSlots, type ScheduleSlotRow } from "@/lib/api/scheduleSlots";
+import { listScheduleSlots, type ScheduleSlotRow } from "@/lib/api/schedule-slots";
 import Card from "@/components/ui/Card";
 import {
   formatTournamentCategoryLabel,
@@ -82,7 +83,7 @@ export default async function TournamentMatchesPage({
   if (userResult.status === "empty") {
     return (
       <main className="p-6">
-        <p className="text-gray-500">프로필 정보를 찾을 수 없습니다.</p>
+        <EmptyState message="프로필 정보를 찾을 수 없습니다." />
       </main>
     );
   }

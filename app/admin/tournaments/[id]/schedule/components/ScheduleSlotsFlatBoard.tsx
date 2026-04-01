@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import EmptyState from "@/components/ui/EmptyState";
 import {
   DndContext,
   closestCenter,
@@ -580,7 +581,7 @@ export default function ScheduleSlotsFlatBoard({
 }: Props) {
   if (groups.length === 0) {
     return (
-      <p className="text-sm text-gray-500">생성된 스케줄 이 없습니다.</p>
+      <EmptyState message="생성된 스케줄이 없습니다." />
     );
   }
 

@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { getUserWithRole } from "@/src/lib/auth/roles";
+import type { ApiResult } from "@/lib/types/api";
 
 export type TeamStatus = "pending" | "approved" | "rejected";
 
@@ -262,11 +263,6 @@ export type TeamApplicationSummary = {
   id: string;
   team_name: string;
   status: TeamStatus;
-};
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
 };
 
 export async function getExistingTeamApplication(

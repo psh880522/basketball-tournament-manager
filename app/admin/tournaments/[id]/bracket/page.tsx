@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getBracketGenerationSummary } from "@/lib/api/bracket";
 import { BracketConsoleForm } from "./Form";
+import EmptyState from "@/components/ui/EmptyState";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -23,7 +24,7 @@ export default async function BracketPage({ params }: PageProps) {
   if (userResult.status === "empty") {
     return (
       <main className="p-6">
-        <p className="text-gray-500">프로필 정보를 찾을 수 없습니다.</p>
+        <EmptyState message="프로필 정보를 찾을 수 없습니다." />
       </main>
     );
   }
@@ -45,7 +46,7 @@ export default async function BracketPage({ params }: PageProps) {
   if (!summary) {
     return (
       <main className="p-6">
-        <p className="text-gray-500">대회 정보를 불러올 수 없습니다.</p>
+        <EmptyState message="대회 정보를 불러올 수 없습니다." />
       </main>
     );
   }

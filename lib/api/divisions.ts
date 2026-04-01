@@ -1,11 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
-type ActionResult = { ok: true } | { ok: false; error: string };
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
 export type DivisionRow = {
   id: string;

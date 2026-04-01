@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import type { BracketGenerationSummary } from "@/lib/api/bracket";
 import {
   TOURNAMENT_SIZE_LABELS,
@@ -71,7 +72,7 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
   }, [summary]);
 
   if (divisions.length === 0) {
-    return <p className="text-gray-500">등록된 디비전이 없습니다.</p>;
+    return <EmptyState message="등록된 디비전이 없습니다." />;
   }
 
   const handleSaveSeed = (matchId: string) => {

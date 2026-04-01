@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FieldHint from "@/components/ui/FieldHint";
@@ -258,7 +260,7 @@ export function DivisionsSection({
       )}
 
       {divisions.length === 0 ? (
-        <p className="text-sm text-gray-500">등록된 division이 없습니다.</p>
+        <EmptyState message="등록된 division이 없습니다." />
       ) : (
         <ul className="divide-y divide-gray-100">
           {divisions.map((div) => (
@@ -425,6 +427,7 @@ function DivisionItem({
   onError: (msg: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [name, setName] = useState(division.name);
   const [groupSize, setGroupSize] = useState<number>(division.group_size ?? 4);
   const [tournamentSize, setTournamentSize] = useState<string>(
@@ -471,11 +474,10 @@ function DivisionItem({
     });
   };
 
-  const handleDelete = () => {
-    if (!window.confirm(`"${division.name}" division을 삭제하시겠습니까?`)) {
-      return;
-    }
+  const handleDelete = () => setShowConfirm(true);
 
+  const doDelete = () => {
+    setShowConfirm(false);
     startTransition(async () => {
       const result = await deleteDivisionAction(tournamentId, division.id);
       if (!result.ok) {
@@ -567,9 +569,17 @@ function DivisionItem({
   }
 
   return (
-    <li className="flex items-center justify-between py-2">
-      <div className="space-y-0.5">
-        <p className="text-sm font-medium">{division.name}</p>
+    <>
+      {showConfirm && (
+        <ConfirmModal
+          message={`"${division.name}" division을 삭제하시겠습니까?`}
+          onConfirm={doDelete}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+      <li className="flex items-center justify-between py-2">
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium">{division.name}</p>
         <p className="text-xs text-gray-400">
           그룹 크기: {division.group_size ?? "-"} 토너먼트 크기:{" "}
           {division.tournament_size ?? "-"} 순서:{" "}
@@ -593,7 +603,8 @@ function DivisionItem({
           {isPending ? "삭제 중..." : "삭제"}
         </Button>
       </div>
-    </li>
+      </li>
+    </>
   );
 }
 
@@ -643,7 +654,7 @@ export function CourtsSection({
       )}
 
       {courts.length === 0 ? (
-        <p className="text-sm text-gray-500">등록된 코트가 없습니다.</p>
+        <EmptyState message="등록된 코트가 없습니다." />
       ) : (
         <ul className="divide-y divide-gray-100">
           {courts.map((court) => (
@@ -745,6 +756,7 @@ function CourtItem({
   onError: (msg: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [name, setName] = useState(court.name);
   const [displayOrder, setDisplayOrder] = useState<number>(court.display_order ?? 0);
   const [isPending, startTransition] = useTransition();
@@ -769,11 +781,10 @@ function CourtItem({
     });
   };
 
-  const handleDelete = () => {
-    if (!window.confirm(`"${court.name}" 코트를 삭제하시겠습니까?`)) {
-      return;
-    }
+  const handleDelete = () => setShowConfirm(true);
 
+  const doDelete = () => {
+    setShowConfirm(false);
     startTransition(async () => {
       const result = await deleteCourtAction(tournamentId, court.id);
       if (!result.ok) {
@@ -826,9 +837,17 @@ function CourtItem({
   }
 
   return (
-    <li className="flex items-center justify-between py-2">
-      <div className="space-y-0.5">
-        <p className="text-sm font-medium">{court.name}</p>
+    <>
+      {showConfirm && (
+        <ConfirmModal
+          message={`"${court.name}" 코트를 삭제하시겠습니까?`}
+          onConfirm={doDelete}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+      <li className="flex items-center justify-between py-2">
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium">{court.name}</p>
         <p className="text-xs text-gray-400">
           순서: {court.display_order ?? "-"}
         </p>
@@ -850,7 +869,8 @@ function CourtItem({
           {isPending ? "삭제 중..." : "삭제"}
         </Button>
       </div>
-    </li>
+      </li>
+    </>
   );
 }
 
@@ -978,6 +998,7 @@ export function PosterSection({
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1011,9 +1032,10 @@ export function PosterSection({
     });
   };
 
-  const handleDelete = () => {
-    if (!window.confirm("포스터를 삭제하시겠습니까?")) return;
+  const handleDelete = () => setShowConfirm(true);
 
+  const doDelete = () => {
+    setShowConfirm(false);
     startTransition(async () => {
       const result = await deletePosterAction(tournamentId);
       if (!result.ok) {
@@ -1031,6 +1053,13 @@ export function PosterSection({
 
   return (
     <Card className="space-y-4">
+      {showConfirm && (
+        <ConfirmModal
+          message="포스터를 삭제하시겠습니까?"
+          onConfirm={doDelete}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
       <h2 className="text-lg font-semibold">포스터</h2>
 
       {displayUrl ? (

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { listUsersWithRole } from "@/lib/api/users";
 import UserRoleForm from "./UserRoleForm";
+import EmptyState from "@/components/ui/EmptyState";
+import Table from "@/components/ui/Table";
 import UserSearchInput from "./UserSearchInput";
 
 export const dynamic = "force-dynamic";
@@ -56,43 +58,37 @@ export default async function AdminUsersPage({
         )}
 
         {!error && filtered.length === 0 && (
-          <p className="text-sm text-gray-500">
-            {query ? "검색 결과가 없습니다." : "사용자가 없습니다."}
-          </p>
+          <EmptyState message={query ? "검색 결과가 없습니다." : "사용자가 없습니다."} />
         )}
 
         {filtered.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">이메일</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">역할</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600">변경</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-800">{user.email}</td>
-                    <td className="px-4 py-3">
-                      <RoleBadge role={user.role} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {user.role === "organizer" || user.id === result.user?.id ? (
-                        <span className="text-xs text-gray-400">변경 불가</span>
-                      ) : (
-                        <UserRoleForm
-                          userId={user.id}
-                          currentRole={user.role}
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <Table.Head>
+              <Table.HeadCell className="text-left">이메일</Table.HeadCell>
+              <Table.HeadCell className="text-center">역할</Table.HeadCell>
+              <Table.HeadCell className="text-center">변경</Table.HeadCell>
+            </Table.Head>
+            <Table.Body>
+              {filtered.map((user) => (
+                <Table.Row key={user.id}>
+                  <Table.Cell className="text-left">{user.email}</Table.Cell>
+                  <Table.Cell className="text-center">
+                    <RoleBadge role={user.role} />
+                  </Table.Cell>
+                  <Table.Cell className="text-center">
+                    {user.role === "organizer" || user.id === result.user?.id ? (
+                      <span className="text-xs text-gray-400">변경 불가</span>
+                    ) : (
+                      <UserRoleForm
+                        userId={user.id}
+                        currentRole={user.role}
+                      />
+                    )}
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table>
         )}
       </div>
     </main>

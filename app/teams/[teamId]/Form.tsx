@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import type { Player } from "@/lib/api/players";
 import {
   createPlayerAction,
@@ -169,7 +170,7 @@ export function PlayerList({
       {/* 빈 상태 */}
       {players.length === 0 && (
         <div className="rounded-xl border bg-white py-8 text-center shadow-sm">
-          <p className="text-sm text-gray-500">등록된 선수가 없습니다.</p>
+          <EmptyState message="등록된 선수가 없습니다." />
         </div>
       )}
 

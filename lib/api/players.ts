@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import type { ApiResult } from "@/lib/types/api";
 
 export type Player = {
   id: string;
@@ -6,11 +7,6 @@ export type Player = {
   name: string;
   number: number | null;
   position: string | null;
-};
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
 };
 
 export async function getPlayersByTeam(

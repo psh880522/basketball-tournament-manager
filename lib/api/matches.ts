@@ -1,10 +1,6 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { setDivisionStandingsDirty } from "@/lib/api/divisions";
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
+import type { ApiResult } from "@/lib/types/api";
 
 export type MatchRow = {
   id: string;

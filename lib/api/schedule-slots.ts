@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { requireOrganizer } from "@/src/lib/auth/guards";
 import { listApprovedTeamsByDivision } from "@/lib/api/applications";
 import {
   createGroups,
@@ -9,12 +9,7 @@ import {
 } from "@/lib/api/bracket";
 import { compareTournamentMatchOrder } from "@/lib/formatters/tournamentMatchOrder";
 
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
-type ActionResult = { ok: true } | { ok: false; error: string };
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
 export type ScheduleValidationResult = {
   isValid: boolean;
@@ -429,14 +424,6 @@ export async function getScheduleSlots(
   const result = courtOrder.map((key) => courtMap.get(key) as ScheduleSlotCourtGroup);
 
   return { data: result, error: null };
-}
-
-async function requireOrganizer(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const auth = await getUserWithRole();
-  if (auth.status !== "ready" || auth.role !== "organizer") {
-    return { ok: false, error: "권한이 없습니다." };
-  }
-  return { ok: true };
 }
 
 async function getDivision(
@@ -2744,4 +2731,41 @@ export async function reorderCourtDivisionSlots(input: {
   if (!reorderResult.ok) return reorderResult;
 
   return recalculateCourtSlotTimes({ tournamentId, courtId });
+}
+
+export type ScheduleSlotRow = {
+  id: string;
+  tournament_id: string;
+  division_id: string | null;
+  court_id: string | null;
+  slot_type:
+    | "break"
+    | "maintenance"
+    | "buffer"
+    | "match"
+    | "tournament_placeholder";
+  start_at: string;
+  end_at: string;
+  label: string | null;
+  match_id: string | null;
+  sort_order: number;
+};
+
+export async function listScheduleSlots(
+  tournamentId: string
+): Promise<{ data: ScheduleSlotRow[] | null; error: string | null }> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("schedule_slots")
+    .select(
+      "id,tournament_id,division_id,court_id,slot_type,start_at,end_at,label,match_id,sort_order"
+    )
+    .eq("tournament_id", tournamentId)
+    .order("sort_order", { ascending: true })
+    .order("start_at", { ascending: true });
+
+  return {
+    data: data as ScheduleSlotRow[] | null,
+    error: error ? error.message : null,
+  };
 }
