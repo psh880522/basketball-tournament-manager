@@ -23,7 +23,7 @@ export default async function AdminUsersPage({
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-8">
         <div className="mx-auto max-w-3xl space-y-4">
-          <h1 className="text-2xl font-semibold">사용자 관리</h1>
+          <h1 className="text-2xl font-semibold">권한 관리</h1>
           <p className="text-sm text-red-600">Failed to load profile: {result.error}</p>
         </div>
       </main>
@@ -43,7 +43,7 @@ export default async function AdminUsersPage({
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="mx-auto flex max-w-3xl flex-col gap-6">
         <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">사용자 관리</h1>
+          <h1 className="text-2xl font-semibold">권한 관리</h1>
           <p className="text-sm text-gray-600">
             사용자 역할을 player ↔ manager로 변경할 수 있습니다.
           </p>

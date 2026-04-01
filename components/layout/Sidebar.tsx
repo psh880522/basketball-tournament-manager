@@ -54,10 +54,11 @@ const IconList = () => (
 function buildMenuItems(role: Role | null): NavItem[] {
   if (role === "organizer" || role === "manager") {
     const items: NavItem[] = [
-      { label: "대시보드", href: "/admin", icon: <IconDashboard /> },
+       { label: "대시보드", href: "/dashboard", icon: <IconDashboard /> },
+      { label: "대회관리", href: "/admin", icon: <IconDashboard /> },
     ];
     if (role === "organizer") {
-      items.push({ label: "권한 관리", href: "/admin/users", icon: <IconUsers /> });
+      items.push({ label: "권한관리", href: "/admin/users", icon: <IconUsers /> });
     }
     return items;
   }
@@ -65,7 +66,7 @@ function buildMenuItems(role: Role | null): NavItem[] {
   // player
   return [
     { label: "대시보드", href: "/dashboard", icon: <IconDashboard /> },
-    { label: "내 팀", href: "/team", icon: <IconTeam /> },
+    { label: "내팀", href: "/team", icon: <IconTeam /> },
   ];
 }
 
