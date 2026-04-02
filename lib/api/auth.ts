@@ -5,6 +5,11 @@ type AuthResult = {
   error: string | null;
 };
 
+type SignUpResult = {
+  error: string | null;
+  requiresEmailConfirmation: boolean;
+};
+
 type RoleResult = {
   role: Role | null;
   error: string | null;
@@ -13,11 +18,18 @@ type RoleResult = {
 export async function signUpWithPassword(
   email: string,
   password: string
-): Promise<AuthResult> {
+): Promise<SignUpResult> {
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({ email, password });
 
-  return { error: error ? error.message : null };
+  if (error) {
+    return { error: error.message, requiresEmailConfirmation: false };
+  }
+
+  return {
+    error: null,
+    requiresEmailConfirmation: !data.session,
+  };
 }
 
 export async function signInWithPassword(
@@ -27,6 +39,29 @@ export async function signInWithPassword(
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
+  return { error: error ? error.message : null };
+}
+
+type ResetPasswordResult = {
+  error: string | null;
+};
+
+export async function resetPasswordForEmail(
+  email: string,
+  redirectTo: string
+): Promise<ResetPasswordResult> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+  return { error: error ? error.message : null };
+}
+
+export async function updateUserPassword(
+  newPassword: string
+): Promise<AuthResult> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
   return { error: error ? error.message : null };
 }
 

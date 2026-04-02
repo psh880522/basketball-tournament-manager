@@ -105,35 +105,10 @@ async function InProgressTournamentsList() {
 export default async function HomePage() {
   const userResult = await getUserWithRole();
   const isLoggedIn = userResult.status === "ready";
-  const isOrganizer = userResult.status === "ready" && userResult.role === "organizer";
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8">
-        <section className="flex flex-wrap gap-3 rounded-xl border bg-white p-4 shadow-sm">
-          {isLoggedIn ? (
-            <>
-              <Link href="/dashboard">
-                <Button variant="secondary">Dashboard</Button>
-              </Link>
-              {isOrganizer ? (
-                <Link href="/admin">
-                  <Button>Admin Console</Button>
-                </Link>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <Link href="/login">
-                <Button>로그인</Button>
-              </Link>
-              <Link href="/signup">
-                <Button variant="secondary">회원가입</Button>
-              </Link>
-            </>
-          )}
-        </section>
-
         <section className="space-y-4 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white p-6">
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold">

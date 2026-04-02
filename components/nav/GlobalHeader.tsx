@@ -7,7 +7,23 @@ type NavItem = {
   href: string;
 };
 
-export default async function GlobalHeader() {
+type GlobalHeaderProps = {
+  minimal?: boolean;
+};
+
+export default async function GlobalHeader({ minimal = false }: GlobalHeaderProps) {
+  if (minimal) {
+    return (
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/85 backdrop-blur">
+        <div className="relative mx-auto flex h-14 max-w-6xl items-center px-4">
+          <Link href="/" className="text-base font-bold tracking-tight text-slate-900">
+            🏀 23Board
+          </Link>
+        </div>
+      </header>
+    );
+  }
+
   const userResult = await getUserWithRole();
 
   const isLoggedIn =
@@ -28,7 +44,7 @@ export default async function GlobalHeader() {
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/85 backdrop-blur">
       <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link href="/" className="text-base font-bold tracking-tight text-slate-900">
-          🏀 Basketball TM
+          🏀 23Board
         </Link>
 
         <NavMenu items={items} isLoggedIn={isLoggedIn} />

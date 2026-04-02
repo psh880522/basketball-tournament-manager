@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find app:*)",
+      "Bash(ls -la \"app/\\(auth\\)/\")",
+      "Bash(ls -la \"app/\\(public\\)/\")"
     ]
   }
 }
