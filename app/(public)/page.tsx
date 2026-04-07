@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isPlayerRole, isUserRole, isOperationRole } from "@/src/lib/auth/roles";
 import { getInProgressTournaments, getOpenTournaments } from "@/lib/api/tournaments";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import type { Role } from "@/src/lib/auth/roles";
 
 const formatDateRange = (start: string | null, end: string | null) => {
   const startLabel = start || "TBD";
@@ -12,11 +13,7 @@ const formatDateRange = (start: string | null, end: string | null) => {
   return `${startLabel} - ${endLabel}`;
 };
 
-async function OpenTournamentsList({
-  isLoggedIn,
-}: {
-  isLoggedIn: boolean;
-}) {
+async function OpenTournamentsList({ role }: { role: Role | null }) {
   const { data, error } = await getOpenTournaments();
 
   if (error) {
@@ -45,11 +42,19 @@ async function OpenTournamentsList({
             <Link href={`/tournament/${tournament.id}`}>
               <Button variant="secondary">상세보기</Button>
             </Link>
-            <Link
-              href={isLoggedIn ? `/tournament/${tournament.id}/apply` : "/login"}
-            >
-              <Button>참가 신청</Button>
-            </Link>
+            {isPlayerRole(role) ? (
+              <Link href={`/tournament/${tournament.id}/apply`}>
+                <Button>참가 신청</Button>
+              </Link>
+            ) : isUserRole(role) ? (
+              <Link href="/onboarding/profile" title="선수 등록 후 신청 가능">
+                <Button variant="secondary">선수 등록 후 신청</Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button>참가 신청</Button>
+              </Link>
+            )}
           </div>
         </Card>
       ))}
@@ -105,10 +110,12 @@ async function InProgressTournamentsList() {
 export default async function HomePage() {
   const userResult = await getUserWithRole();
   const isLoggedIn = userResult.status === "ready";
+  const role = userResult.role;
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8">
+        {/* 히어로 섹션 */}
         <section className="space-y-4 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white p-6">
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold">
@@ -117,15 +124,48 @@ export default async function HomePage() {
             <p className="text-sm text-gray-600">
               대회를 살펴보고 참가해보세요!
             </p>
+            {!isLoggedIn ? (
+              <Link href="/login" className="inline-block">
+                <Button>대회 참여하기</Button>
+              </Link>
+            ) : isUserRole(role) ? (
+              <Link href="/onboarding/profile" className="inline-block">
+                <Button>선수 등록하기</Button>
+              </Link>
+            ) : isPlayerRole(role) ? (
+              <Link href="/dashboard" className="inline-block">
+                <Button>대시보드 가기</Button>
+              </Link>
+            ) : isOperationRole(role) ? (
+              <Link href="/admin" className="inline-block">
+                <Button>관리자 페이지</Button>
+              </Link>
+            ) : null}
           </div>
         </section>
+
+        {/* user 전용 선수 등록 안내 카드 */}
+        {isUserRole(role) && (
+          <section className="rounded-xl border border-blue-200 bg-blue-50 p-6 space-y-3">
+            <h2 className="text-lg font-semibold text-blue-900">
+              선수로 참가하려면 등록이 필요합니다
+            </h2>
+            <p className="text-sm text-blue-700">
+              이름, 연락처 등 기본 정보를 입력하고 본인인증을 완료하면
+              대회에 참가 신청할 수 있습니다.
+            </p>
+            <Link href="/onboarding/profile" className="inline-block">
+              <Button>지금 선수 등록하기</Button>
+            </Link>
+          </section>
+        )}
 
         <section id="open-tournaments" className="space-y-4">
           <h2 className="text-lg font-semibold">현재 모집 중인 대회</h2>
           <Suspense
             fallback={<p className="text-sm text-gray-600">대회 목록을 불러오는 중...</p>}
           >
-            <OpenTournamentsList isLoggedIn={isLoggedIn} />
+            <OpenTournamentsList role={role} />
           </Suspense>
         </section>
 

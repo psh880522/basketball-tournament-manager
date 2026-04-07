@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isPlayerRole, isUserRole, isOperationRole } from "@/src/lib/auth/roles";
 import NavMenu from "./NavMenu";
 
 type NavItem = {
@@ -32,12 +32,12 @@ export default async function GlobalHeader({ minimal = false }: GlobalHeaderProp
 
   const items: NavItem[] = [{ label: "대회", href: "/" }];
 
-  if (isLoggedIn) {
+  if (isUserRole(role)) {
+    items.push({ label: "선수 등록하기", href: "/onboarding/profile" });
+  } else if (isPlayerRole(role)) {
     items.push({ label: "대시보드", href: "/dashboard" });
-  }
-
-  if (role === "organizer") {
-    items.push({ label: "Admin", href: "/admin" });
+  } else if (isOperationRole(role)) {
+    items.push({ label: "관리", href: "/admin" });
   }
 
   return (

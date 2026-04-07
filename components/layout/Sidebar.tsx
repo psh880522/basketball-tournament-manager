@@ -63,10 +63,19 @@ function buildMenuItems(role: Role | null): NavItem[] {
     return items;
   }
 
+  // user
+  if (role === "user") {
+    return [
+      { label: "대회 보기", href: "/tournaments", icon: <IconList /> },
+      { label: "선수 등록하기", href: "/onboarding/profile", icon: <IconUsers /> },
+    ];
+  }
+
   // player
   return [
     { label: "대시보드", href: "/dashboard", icon: <IconDashboard /> },
-    { label: "내팀", href: "/team", icon: <IconTeam /> },
+    { label: "대회 보기", href: "/tournaments", icon: <IconList /> },
+    { label: "내 팀", href: "/team", icon: <IconTeam /> },
   ];
 }
 

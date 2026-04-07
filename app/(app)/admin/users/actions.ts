@@ -8,7 +8,7 @@ type ActionResult = { ok: true } | { ok: false; error: string };
 
 type UpdateRoleInput = {
   targetUserId: string;
-  newRole: "player" | "manager";
+  newRole: "user" | "player" | "manager";
 };
 
 export async function updateUserRoleAction(
@@ -28,7 +28,7 @@ export async function updateUserRoleAction(
   if (!input.targetUserId) {
     return { ok: false, error: "대상 사용자 ID가 필요합니다." };
   }
-  if (input.newRole !== "player" && input.newRole !== "manager") {
+  if (!["user", "player", "manager"].includes(input.newRole)) {
     return { ok: false, error: "유효하지 않은 역할입니다." };
   }
 

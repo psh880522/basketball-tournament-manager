@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# MCP 설정 (PAT 토큰 포함)
+.mcp.json
+
 # dependencies
 /node_modules
 /.pnp

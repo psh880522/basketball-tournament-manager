@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isUserRole } from "@/src/lib/auth/roles";
 import { getMyTeamsWithTournament } from "@/lib/api/teams";
 
 async function TeamContent() {
@@ -27,8 +27,9 @@ async function TeamContent() {
     );
   }
 
-  // 로그인 사용자 전체 접근 허용 (팀 생성은 player도 가능)
-
+  if (isUserRole(result.role)) {
+    redirect("/onboarding/profile");
+  }
 
   const userId = result.user?.id;
 

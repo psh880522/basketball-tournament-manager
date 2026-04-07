@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isUserRole } from "@/src/lib/auth/roles";
 import { listMyManagedTeams } from "@/lib/api/teams";
 import { getMyApplicationStatus } from "@/lib/api/applications";
 import { getPublicTournamentById } from "@/lib/api/tournaments";
@@ -20,6 +20,10 @@ export default async function TournamentApplyPage({ params }: PageProps) {
   const userResult = await getUserWithRole();
 
   if (userResult.status === "unauthenticated") redirect("/login");
+
+  if (isUserRole(userResult.role)) {
+    redirect("/onboarding/profile");
+  }
 
   if (userResult.status === "error") {
     return (

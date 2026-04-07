@@ -12,6 +12,7 @@ type ProfilePopupProps = {
 const ROLE_LABEL: Record<Role, string> = {
   organizer: "오거나이저",
   manager: "매니저",
+  user: "일반 사용자",
   player: "플레이어",
 };
 

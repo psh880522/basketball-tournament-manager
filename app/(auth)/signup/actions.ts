@@ -44,6 +44,6 @@ export async function signUpWithPassword(
     return { ok: true, requiresEmailConfirmation: true };
   }
 
-  redirect("/dashboard");
+  redirect("/");
   return { ok: true, requiresEmailConfirmation: false };
 }

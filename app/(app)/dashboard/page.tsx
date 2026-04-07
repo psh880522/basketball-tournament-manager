@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isOperationRole, isUserRole } from "@/src/lib/auth/roles";
 import { listMyTeams } from "@/lib/api/teams";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -38,6 +38,10 @@ export default async function DashboardPage() {
 
   if (isOperationRole(result.role)) {
     redirect("/admin");
+  }
+
+  if (isUserRole(result.role)) {
+    redirect("/");
   }
 
   /* ── 내 팀 목록 조회 ─────────────────────────── */

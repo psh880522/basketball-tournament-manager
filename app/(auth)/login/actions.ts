@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUserRole, signInWithPassword as signIn } from "@/lib/api/auth";
-import { isOperationRole } from "@/src/lib/auth/roles";
+import { isOperationRole, isPlayerRole } from "@/src/lib/auth/roles";
 
 type ActionResult =
   | { ok: true }
@@ -45,7 +45,14 @@ export async function signInWithPassword(
     return { ok: false, error: "사용자 정보를 불러오지 못했습니다." };
   }
 
-  const nextPath = isOperationRole(roleResult.role) ? "/admin" : "/dashboard";
-  redirect(nextPath);
-  return { ok: true };
+  if (isOperationRole(roleResult.role)) {
+    redirect("/admin");
+  }
+
+  if (isPlayerRole(roleResult.role)) {
+    redirect("/dashboard");
+  }
+
+  // user role: 랜딩으로 이동 (선수 등록 CTA)
+  redirect("/");
 }
