@@ -301,6 +301,10 @@ function AddDivisionForm({
   const [name, setName] = useState("");
   const [groupSize, setGroupSize] = useState<number>(4);
   const [tournamentSize, setTournamentSize] = useState<string>("");
+  const [entryFee, setEntryFee] = useState<number>(0);
+  const [capacity, setCapacity] = useState<string>("");
+  const [appOpenAt, setAppOpenAt] = useState<string>("");
+  const [appCloseAt, setAppCloseAt] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
   const isGroupSizeValid = typeof groupSize === "number" && groupSize >= 2;
@@ -313,31 +317,38 @@ function AddDivisionForm({
       TOURNAMENT_SIZE_OPTIONS.includes(
         tournamentSizeValue as (typeof TOURNAMENT_SIZE_OPTIONS)[number]
       ));
+  const capacityValue = capacity.trim() ? Number(capacity) : null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !isGroupSizeValid || !isTournamentSizeValid) return;
 
     startTransition(async () => {
-      const result = await createDivisionAction(
-        tournamentId,
-        name.trim(),
+      const result = await createDivisionAction(tournamentId, {
+        name: name.trim(),
         groupSize,
-        isTournamentSizeValid ? tournamentSizeValue : null
-      );
+        tournamentSize: isTournamentSizeValid ? tournamentSizeValue : null,
+        entryFee,
+        capacity: capacityValue,
+        applicationOpenAt: appOpenAt ? new Date(appOpenAt).toISOString() : null,
+        applicationCloseAt: appCloseAt ? new Date(appCloseAt).toISOString() : null,
+      });
       if (!result.ok) {
         onError(result.error);
         return;
       }
-      // Optimistic: create a temp row; real data will come from revalidation
       onCreated({
-        id: crypto.randomUUID(),
+        id: result.id,
         tournament_id: tournamentId,
         name: name.trim(),
         group_size: groupSize,
         tournament_size: isTournamentSizeValid ? tournamentSizeValue : null,
-        sort_order: 9999,
+        sort_order: result.sort_order,
         standings_dirty: false,
+        entry_fee: entryFee,
+        capacity: capacityValue,
+        application_open_at: appOpenAt ? new Date(appOpenAt).toISOString() : null,
+        application_close_at: appCloseAt ? new Date(appCloseAt).toISOString() : null,
       });
     });
   };
@@ -390,6 +401,45 @@ function AddDivisionForm({
           ))}
         </select>
       </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-600">참가비 (원)</label>
+        <input
+          type="number"
+          className="w-28 rounded-md border border-gray-300 px-2 py-2 text-sm"
+          value={entryFee}
+          onChange={(e) => setEntryFee(Number(e.target.value))}
+          min={0}
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-600">정원 (빈칸=무제한)</label>
+        <input
+          type="number"
+          className="w-24 rounded-md border border-gray-300 px-2 py-2 text-sm"
+          value={capacity}
+          onChange={(e) => setCapacity(e.target.value)}
+          min={0}
+          placeholder="무제한"
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-600">신청 시작</label>
+        <input
+          type="datetime-local"
+          className="rounded-md border border-gray-300 px-2 py-2 text-sm"
+          value={appOpenAt}
+          onChange={(e) => setAppOpenAt(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-600">신청 마감</label>
+        <input
+          type="datetime-local"
+          className="rounded-md border border-gray-300 px-2 py-2 text-sm"
+          value={appCloseAt}
+          onChange={(e) => setAppCloseAt(e.target.value)}
+        />
+      </div>
       {!isGroupSizeValid && (
         <span className="text-xs text-red-500 self-center">2 이상 입력</span>
       )}
@@ -435,6 +485,22 @@ function DivisionItem({
       ? String(division.tournament_size)
       : ""
   );
+  const [entryFee, setEntryFee] = useState<number>(division.entry_fee ?? 0);
+  const [capacity, setCapacity] = useState<string>(
+    division.capacity !== null && division.capacity !== undefined
+      ? String(division.capacity)
+      : ""
+  );
+  const [appOpenAt, setAppOpenAt] = useState<string>(
+    division.application_open_at
+      ? new Date(division.application_open_at).toISOString().slice(0, 16)
+      : ""
+  );
+  const [appCloseAt, setAppCloseAt] = useState<string>(
+    division.application_close_at
+      ? new Date(division.application_close_at).toISOString().slice(0, 16)
+      : ""
+  );
   const [isPending, startTransition] = useTransition();
 
   const isGroupSizeValid = typeof groupSize === "number" && groupSize >= 2;
@@ -447,19 +513,22 @@ function DivisionItem({
       TOURNAMENT_SIZE_OPTIONS.includes(
         tournamentSizeValue as (typeof TOURNAMENT_SIZE_OPTIONS)[number]
       ));
+  const capacityValue = capacity.trim() ? Number(capacity) : null;
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !isGroupSizeValid || !isTournamentSizeValid) return;
 
     startTransition(async () => {
-      const result = await updateDivisionAction(
-        tournamentId,
-        division.id,
-        name.trim(),
+      const result = await updateDivisionAction(tournamentId, division.id, {
+        name: name.trim(),
         groupSize,
-        isTournamentSizeValid ? tournamentSizeValue : null
-      );
+        tournamentSize: isTournamentSizeValid ? tournamentSizeValue : null,
+        entryFee,
+        capacity: capacityValue,
+        applicationOpenAt: appOpenAt ? new Date(appOpenAt).toISOString() : null,
+        applicationCloseAt: appCloseAt ? new Date(appCloseAt).toISOString() : null,
+      });
       if (!result.ok) {
         onError(result.error);
         return;
@@ -469,6 +538,10 @@ function DivisionItem({
         name: name.trim(),
         group_size: groupSize,
         tournament_size: isTournamentSizeValid ? tournamentSizeValue : null,
+        entry_fee: entryFee,
+        capacity: capacityValue,
+        application_open_at: appOpenAt ? new Date(appOpenAt).toISOString() : null,
+        application_close_at: appCloseAt ? new Date(appCloseAt).toISOString() : null,
       });
       setEditing(false);
     });
@@ -530,6 +603,45 @@ function DivisionItem({
               ))}
             </select>
           </label>
+          <label className="flex items-center gap-1 text-sm text-gray-600">
+            참가비
+            <input
+              type="number"
+              className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              value={entryFee}
+              onChange={(e) => setEntryFee(Number(e.target.value))}
+              min={0}
+            />
+          </label>
+          <label className="flex items-center gap-1 text-sm text-gray-600">
+            정원
+            <input
+              type="number"
+              className="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              min={0}
+              placeholder="무제한"
+            />
+          </label>
+          <label className="flex items-center gap-1 text-sm text-gray-600">
+            신청 시작
+            <input
+              type="datetime-local"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              value={appOpenAt}
+              onChange={(e) => setAppOpenAt(e.target.value)}
+            />
+          </label>
+          <label className="flex items-center gap-1 text-sm text-gray-600">
+            신청 마감
+            <input
+              type="datetime-local"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              value={appCloseAt}
+              onChange={(e) => setAppCloseAt(e.target.value)}
+            />
+          </label>
           {!isGroupSizeValid && (
             <span className="text-xs text-red-500">2 이상 입력</span>
           )}
@@ -558,6 +670,22 @@ function DivisionItem({
                   ? String(division.tournament_size)
                   : ""
               );
+              setEntryFee(division.entry_fee ?? 0);
+              setCapacity(
+                division.capacity !== null && division.capacity !== undefined
+                  ? String(division.capacity)
+                  : ""
+              );
+              setAppOpenAt(
+                division.application_open_at
+                  ? new Date(division.application_open_at).toISOString().slice(0, 16)
+                  : ""
+              );
+              setAppCloseAt(
+                division.application_close_at
+                  ? new Date(division.application_close_at).toISOString().slice(0, 16)
+                  : ""
+              );
               setEditing(false);
             }}
           >
@@ -581,9 +709,7 @@ function DivisionItem({
         <div className="space-y-0.5">
           <p className="text-sm font-medium">{division.name}</p>
         <p className="text-xs text-gray-400">
-          그룹 크기: {division.group_size ?? "-"} 토너먼트 크기:{" "}
-          {division.tournament_size ?? "-"} 순서:{" "}
-          {division.sort_order}
+          그룹: {division.group_size ?? "-"} · 토너먼트: {division.tournament_size ?? "-"} · 참가비: {(division.entry_fee ?? 0).toLocaleString()}원 · 정원: {division.capacity ?? "무제한"} · 순서: {division.sort_order}
         </p>
       </div>
       <div className="flex gap-2">

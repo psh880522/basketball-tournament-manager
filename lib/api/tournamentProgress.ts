@@ -87,7 +87,7 @@ export async function getTournamentProgressState(
       .from("tournament_team_applications")
       .select("id", { count: "exact", head: true })
       .eq("tournament_id", tournamentId)
-      .eq("status", "approved"),
+      .eq("status", "confirmed"),
     supabase
       .from("tournament_team_applications")
       .select("id", { count: "exact", head: true })

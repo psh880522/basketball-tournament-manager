@@ -1,49 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
 import type { ManagedTeamRow } from "@/lib/api/teams";
 import type { MyApplicationRow } from "@/lib/api/applications";
 import type { DivisionRow } from "@/lib/api/divisions";
 import { applyTeamToTournament } from "./actions";
-
-/* ── 신청 상태 표시 ──────────────────────────── */
-
-const statusLabels: Record<string, { text: string; className: string }> = {
-  pending: { text: "승인 대기 중", className: "bg-yellow-100 text-yellow-800" },
-  approved: { text: "참가 확정", className: "bg-green-100 text-green-700" },
-  rejected: { text: "참가 거절", className: "bg-red-100 text-red-700" },
-};
-
-function ApplicationStatus({ app }: { app: MyApplicationRow }) {
-  const label = statusLabels[app.status] ?? statusLabels.pending;
-  return (
-    <Card className="space-y-3">
-      <h2 className="text-lg font-semibold">참가 신청 현황</h2>
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">팀</span>
-          <span className="font-medium">{app.team_name}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">부문</span>
-          <span className="font-medium">{app.division_name}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">상태</span>
-          <Badge className={label.className}>{label.text}</Badge>
-        </div>
-      </div>
-      <Link href={`/teams/${app.team_id}`}>
-        <Button variant="secondary">내 팀 보기</Button>
-      </Link>
-    </Card>
-  );
-}
+import StatusCard from "./StatusCard";
 
 /* ── 팀 없음 안내 ────────────────────────────── */
 
@@ -98,9 +64,27 @@ export default function ApplyTeamForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  /* 이미 신청한 경우 */
+  /* 신청 성공 후 자동으로 서버 데이터 갱신 */
+  useEffect(() => {
+    if (success) {
+      router.refresh();
+    }
+  }, [success, router]);
+
+  /* 취소/만료 후 router.refresh()로 existingApp이 null로 바뀌면 success 리셋
+     (신청 직후 existingApp=null 상태와 구분하기 위해 이전 값 추적) */
+  const prevExistingAppRef = useRef(existingApp);
+  useEffect(() => {
+    const prev = prevExistingAppRef.current;
+    prevExistingAppRef.current = existingApp;
+    if (success && prev !== null && existingApp === null) {
+      setSuccess(false);
+    }
+  }, [existingApp, success]);
+
+  /* 이미 신청한 경우 — 6-state StatusCard */
   if (existingApp) {
-    return <ApplicationStatus app={existingApp} />;
+    return <StatusCard app={existingApp} tournamentId={tournamentId} />;
   }
 
   /* 팀이 없는 경우 */
@@ -113,23 +97,22 @@ export default function ApplyTeamForm({
     return <NoDivisionsGuide />;
   }
 
-  /* 신청 성공 후 */
+  /* 신청 성공 후 (router.refresh() 결과 대기 중) */
   if (success) {
     return (
       <Card className="space-y-3 text-center">
         <p className="text-sm text-green-700 font-medium">
           참가 신청이 완료되었습니다!
         </p>
-        <Button variant="secondary" onClick={() => router.refresh()}>
-          신청 현황 보기
-        </Button>
+        <p className="text-xs text-gray-500">신청 현황을 불러오는 중...</p>
       </Card>
     );
   }
 
+  const selectedDivision = divisions.find((d) => d.id === selectedDivisionId);
   const canSubmit = !!selectedTeamId && !!selectedDivisionId && !loading;
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedTeamId) {
       setError("팀을 선택해주세요.");
@@ -206,10 +189,39 @@ export default function ApplyTeamForm({
             {divisions.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
+                {d.entry_fee > 0 ? ` (${d.entry_fee.toLocaleString()}원)` : ""}
               </option>
             ))}
           </select>
         </div>
+
+        {/* Division 상세 정보 */}
+        {selectedDivision && (
+          <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 space-y-1">
+            <p>
+              <span className="font-medium text-gray-800">참가비:</span>{" "}
+              {selectedDivision.entry_fee > 0
+                ? `${selectedDivision.entry_fee.toLocaleString()}원`
+                : "무료"}
+            </p>
+            <p>
+              <span className="font-medium text-gray-800">정원:</span>{" "}
+              {selectedDivision.capacity != null
+                ? `${selectedDivision.capacity}팀`
+                : "무제한"}
+            </p>
+            {(selectedDivision.application_open_at || selectedDivision.application_close_at) && (
+              <p>
+                <span className="font-medium text-gray-800">신청 기간:</span>{" "}
+                {selectedDivision.application_open_at
+                  ? new Date(selectedDivision.application_open_at).toLocaleDateString("ko-KR")
+                  : ""}
+                {selectedDivision.application_close_at &&
+                  ` ~ ${new Date(selectedDivision.application_close_at).toLocaleDateString("ko-KR")}`}
+              </p>
+            )}
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

@@ -1,15 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { setApplicationStatus } from "@/lib/api/applications";
+import { confirmApplication, adminCancelApplication, extendPaymentDue } from "@/lib/api/applications";
 import { createDummyTeam } from "@/lib/api/teams";
 
-export async function setApplicationStatusAction(
+export async function confirmApplicationAction(
   applicationId: string,
-  status: "approved" | "rejected",
   tournamentId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const result = await setApplicationStatus(applicationId, status);
+  const result = await confirmApplication(applicationId);
 
   if (!result.ok) {
     return { ok: false, error: result.error };
@@ -18,6 +17,37 @@ export async function setApplicationStatusAction(
   revalidatePath(`/admin/tournaments/${tournamentId}/applications`);
   revalidatePath(`/admin/tournaments/${tournamentId}`);
 
+  return { ok: true };
+}
+
+export async function adminCancelApplicationAction(
+  applicationId: string,
+  tournamentId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const result = await adminCancelApplication(applicationId);
+
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  revalidatePath(`/admin/tournaments/${tournamentId}/applications`);
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+
+  return { ok: true };
+}
+
+export async function extendPaymentDueAction(
+  applicationId: string,
+  tournamentId: string,
+  newDueAt: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const result = await extendPaymentDue(applicationId, newDueAt);
+
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  revalidatePath(`/admin/tournaments/${tournamentId}/applications`);
   return { ok: true };
 }
 

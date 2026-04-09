@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getPublicTournamentById } from "@/lib/api/tournaments";
-import { getTeamApplicationByTournamentAndCaptain } from "@/lib/api/teams";
+import { getMyApplicationStatus } from "@/lib/api/applications";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -33,8 +33,8 @@ async function TournamentDetail({ id }: { id: string }) {
   const isLoggedIn = userResult.status === "ready";
   const isOrganizer = userResult.status === "ready" && userResult.role === "organizer";
 
-  const teamApplicationResult = isLoggedIn && userResult.user
-    ? await getTeamApplicationByTournamentAndCaptain(id, userResult.user.id)
+  const teamApplicationResult = isLoggedIn
+    ? await getMyApplicationStatus(id)
     : { data: null, error: null };
 
   if (teamApplicationResult.error) {
@@ -67,11 +67,15 @@ async function TournamentDetail({ id }: { id: string }) {
   const adminHref = `/admin/tournaments/${id}`;
 
   const statusCopy = teamApplication
-    ? teamApplication.status === "approved"
+    ? teamApplication.status === "confirmed"
       ? "참가 확정"
-      : teamApplication.status === "rejected"
-      ? "참가 거절됨"
-      : "승인 대기 중"
+      : teamApplication.status === "cancelled"
+      ? "참가 취소됨"
+      : teamApplication.status === "expired"
+      ? "신청 만료됨"
+      : teamApplication.status === "waitlisted"
+      ? "대기 중"
+      : "처리 중"
     : null;
 
   return (
@@ -166,13 +170,13 @@ async function TournamentDetail({ id }: { id: string }) {
             </Link>
           ) : null}
 
-          {teamApplication?.status === "pending" ? (
+          {teamApplication?.status === "payment_pending" ? (
             <button type="button" disabled style={{ padding: "10px 16px", marginTop: 8 }}>
-              승인 대기 중
+              입금 대기 중
             </button>
           ) : null}
 
-          {teamApplication?.status === "approved" ? (
+          {teamApplication?.status === "confirmed" ? (
             <Link href="/team">
               <button type="button" style={{ padding: "10px 16px", marginTop: 8 }}>
                 내 팀 보기
@@ -180,9 +184,9 @@ async function TournamentDetail({ id }: { id: string }) {
             </Link>
           ) : null}
 
-          {teamApplication?.status === "rejected" ? (
+          {teamApplication?.status === "cancelled" || teamApplication?.status === "expired" ? (
             <button type="button" disabled style={{ padding: "10px 16px", marginTop: 8 }}>
-              참가 거절됨
+              {teamApplication.status === "cancelled" ? "참가 취소됨" : "신청 만료됨"}
             </button>
           ) : null}
 

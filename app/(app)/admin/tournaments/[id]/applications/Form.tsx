@@ -5,19 +5,25 @@ import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import { setApplicationStatusAction, createDummyTeamAction } from "./actions";
+import { confirmApplicationAction, adminCancelApplicationAction, createDummyTeamAction } from "./actions";
 import type { TournamentApplicationRow, ApplicationStatus } from "@/lib/api/applications";
 
 const statusLabel: Record<ApplicationStatus, string> = {
-  pending: "대기",
-  approved: "승인",
-  rejected: "거절",
+  payment_pending: "입금 대기",
+  paid_pending_approval: "승인 대기",
+  confirmed: "참가 확정",
+  waitlisted: "대기열",
+  expired: "만료",
+  cancelled: "취소",
 };
 
 const statusBadgeClass: Record<ApplicationStatus, string> = {
-  pending: "bg-yellow-100 text-yellow-700",
-  approved: "bg-emerald-100 text-emerald-700",
-  rejected: "bg-red-100 text-red-700",
+  payment_pending: "bg-yellow-100 text-yellow-700",
+  paid_pending_approval: "bg-blue-100 text-blue-700",
+  confirmed: "bg-emerald-100 text-emerald-700",
+  waitlisted: "bg-orange-100 text-orange-700",
+  expired: "bg-gray-100 text-gray-500",
+  cancelled: "bg-red-100 text-red-700",
 };
 
 function formatDate(iso: string) {
@@ -171,15 +177,22 @@ function ApplicationItem({
 }) {
   const [isPending, startTransition] = useTransition();
 
-  const handleAction = (status: "approved" | "rejected") => {
+  const handleConfirm = () => {
     startTransition(async () => {
-      const result = await setApplicationStatusAction(
-        application.id,
-        status,
-        tournamentId
-      );
+      const result = await confirmApplicationAction(application.id, tournamentId);
       if (result.ok) {
-        onStatusChanged(application.id, status);
+        onStatusChanged(application.id, "confirmed");
+      } else {
+        onError(result.error);
+      }
+    });
+  };
+
+  const handleCancel = () => {
+    startTransition(async () => {
+      const result = await adminCancelApplicationAction(application.id, tournamentId);
+      if (result.ok) {
+        onStatusChanged(application.id, "cancelled");
       } else {
         onError(result.error);
       }
@@ -208,23 +221,31 @@ function ApplicationItem({
         <Badge className={statusBadgeClass[application.status]}>
           {statusLabel[application.status]}
         </Badge>
-        {application.status === "pending" ? (
+        {application.status === "paid_pending_approval" ? (
           <>
             <Button
               variant="primary"
-              onClick={() => handleAction("approved")}
+              onClick={handleConfirm}
               disabled={isPending}
             >
-              {isPending ? "처리중..." : "승인"}
+              {isPending ? "처리중..." : "참가 확정"}
             </Button>
             <Button
               variant="secondary"
-              onClick={() => handleAction("rejected")}
+              onClick={handleCancel}
               disabled={isPending}
             >
-              {isPending ? "처리중..." : "거절"}
+              {isPending ? "처리중..." : "취소"}
             </Button>
           </>
+        ) : application.status === "confirmed" || application.status === "payment_pending" ? (
+          <Button
+            variant="secondary"
+            onClick={handleCancel}
+            disabled={isPending}
+          >
+            {isPending ? "처리중..." : "취소"}
+          </Button>
         ) : null}
       </div>
     </Card>

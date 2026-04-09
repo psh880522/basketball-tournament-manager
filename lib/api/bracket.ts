@@ -135,7 +135,7 @@ export async function getApprovedTeamsByDivision(
     .from("tournament_team_applications")
     .select("team_id, teams(id, team_name)")
     .eq("division_id", divisionId)
-    .eq("status", "approved");
+    .eq("status", "confirmed");
 
   if (error) return { data: null, error: error.message };
 

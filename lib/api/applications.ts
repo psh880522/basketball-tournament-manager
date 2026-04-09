@@ -1,6 +1,36 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
-export type ApplicationStatus = "pending" | "approved" | "rejected";
+// ────────────────────────────────────────────────────────────
+// 상태 타입
+// ────────────────────────────────────────────────────────────
+
+export type ApplicationStatus =
+  | "payment_pending"
+  | "paid_pending_approval"
+  | "confirmed"
+  | "waitlisted"
+  | "expired"
+  | "cancelled";
+
+/** 정원 점유 대상 상태 */
+export const OCCUPYING_STATUSES: ApplicationStatus[] = [
+  "payment_pending",
+  "paid_pending_approval",
+  "confirmed",
+];
+
+/** 중복 신청 방지 대상 상태 (활성 상태) */
+export const ACTIVE_STATUSES: ApplicationStatus[] = [
+  "payment_pending",
+  "paid_pending_approval",
+  "confirmed",
+  "waitlisted",
+];
+
+// ────────────────────────────────────────────────────────────
+// Row 타입
+// ────────────────────────────────────────────────────────────
 
 export type MyApplicationRow = {
   id: string;
@@ -9,6 +39,18 @@ export type MyApplicationRow = {
   division_id: string;
   division_name: string;
   status: ApplicationStatus;
+  base_entry_fee: number;
+  discount_amount: number;
+  final_amount: number;
+  waitlist_position: number | null;
+  payment_due_at: string | null;
+  depositor_name: string | null;
+  depositor_note: string | null;
+  paid_marked_at: string | null;
+  submitted_at: string;
+  confirmed_at: string | null;
+  cancelled_at: string | null;
+  expired_at: string | null;
 };
 
 export type TournamentApplicationRow = {
@@ -21,6 +63,21 @@ export type TournamentApplicationRow = {
   status: ApplicationStatus;
   applied_by: string;
   created_at: string;
+  base_entry_fee: number;
+  discount_amount: number;
+  final_amount: number;
+  waitlist_position: number | null;
+  payment_due_at: string | null;
+  depositor_name: string | null;
+  depositor_note: string | null;
+  paid_marked_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  admin_memo: string | null;
+  submitted_at: string;
+  confirmed_at: string | null;
+  cancelled_at: string | null;
+  expired_at: string | null;
 };
 
 export type ApprovedTeamRow = {
@@ -28,11 +85,54 @@ export type ApprovedTeamRow = {
   team_name: string;
 };
 
+export type ApplicationStatusHistoryRow = {
+  id: string;
+  application_id: string;
+  from_status: ApplicationStatus | null;
+  to_status: ApplicationStatus;
+  changed_by: string;
+  changed_at: string;
+  memo: string | null;
+};
+
+export type MarkPaymentInput = {
+  applicationId: string;
+  depositorName: string;
+  depositorNote?: string;
+};
+
+// ────────────────────────────────────────────────────────────
+// 조회 함수
+// ────────────────────────────────────────────────────────────
+
+const MY_APP_SELECT = [
+  "id",
+  "team_id",
+  "status",
+  "division_id",
+  "base_entry_fee",
+  "discount_amount",
+  "final_amount",
+  "waitlist_position",
+  "payment_due_at",
+  "depositor_name",
+  "depositor_note",
+  "paid_marked_at",
+  "submitted_at",
+  "confirmed_at",
+  "cancelled_at",
+  "expired_at",
+  "teams(team_name)",
+  "divisions(name)",
+].join(", ");
+
 /**
  * 현재 유저가 manager인 팀 중 해당 tournament에 신청한 application 조회
+ * divisionId를 제공하면 해당 division 기준으로 조회
  */
 export async function getMyApplicationStatus(
-  tournamentId: string
+  tournamentId: string,
+  divisionId?: string
 ): Promise<{ data: MyApplicationRow | null; error: string | null }> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -41,56 +141,71 @@ export async function getMyApplicationStatus(
 
   if (!user) return { data: null, error: "로그인이 필요합니다." };
 
-  // manager인 팀의 team_id 목록
   const { data: memberships, error: memErr } = await supabase
     .from("team_members")
     .select("team_id")
     .eq("user_id", user.id)
-    .eq("role_in_team", "manager");
+    .eq("role_in_team", "captain");
 
   if (memErr) return { data: null, error: memErr.message };
 
-  const teamIds = (memberships ?? []).map(
-    (m: { team_id: string }) => m.team_id
-  );
+  const teamIds = (memberships ?? []).map((m: { team_id: string }) => m.team_id);
   if (teamIds.length === 0) return { data: null, error: null };
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("tournament_team_applications")
-    .select("id, team_id, status, division_id, teams(team_name), divisions(name)")
+    .select(MY_APP_SELECT)
     .eq("tournament_id", tournamentId)
-    .in("team_id", teamIds)
-    .limit(1)
-    .maybeSingle();
+    .in("team_id", teamIds);
+
+  if (divisionId) {
+    query = query.eq("division_id", divisionId);
+  } else {
+    query = query.in("status", ACTIVE_STATUSES);
+  }
+
+  const { data, error } = await query.limit(1).maybeSingle();
 
   if (error) return { data: null, error: error.message };
   if (!data) return { data: null, error: null };
 
-  const row = data as Record<string, unknown>;
+  const row = data as unknown as Record<string, unknown>;
   const teams = row.teams as { team_name: string } | null;
   const divisions = row.divisions as { name: string } | null;
 
   return {
     data: {
-      id: data.id,
-      team_id: data.team_id,
+      id: row.id as string,
+      team_id: row.team_id as string,
       team_name: teams?.team_name ?? "",
-      division_id: (row.division_id as string) ?? "",
+      division_id: row.division_id as string,
       division_name: divisions?.name ?? "",
-      status: data.status as ApplicationStatus,
+      status: row.status as ApplicationStatus,
+      base_entry_fee: (row.base_entry_fee as number) ?? 0,
+      discount_amount: (row.discount_amount as number) ?? 0,
+      final_amount: (row.final_amount as number) ?? 0,
+      waitlist_position: (row.waitlist_position as number | null) ?? null,
+      payment_due_at: (row.payment_due_at as string | null) ?? null,
+      depositor_name: (row.depositor_name as string | null) ?? null,
+      depositor_note: (row.depositor_note as string | null) ?? null,
+      paid_marked_at: (row.paid_marked_at as string | null) ?? null,
+      submitted_at: (row.submitted_at as string) ?? "",
+      confirmed_at: (row.confirmed_at as string | null) ?? null,
+      cancelled_at: (row.cancelled_at as string | null) ?? null,
+      expired_at: (row.expired_at as string | null) ?? null,
     },
     error: null,
   };
 }
 
 /**
- * 대회 참가 신청
+ * 대회 참가 신청 (submit_tournament_application RPC 경유)
  */
 export async function applyToTournament(input: {
   tournamentId: string;
   teamId: string;
   divisionId: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true; status: string } | { ok: false; error: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -98,79 +213,59 @@ export async function applyToTournament(input: {
 
   if (!user) return { ok: false, error: "로그인이 필요합니다." };
 
-  // manager 확인
-  const { data: membership } = await supabase
-    .from("team_members")
-    .select("role_in_team")
-    .eq("team_id", input.teamId)
-    .eq("user_id", user.id)
-    .eq("role_in_team", "manager")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("submit_tournament_application", {
+    p_tournament_id: input.tournamentId,
+    p_team_id: input.teamId,
+    p_division_id: input.divisionId,
+    p_user_id: user.id,
+  });
 
-  if (!membership) {
-    return { ok: false, error: "이 팀의 매니저만 신청할 수 있습니다." };
-  }
+  if (error) return { ok: false, error: error.message };
 
-  // tournament status=open 확인
-  const { data: tournament } = await supabase
-    .from("tournaments")
-    .select("status")
-    .eq("id", input.tournamentId)
-    .maybeSingle();
+  const result = data as { ok: boolean; error?: string; status?: string };
+  if (!result.ok) return { ok: false, error: result.error ?? "신청에 실패했습니다." };
 
-  if (!tournament || tournament.status !== "open") {
-    return { ok: false, error: "현재 신청 가능한 대회가 아닙니다." };
-  }
-
-  // division이 해당 tournament에 속하는지 검증
-  const { data: division } = await supabase
-    .from("divisions")
-    .select("id")
-    .eq("id", input.divisionId)
-    .eq("tournament_id", input.tournamentId)
-    .maybeSingle();
-
-  if (!division) {
-    return { ok: false, error: "유효하지 않은 division입니다." };
-  }
-
-  // INSERT
-  const { error } = await supabase
-    .from("tournament_team_applications")
-    .insert({
-      tournament_id: input.tournamentId,
-      team_id: input.teamId,
-      division_id: input.divisionId,
-      applied_by: user.id,
-      status: "pending",
-    });
-
-  if (error) {
-    // unique constraint → 중복 신청
-    if (error.code === "23505") {
-      return { ok: false, error: "이미 이 대회에 신청한 팀입니다." };
-    }
-    return { ok: false, error: error.message };
-  }
-
-  return { ok: true };
+  return { ok: true, status: result.status ?? "payment_pending" };
 }
+
+const TOURNAMENT_APP_SELECT = [
+  "id",
+  "team_id",
+  "division_id",
+  "status",
+  "applied_by",
+  "created_at",
+  "base_entry_fee",
+  "discount_amount",
+  "final_amount",
+  "waitlist_position",
+  "payment_due_at",
+  "depositor_name",
+  "depositor_note",
+  "paid_marked_at",
+  "approved_by",
+  "approved_at",
+  "admin_memo",
+  "submitted_at",
+  "confirmed_at",
+  "cancelled_at",
+  "expired_at",
+  "teams(team_name,is_dummy)",
+  "divisions(name)",
+].join(", ");
 
 /**
  * 대회의 전체 참가 신청 목록 조회 (organizer용)
- * pending 먼저, 그 다음 approved/rejected, pending 내 created_at asc
  */
 export async function listTournamentApplications(
   tournamentId: string,
-  options?: { divisionId?: string }
+  options?: { divisionId?: string; statusFilter?: ApplicationStatus[] }
 ): Promise<{ data: TournamentApplicationRow[]; error: string | null }> {
   const supabase = await createSupabaseServerClient();
 
   let query = supabase
     .from("tournament_team_applications")
-    .select(
-      "id, team_id, division_id, status, applied_by, created_at, teams(team_name,is_dummy), divisions(name)"
-    )
+    .select(TOURNAMENT_APP_SELECT)
     .eq("tournament_id", tournamentId)
     .order("created_at", { ascending: true });
 
@@ -178,11 +273,15 @@ export async function listTournamentApplications(
     query = query.eq("division_id", options.divisionId);
   }
 
+  if (options?.statusFilter && options.statusFilter.length > 0) {
+    query = query.in("status", options.statusFilter);
+  }
+
   const { data, error } = await query;
 
   if (error) return { data: [], error: error.message };
 
-  const rows: TournamentApplicationRow[] = ((data ?? []) as Record<string, unknown>[]).map(
+  const rows: TournamentApplicationRow[] = ((data ?? []) as unknown as Record<string, unknown>[]).map(
     (row) => {
       const teams = row.teams as { team_name: string; is_dummy: boolean } | null;
       const divisions = row.divisions as { name: string } | null;
@@ -191,48 +290,51 @@ export async function listTournamentApplications(
         team_id: row.team_id as string,
         team_name: teams?.team_name ?? "",
         team_is_dummy: teams?.is_dummy ?? false,
-        division_id: (row.division_id as string) ?? "",
+        division_id: row.division_id as string,
         division_name: divisions?.name ?? "",
         status: row.status as ApplicationStatus,
         applied_by: row.applied_by as string,
         created_at: row.created_at as string,
+        base_entry_fee: (row.base_entry_fee as number) ?? 0,
+        discount_amount: (row.discount_amount as number) ?? 0,
+        final_amount: (row.final_amount as number) ?? 0,
+        waitlist_position: (row.waitlist_position as number | null) ?? null,
+        payment_due_at: (row.payment_due_at as string | null) ?? null,
+        depositor_name: (row.depositor_name as string | null) ?? null,
+        depositor_note: (row.depositor_note as string | null) ?? null,
+        paid_marked_at: (row.paid_marked_at as string | null) ?? null,
+        approved_by: (row.approved_by as string | null) ?? null,
+        approved_at: (row.approved_at as string | null) ?? null,
+        admin_memo: (row.admin_memo as string | null) ?? null,
+        submitted_at: (row.submitted_at as string) ?? "",
+        confirmed_at: (row.confirmed_at as string | null) ?? null,
+        cancelled_at: (row.cancelled_at as string | null) ?? null,
+        expired_at: (row.expired_at as string | null) ?? null,
       };
     }
   );
 
-  // pending을 먼저, 나머지는 기존 순서 유지
-  const pending = rows.filter((r) => r.status === "pending");
-  const rest = rows.filter((r) => r.status !== "pending");
+  // 정렬: payment_pending, paid_pending_approval 먼저 → waitlisted → confirmed → 나머지
+  const ORDER: ApplicationStatus[] = [
+    "payment_pending",
+    "paid_pending_approval",
+    "waitlisted",
+    "confirmed",
+    "expired",
+    "cancelled",
+  ];
+  rows.sort((a, b) => {
+    const ai = ORDER.indexOf(a.status);
+    const bi = ORDER.indexOf(b.status);
+    if (ai !== bi) return ai - bi;
+    return a.created_at.localeCompare(b.created_at);
+  });
 
-  return { data: [...pending, ...rest], error: null };
+  return { data: rows, error: null };
 }
 
 /**
- * 참가 신청 상태 변경 (organizer만)
- */
-export async function setApplicationStatus(
-  applicationId: string,
-  status: "approved" | "rejected"
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { ok: false, error: "로그인이 필요합니다." };
-
-  const { error } = await supabase
-    .from("tournament_team_applications")
-    .update({ status })
-    .eq("id", applicationId);
-
-  if (error) return { ok: false, error: error.message };
-
-  return { ok: true };
-}
-
-/**
- * 대회의 승인된 팀 목록 조회 (downstream helper)
+ * 대회의 confirmed 팀 목록 조회 (downstream helper)
  */
 export async function listApprovedTeamsForTournament(
   tournamentId: string
@@ -243,25 +345,23 @@ export async function listApprovedTeamsForTournament(
     .from("tournament_team_applications")
     .select("team_id, teams(team_name)")
     .eq("tournament_id", tournamentId)
-    .eq("status", "approved");
+    .eq("status", "confirmed");
 
   if (error) return { data: [], error: error.message };
 
-  const rows: ApprovedTeamRow[] = ((data ?? []) as Record<string, unknown>[]).map(
-    (row) => {
-      const teams = row.teams as { team_name: string } | null;
-      return {
-        team_id: row.team_id as string,
-        team_name: teams?.team_name ?? "",
-      };
-    }
-  );
+  const rows: ApprovedTeamRow[] = ((data ?? []) as Record<string, unknown>[]).map((row) => {
+    const teams = row.teams as { team_name: string } | null;
+    return {
+      team_id: row.team_id as string,
+      team_name: teams?.team_name ?? "",
+    };
+  });
 
   return { data: rows, error: null };
 }
 
 /**
- * division 기준 승인된 팀 목록 조회
+ * division 기준 confirmed 팀 목록 조회
  */
 export async function listApprovedTeamsByDivision(
   tournamentId: string,
@@ -274,19 +374,207 @@ export async function listApprovedTeamsByDivision(
     .select("team_id, teams(team_name)")
     .eq("tournament_id", tournamentId)
     .eq("division_id", divisionId)
-    .eq("status", "approved");
+    .eq("status", "confirmed");
 
   if (error) return { data: [], error: error.message };
 
-  const rows: ApprovedTeamRow[] = ((data ?? []) as Record<string, unknown>[]).map(
-    (row) => {
-      const teams = row.teams as { team_name: string } | null;
-      return {
-        team_id: row.team_id as string,
-        team_name: teams?.team_name ?? "",
-      };
-    }
-  );
+  const rows: ApprovedTeamRow[] = ((data ?? []) as Record<string, unknown>[]).map((row) => {
+    const teams = row.teams as { team_name: string } | null;
+    return {
+      team_id: row.team_id as string,
+      team_name: teams?.team_name ?? "",
+    };
+  });
 
   return { data: rows, error: null };
+}
+
+// ────────────────────────────────────────────────────────────
+// 정원 헬퍼
+// ────────────────────────────────────────────────────────────
+
+/**
+ * division의 현재 점유 수 (OCCUPYING_STATUSES 기준)
+ */
+export async function getOccupiedCount(divisionId: string): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+
+  const { count, error } = await supabase
+    .from("tournament_team_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("division_id", divisionId)
+    .in("status", OCCUPYING_STATUSES);
+
+  if (error) return 0;
+  return count ?? 0;
+}
+
+// ────────────────────────────────────────────────────────────
+// 상태 전환 함수 (RPC 호출)
+// ────────────────────────────────────────────────────────────
+
+/**
+ * 사용자: 입금 완료 표시
+ */
+export async function markPaymentDone(
+  input: MarkPaymentInput
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "로그인이 필요합니다." };
+
+  const { data, error } = await supabase.rpc("mark_payment_done", {
+    p_application_id: input.applicationId,
+    p_user_id: user.id,
+    p_depositor_name: input.depositorName,
+    p_depositor_note: input.depositorNote ?? null,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  const result = data as { ok: boolean; error?: string };
+  if (!result.ok) return { ok: false, error: result.error ?? "처리에 실패했습니다." };
+
+  return { ok: true };
+}
+
+/**
+ * 사용자(팀 매니저): 신청 취소
+ */
+export async function cancelApplication(
+  applicationId: string
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "로그인이 필요합니다." };
+
+  const { data, error } = await supabase.rpc("cancel_application", {
+    p_application_id: applicationId,
+    p_user_id: user.id,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  const result = data as { ok: boolean; error?: string };
+  if (!result.ok) return { ok: false, error: result.error ?? "취소에 실패했습니다." };
+
+  return { ok: true };
+}
+
+/**
+ * 운영자: 입금 확인 완료 (confirmed 전환)
+ */
+export async function confirmApplication(
+  applicationId: string,
+  memo?: string
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "로그인이 필요합니다." };
+
+  const { data, error } = await supabase.rpc("confirm_application", {
+    p_application_id: applicationId,
+    p_admin_user_id: user.id,
+    p_memo: memo ?? null,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  const result = data as { ok: boolean; error?: string };
+  if (!result.ok) return { ok: false, error: result.error ?? "처리에 실패했습니다." };
+
+  return { ok: true };
+}
+
+/**
+ * 운영자: 신청 취소
+ */
+export async function adminCancelApplication(
+  applicationId: string,
+  memo?: string
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "로그인이 필요합니다." };
+
+  const { data, error } = await supabase.rpc("admin_cancel_application", {
+    p_application_id: applicationId,
+    p_admin_user_id: user.id,
+    p_memo: memo ?? null,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  const result = data as { ok: boolean; error?: string };
+  if (!result.ok) return { ok: false, error: result.error ?? "취소에 실패했습니다." };
+
+  return { ok: true };
+}
+
+/**
+ * 운영자: 입금 기한 연장
+ */
+export async function extendPaymentDue(
+  applicationId: string,
+  newDueAt: string
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "로그인이 필요합니다." };
+
+  const { data: app } = await supabase
+    .from("tournament_team_applications")
+    .select("status")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (!app || app.status !== "payment_pending") {
+    return { ok: false, error: "입금 대기 상태인 신청만 기한을 연장할 수 있습니다." };
+  }
+
+  const { error } = await supabase
+    .from("tournament_team_applications")
+    .update({ payment_due_at: newDueAt })
+    .eq("id", applicationId);
+
+  if (error) return { ok: false, error: error.message };
+
+  return { ok: true };
+}
+
+/**
+ * 신청 상태 이력 조회
+ */
+export async function listStatusHistory(
+  applicationId: string
+): Promise<ApiResult<ApplicationStatusHistoryRow[]>> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("application_status_history")
+    .select("id, application_id, from_status, to_status, changed_by, changed_at, memo")
+    .eq("application_id", applicationId)
+    .order("changed_at", { ascending: true });
+
+  if (error) return { data: null, error: error.message };
+
+  return {
+    data: (data ?? []) as ApplicationStatusHistoryRow[],
+    error: null,
+  };
 }

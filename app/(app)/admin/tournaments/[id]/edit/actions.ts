@@ -41,7 +41,7 @@ export async function updateTournamentAction(
     return { ok: false, error: "대회 정보가 없습니다." };
   }
 
-  return updateTournament(input.tournamentId, {
+  const result = await updateTournament(input.tournamentId, {
     name: input.name,
     location: input.location,
     start_date: input.start_date,
@@ -50,6 +50,13 @@ export async function updateTournamentAction(
     schedule_start_at: input.schedule_start_at,
     description: input.description,
   });
+
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${input.tournamentId}/edit`);
+    revalidatePath(`/admin`);
+  }
+
+  return result;
 }
 
 export async function updateMaxTeamsAction(
@@ -140,19 +147,31 @@ export async function deletePosterAction(
   return { ok: true };
 }
 
+type DivisionConfigInput = {
+  name: string;
+  groupSize?: number;
+  tournamentSize?: number | null;
+  entryFee?: number;
+  capacity?: number | null;
+  applicationOpenAt?: string | null;
+  applicationCloseAt?: string | null;
+};
+
 export async function createDivisionAction(
   tournamentId: string,
-  name: string,
-  groupSize?: number,
-  tournamentSize?: number | null
-): Promise<ActionResult> {
+  input: DivisionConfigInput
+): Promise<{ ok: false; error: string } | { ok: true; id: string; sort_order: number }> {
   if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
-  if (!name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
+  if (!input.name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
 
   const result = await createDivision(tournamentId, {
-    name,
-    ...(groupSize !== undefined ? { group_size: groupSize } : {}),
-    ...(tournamentSize !== undefined ? { tournament_size: tournamentSize } : {}),
+    name: input.name,
+    ...(input.groupSize !== undefined ? { group_size: input.groupSize } : {}),
+    ...(input.tournamentSize !== undefined ? { tournament_size: input.tournamentSize } : {}),
+    ...(input.entryFee !== undefined ? { entry_fee: input.entryFee } : {}),
+    ...("capacity" in input ? { capacity: input.capacity ?? null } : {}),
+    ...("applicationOpenAt" in input ? { application_open_at: input.applicationOpenAt ?? null } : {}),
+    ...("applicationCloseAt" in input ? { application_close_at: input.applicationCloseAt ?? null } : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
@@ -163,17 +182,19 @@ export async function createDivisionAction(
 export async function updateDivisionAction(
   tournamentId: string,
   divisionId: string,
-  name: string,
-  groupSize?: number,
-  tournamentSize?: number | null
+  input: DivisionConfigInput
 ): Promise<ActionResult> {
   if (!divisionId) return { ok: false, error: "Division 정보가 없습니다." };
-  if (!name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
+  if (!input.name.trim()) return { ok: false, error: "Division 이름을 입력하세요." };
 
   const result = await updateDivisionConfig(divisionId, {
-    name,
-    ...(groupSize !== undefined ? { group_size: groupSize } : {}),
-    ...(tournamentSize !== undefined ? { tournament_size: tournamentSize } : {}),
+    name: input.name,
+    ...(input.groupSize !== undefined ? { group_size: input.groupSize } : {}),
+    ...(input.tournamentSize !== undefined ? { tournament_size: input.tournamentSize } : {}),
+    ...(input.entryFee !== undefined ? { entry_fee: input.entryFee } : {}),
+    ...("capacity" in input ? { capacity: input.capacity ?? null } : {}),
+    ...("applicationOpenAt" in input ? { application_open_at: input.applicationOpenAt ?? null } : {}),
+    ...("applicationCloseAt" in input ? { application_close_at: input.applicationCloseAt ?? null } : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);

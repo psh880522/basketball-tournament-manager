@@ -1,6 +1,8 @@
 "use server";
 
-import { applyToTournament } from "@/lib/api/applications";
+import { revalidatePath } from "next/cache";
+import { applyToTournament, markPaymentDone, cancelApplication } from "@/lib/api/applications";
+import type { MarkPaymentInput } from "@/lib/api/applications";
 
 type ApplyInput = {
   tournamentId: string;
@@ -28,4 +30,32 @@ export async function applyTeamToTournament(
     teamId: input.teamId,
     divisionId: input.divisionId,
   });
+}
+
+export async function markPaymentDoneAction(
+  tournamentId: string,
+  input: MarkPaymentInput
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const result = await markPaymentDone(input);
+
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  revalidatePath(`/tournament/${tournamentId}/apply`);
+  return { ok: true };
+}
+
+export async function cancelApplicationAction(
+  applicationId: string,
+  tournamentId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const result = await cancelApplication(applicationId);
+
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  revalidatePath(`/tournament/${tournamentId}/apply`);
+  return { ok: true };
 }

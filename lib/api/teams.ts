@@ -169,7 +169,7 @@ export async function createDummyTeam(input: {
       division_id: input.divisionId,
       team_id: team.id,
       applied_by: auth.user.id,
-      status: "approved",
+      status: "confirmed",
     });
 
   if (applicationError) return { ok: false, error: applicationError.message };
