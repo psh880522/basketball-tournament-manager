@@ -41,7 +41,7 @@ export default async function DashboardPage() {
   }
 
   if (isUserRole(result.role)) {
-    redirect("/");
+    redirect("/onboarding/profile");
   }
 
   /* ── 내 팀 목록 조회 ─────────────────────────── */

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getUserWithRole, isPlayerRole, isOperationRole } from "@/src/lib/auth/roles";
 import { getMyProfile } from "@/lib/api/profiles";
+import { getMyPlayerProfile } from "@/lib/api/player-profile";
 import ProfileForm from "./Form";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +23,17 @@ export default async function OnboardingProfilePage() {
     );
   }
 
-  // 2. 프로필 초기값 로드
-  const profileResult = await getMyProfile();
-  const initialValues = profileResult.data ?? null;
+  // 이미 player인 경우 온보딩 재진입 차단
+  if (isPlayerRole(userResult.role)) redirect("/dashboard");
+
+  // 운영 역할(organizer/manager)은 온보딩 대상 아님
+  if (isOperationRole(userResult.role)) redirect("/");
+
+  // 2. 초기값 병렬 로드
+  const [profileResult, playerProfileResult] = await Promise.all([
+    getMyProfile(),
+    getMyPlayerProfile(),
+  ]);
 
   // 3. 렌더링
   return (
@@ -36,14 +45,17 @@ export default async function OnboardingProfilePage() {
             선수 등록 — 기본 정보 입력
           </h1>
           <p className="text-sm text-slate-500">
-            이름과 연락처를 입력하세요.
+            닉네임과 선수 정보를 입력하세요.
           </p>
           <p className="text-sm text-slate-500">
             입력 완료 후 본인인증을 거쳐 선수로 등록됩니다.
           </p>
         </header>
 
-        <ProfileForm initialValues={initialValues} />
+        <ProfileForm
+          initialProfile={profileResult.data ?? null}
+          initialPlayerProfile={playerProfileResult.data ?? null}
+        />
       </div>
     </main>
   );

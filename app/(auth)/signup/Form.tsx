@@ -78,6 +78,20 @@ export default function SignupForm() {
   const [emailConfirmSent, setEmailConfirmSent] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // 약관 동의 상태
+  const [agreeService, setAgreeService] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [agreeMarketing, setAgreeMarketing] = useState(false);
+
+  const agreeAll = agreeService && agreePrivacy && agreeMarketing;
+
+  function handleAgreeAll() {
+    const next = !agreeAll;
+    setAgreeService(next);
+    setAgreePrivacy(next);
+    setAgreeMarketing(next);
+  }
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage(null);
@@ -92,8 +106,19 @@ export default function SignupForm() {
       return;
     }
 
+    if (!agreeService || !agreePrivacy) {
+      setMessage({ tone: "error", text: "필수 약관에 동의해주세요." });
+      return;
+    }
+
     startTransition(async () => {
-      const result = await signUpWithPassword({ email, password });
+      const result = await signUpWithPassword({
+        email,
+        password,
+        agreeService,
+        agreePrivacy,
+        agreeMarketing,
+      });
 
       if (!result.ok) {
         setMessage({ tone: "error", text: result.error });
@@ -204,6 +229,74 @@ export default function SignupForm() {
           </button>
         }
       />
+
+      {/* 약관 동의 영역 */}
+      <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        {/* 전체 동의 */}
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={agreeAll}
+            onChange={handleAgreeAll}
+            disabled={isPending}
+            className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+          />
+          <span className="text-sm font-semibold text-slate-800">전체 동의</span>
+        </label>
+
+        <hr className="border-slate-200" />
+
+        {/* 서비스 이용약관 (필수) */}
+        <label className="flex cursor-pointer items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={agreeService}
+              onChange={(e) => setAgreeService(e.target.checked)}
+              disabled={isPending}
+              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+            />
+            <span className="text-sm text-slate-700">
+              <span className="font-medium text-amber-600">[필수]</span> 서비스 이용약관 동의
+            </span>
+          </div>
+          <span className="text-xs text-slate-400 underline">전문 보기</span>
+        </label>
+
+        {/* 개인정보처리방침 (필수) */}
+        <label className="flex cursor-pointer items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={agreePrivacy}
+              onChange={(e) => setAgreePrivacy(e.target.checked)}
+              disabled={isPending}
+              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+            />
+            <span className="text-sm text-slate-700">
+              <span className="font-medium text-amber-600">[필수]</span> 개인정보처리방침 동의
+            </span>
+          </div>
+          <span className="text-xs text-slate-400 underline">전문 보기</span>
+        </label>
+
+        {/* 마케팅 동의 (선택) */}
+        <label className="flex cursor-pointer items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={agreeMarketing}
+              onChange={(e) => setAgreeMarketing(e.target.checked)}
+              disabled={isPending}
+              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+            />
+            <span className="text-sm text-slate-700">
+              <span className="text-slate-400">[선택]</span> 마케팅 정보 수신 동의
+            </span>
+          </div>
+          <span className="text-xs text-slate-400 underline">전문 보기</span>
+        </label>
+      </div>
 
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? "가입 중..." : "회원가입"}

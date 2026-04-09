@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { isPlayerRole, isUserRole } from "@/src/lib/auth/roles";
+import { getMyProfile, isProfileCompleted } from "@/lib/api/profiles";
 import IdentityForm from "./IdentityForm";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,12 @@ export default async function OnboardingIdentityPage() {
 
   // user가 아닌 경우(organizer, manager 등) → 홈
   if (!isUserRole(result.role)) redirect("/");
+
+  // 프로필 미완료 → 프로필 입력 (display_name 미입력 시)
+  const profileResult = await getMyProfile();
+  if (!isProfileCompleted(profileResult.data)) {
+    redirect("/onboarding/profile");
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
