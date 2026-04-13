@@ -27,7 +27,6 @@ export async function createTournamentAction(
   const end_date = formData.get("end_date") as string;
   const timeValue = formData.get("start_time") as string; // "HH:mm"
   const description = (formData.get("description") as string)?.trim() || null;
-  const max_teams_raw = formData.get("max_teams") as string;
   const posterFile = formData.get("poster") as File | null;
   const divisionsRaw = formData.get("divisions") as string;
   const courtsRaw = formData.get("courts") as string;
@@ -46,19 +45,16 @@ export async function createTournamentAction(
     }
   }
 
-  // 5. max_teams 파싱
-  const max_teams = max_teams_raw ? Number(max_teams_raw) : null;
-  if (max_teams !== null && (!Number.isInteger(max_teams) || max_teams < 2)) {
-    return { ok: false, error: "최대 팀 수는 2 이상의 정수여야 합니다." };
-  }
-
-  // 6. divisions/courts JSON 파싱
+  // 5. divisions/courts JSON 파싱
   type DivisionPayload = {
     name: string;
     group_size: number;
     tournament_size: number | null;
+    entry_fee: number;
+    capacity: number | null;
   };
   type CourtPayload = { name: string };
+
   const divisions: DivisionPayload[] = divisionsRaw
     ? (JSON.parse(divisionsRaw) as DivisionPayload[])
     : [];
@@ -76,7 +72,6 @@ export async function createTournamentAction(
       location,
       start_date,
       end_date,
-      max_teams,
       description,
       schedule_start_at,
       status: "draft",
@@ -103,6 +98,8 @@ export async function createTournamentAction(
       group_size: div.group_size ?? 4,
       tournament_size: div.tournament_size ?? null,
       sort_order: i,
+      entry_fee: div.entry_fee ?? 0,
+      capacity: div.capacity ?? null,
     });
   }
 

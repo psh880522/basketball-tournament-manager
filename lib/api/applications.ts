@@ -557,6 +557,47 @@ export async function extendPaymentDue(
   return { ok: true };
 }
 
+// ────────────────────────────────────────────────────────────
+// 디비전별 신청 현황 집계
+// ────────────────────────────────────────────────────────────
+
+export type DivisionApplicationCounts = {
+  division_id: string;
+  confirmed: number;
+  waitlisted: number;
+};
+
+/**
+ * 대회의 디비전별 confirmed/waitlisted 팀 수 집계 (organizer용)
+ */
+export async function getDivisionApplicationCounts(
+  tournamentId: string
+): Promise<{ data: DivisionApplicationCounts[]; error: string | null }> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("tournament_team_applications")
+    .select("division_id, status")
+    .eq("tournament_id", tournamentId)
+    .in("status", ["confirmed", "waitlisted"]);
+
+  if (error) return { data: [], error: error.message };
+
+  const countsMap = new Map<string, DivisionApplicationCounts>();
+  for (const row of (data ?? []) as { division_id: string; status: string }[]) {
+    const existing = countsMap.get(row.division_id) ?? {
+      division_id: row.division_id,
+      confirmed: 0,
+      waitlisted: 0,
+    };
+    if (row.status === "confirmed") existing.confirmed += 1;
+    if (row.status === "waitlisted") existing.waitlisted += 1;
+    countsMap.set(row.division_id, existing);
+  }
+
+  return { data: Array.from(countsMap.values()), error: null };
+}
+
 /**
  * 신청 상태 이력 조회
  */

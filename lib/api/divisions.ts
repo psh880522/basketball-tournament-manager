@@ -11,8 +11,6 @@ export type DivisionRow = {
   standings_dirty: boolean;
   entry_fee: number;
   capacity: number | null;
-  application_open_at: string | null;
-  application_close_at: string | null;
 };
 
 export async function getDivisionsByTournament(
@@ -22,7 +20,7 @@ export async function getDivisionsByTournament(
   const { data, error } = await supabase
     .from("divisions")
     .select(
-      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty,entry_fee,capacity,application_open_at,application_close_at"
+      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty,entry_fee,capacity"
     )
     .eq("tournament_id", tournamentId)
     .order("sort_order", { ascending: true });
@@ -55,8 +53,6 @@ export async function createDivision(
     tournament_size?: number | null;
     entry_fee?: number;
     capacity?: number | null;
-    application_open_at?: string | null;
-    application_close_at?: string | null;
   }
 ): Promise<{ ok: false; error: string } | { ok: true; id: string; sort_order: number }> {
   const groupSize = input.group_size ?? 4;
@@ -99,8 +95,6 @@ export async function createDivision(
     sort_order: nextOrder,
     entry_fee: input.entry_fee ?? 0,
     capacity: input.capacity ?? null,
-    application_open_at: input.application_open_at ?? null,
-    application_close_at: input.application_close_at ?? null,
   }).select("id,sort_order").single();
 
   if (error) return { ok: false, error: error.message };
@@ -115,8 +109,6 @@ export async function updateDivision(
     tournament_size?: number | null;
     entry_fee?: number;
     capacity?: number | null;
-    application_open_at?: string | null;
-    application_close_at?: string | null;
   }
 ): Promise<ActionResult> {
   if (input.group_size !== undefined && (typeof input.group_size !== "number" || input.group_size < 2)) {
@@ -154,8 +146,6 @@ export async function updateDivision(
   if (input.tournament_size !== undefined) payload.tournament_size = input.tournament_size;
   if (input.entry_fee !== undefined) payload.entry_fee = input.entry_fee;
   if ("capacity" in input) payload.capacity = input.capacity ?? null;
-  if ("application_open_at" in input) payload.application_open_at = input.application_open_at ?? null;
-  if ("application_close_at" in input) payload.application_close_at = input.application_close_at ?? null;
 
   const supabase = await createSupabaseServerClient();
 
@@ -178,8 +168,6 @@ export async function updateDivisionConfig(
     tournament_size?: number | null;
     entry_fee?: number;
     capacity?: number | null;
-    application_open_at?: string | null;
-    application_close_at?: string | null;
   }
 ): Promise<ActionResult> {
   return updateDivision(divisionId, input);

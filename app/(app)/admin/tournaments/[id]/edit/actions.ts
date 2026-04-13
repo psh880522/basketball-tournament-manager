@@ -2,6 +2,8 @@
 
 import {
   updateTournament,
+  changeTournamentStatus,
+  type TournamentStatus,
 } from "@/lib/api/tournaments";
 import {
   createDivision,
@@ -22,7 +24,6 @@ type UpdateTournamentInput = {
   location: string | null;
   start_date: string;
   end_date: string;
-  max_teams: number | null;
   schedule_start_at: string | null;
   description: string | null;
 };
@@ -46,7 +47,6 @@ export async function updateTournamentAction(
     location: input.location,
     start_date: input.start_date,
     end_date: input.end_date,
-    max_teams: input.max_teams,
     schedule_start_at: input.schedule_start_at,
     description: input.description,
   });
@@ -59,20 +59,6 @@ export async function updateTournamentAction(
   return result;
 }
 
-export async function updateMaxTeamsAction(
-  tournamentId: string,
-  maxTeams: number | null
-): Promise<ActionResult> {
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("tournaments")
-    .update({ max_teams: maxTeams })
-    .eq("id", tournamentId);
-
-  if (error) return { ok: false, error: error.message };
-  revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
-  return { ok: true };
-}
 
 export async function uploadPosterAction(
   tournamentId: string,
@@ -153,8 +139,6 @@ type DivisionConfigInput = {
   tournamentSize?: number | null;
   entryFee?: number;
   capacity?: number | null;
-  applicationOpenAt?: string | null;
-  applicationCloseAt?: string | null;
 };
 
 export async function createDivisionAction(
@@ -170,8 +154,6 @@ export async function createDivisionAction(
     ...(input.tournamentSize !== undefined ? { tournament_size: input.tournamentSize } : {}),
     ...(input.entryFee !== undefined ? { entry_fee: input.entryFee } : {}),
     ...("capacity" in input ? { capacity: input.capacity ?? null } : {}),
-    ...("applicationOpenAt" in input ? { application_open_at: input.applicationOpenAt ?? null } : {}),
-    ...("applicationCloseAt" in input ? { application_close_at: input.applicationCloseAt ?? null } : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
@@ -193,8 +175,6 @@ export async function updateDivisionAction(
     ...(input.tournamentSize !== undefined ? { tournament_size: input.tournamentSize } : {}),
     ...(input.entryFee !== undefined ? { entry_fee: input.entryFee } : {}),
     ...("capacity" in input ? { capacity: input.capacity ?? null } : {}),
-    ...("applicationOpenAt" in input ? { application_open_at: input.applicationOpenAt ?? null } : {}),
-    ...("applicationCloseAt" in input ? { application_close_at: input.applicationCloseAt ?? null } : {}),
   });
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
@@ -259,6 +239,20 @@ export async function deleteCourtAction(
   const result = await deleteCourtSafe(courtId);
   if (result.ok) {
     revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
+  }
+  return result;
+}
+
+export async function updateTournamentStatusAction(
+  tournamentId: string,
+  nextStatus: TournamentStatus
+): Promise<ActionResult> {
+  if (!tournamentId) return { ok: false, error: "대회 정보가 없습니다." };
+
+  const result = await changeTournamentStatus(tournamentId, nextStatus);
+  if (result.ok) {
+    revalidatePath(`/admin/tournaments/${tournamentId}/edit`);
+    revalidatePath(`/admin`);
   }
   return result;
 }

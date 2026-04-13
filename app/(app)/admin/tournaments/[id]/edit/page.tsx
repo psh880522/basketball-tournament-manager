@@ -4,9 +4,10 @@ import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getTournamentForEdit } from "@/lib/api/tournaments";
 import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getCourtsByTournament } from "@/lib/api/courts";
+import { getDivisionApplicationCounts } from "@/lib/api/applications";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import TournamentEditForm, { PosterSection, SettingsSection } from "./Form";
+import TournamentEditForm from "./Form";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -46,9 +47,17 @@ export default async function TournamentEditPage({ params }: PageProps) {
   if (userResult.role !== "organizer") redirect("/dashboard");
 
   const { id } = await params;
-  const { data, error } = await getTournamentForEdit(id);
-  const { data: divisions } = await getDivisionsByTournament(id);
-  const { data: courts } = await getCourtsByTournament(id);
+  const [
+    { data, error },
+    { data: divisions },
+    { data: courts },
+    { data: applicationCounts },
+  ] = await Promise.all([
+    getTournamentForEdit(id),
+    getDivisionsByTournament(id),
+    getCourtsByTournament(id),
+    getDivisionApplicationCounts(id),
+  ]);
 
   if (error) {
     return (
@@ -91,15 +100,11 @@ export default async function TournamentEditPage({ params }: PageProps) {
           </Link>
         </header>
 
-        <PosterSection tournamentId={id} initialPosterUrl={data.poster_url ?? null} />
-
-        <TournamentEditForm tournament={data} />
-
-        <SettingsSection
-          tournamentId={id}
-          initialMaxTeams={data.max_teams}
-          initialDivisions={divisions ?? []}
-          initialCourts={courts ?? []}
+        <TournamentEditForm
+          tournament={data}
+          divisions={divisions ?? []}
+          courts={courts ?? []}
+          applicationCounts={applicationCounts ?? []}
         />
       </div>
     </main>
