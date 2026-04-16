@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUserWithRole, isOperationRole, isUserRole } from "@/src/lib/auth/roles";
 import { listMyTeams } from "@/lib/api/teams";
+import { getUserTeamStatus } from "@/lib/api/team-applications";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import TeamSection from "./TeamSection";
@@ -44,8 +45,12 @@ export default async function DashboardPage() {
     redirect("/onboarding/profile");
   }
 
-  /* ── 내 팀 목록 조회 ─────────────────────────── */
-  const teamsResult = await listMyTeams();
+  /* ── 내 팀 목록 + 팀 상태 병렬 조회 ─────────── */
+  const [teamsResult, teamStatusResult] = await Promise.all([
+    listMyTeams(),
+    getUserTeamStatus(result.user!.id),
+  ]);
+  const teamStatus = teamStatusResult.data;
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -54,6 +59,35 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-semibold">Dashboard</h1>
           <p className="text-sm text-gray-600">안녕하세요, {result.user?.email}</p>
         </header>
+
+        {/* ── 온보딩 배너 ─────────────────────── */}
+        {teamStatus === "no_team" && (
+          <Card className="flex items-center justify-between gap-4 border-blue-200 bg-blue-50">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-blue-900">팀이 없습니다</p>
+              <p className="text-xs text-blue-700">
+                팀을 만들거나, 기존 팀에 합류 신청을 해보세요.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Link href="/teams/new">
+                <Button variant="secondary">팀 만들기</Button>
+              </Link>
+              <Link href="/teams/find">
+                <Button variant="secondary">팀 찾기</Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
+        {teamStatus === "join_pending" && (
+          <Card className="border-amber-200 bg-amber-50">
+            <p className="text-sm font-medium text-amber-900">팀 합류 신청 중</p>
+            <p className="text-xs text-amber-700 mt-1">
+              팀 캡틴의 승인을 기다리고 있습니다.
+            </p>
+          </Card>
+        )}
 
         {/* ── 내 팀 섹션 ──────────────────────── */}
         <TeamSection

@@ -44,7 +44,12 @@ export async function signUpWithPassword(
     return { ok: false, error: "필수 약관에 동의해주세요." };
   }
 
-  const result = await signUp(input.email.trim(), input.password);
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const emailRedirectTo = `${siteUrl}/auth/callback?next=/onboarding/completion?step=signup`;
+
+  const result = await signUp(input.email.trim(), input.password, emailRedirectTo);
 
   if (result.error) {
     return { ok: false, error: translateSignUpError(result.error) };
@@ -62,6 +67,6 @@ export async function signUpWithPassword(
     return { ok: true, requiresEmailConfirmation: true };
   }
 
-  redirect("/");
+  redirect("/onboarding/completion?step=signup");
   return { ok: true, requiresEmailConfirmation: false };
 }

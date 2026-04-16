@@ -44,8 +44,7 @@ export default function IdentityForm() {
 
       setIsSuccess(true);
       setToastMessage("본인인증 완료. 선수로 등록되었습니다.");
-      router.refresh();
-      setTimeout(() => router.push("/dashboard"), 1500);
+      setTimeout(() => router.push(result.redirectTo), 1500);
     });
   }
 
@@ -58,7 +57,7 @@ export default function IdentityForm() {
       <Card className="space-y-5">
         {isSuccess ? (
           <p className="text-sm text-emerald-600 font-medium">
-            인증 완료. 대시보드로 이동합니다…
+            인증 완료. 잠시 후 이동합니다…
           </p>
         ) : (
           <form onSubmit={handleVerify} className="space-y-4">

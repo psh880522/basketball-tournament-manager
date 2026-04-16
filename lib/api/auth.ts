@@ -17,10 +17,15 @@ type RoleResult = {
 
 export async function signUpWithPassword(
   email: string,
-  password: string
+  password: string,
+  emailRedirectTo?: string
 ): Promise<SignUpResult> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: emailRedirectTo ? { emailRedirectTo } : undefined,
+  });
 
   if (error) {
     return { error: error.message, requiresEmailConfirmation: false };

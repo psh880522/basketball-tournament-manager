@@ -62,6 +62,7 @@ export default function ProfileForm({ initialProfile, initialPlayerProfile }: Pr
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleToastClose = useCallback(() => {
@@ -104,8 +105,8 @@ export default function ProfileForm({ initialProfile, initialPlayerProfile }: Pr
       return;
     }
 
-    setToastMessage("기본 정보가 저장되었습니다. 본인인증 단계로 이동합니다.");
-    setTimeout(() => router.push("/onboarding/identity"), 1500);
+    setToastMessage("기본 정보가 저장되었습니다.");
+    setSaved(true);
   }
 
   const selectClass =
@@ -162,16 +163,20 @@ export default function ProfileForm({ initialProfile, initialPlayerProfile }: Pr
             </div>
 
             {/* 신장 */}
-            <Input
-              id="height-cm"
-              label="신장 (cm) *"
-              type="number"
-              placeholder="예: 180"
-              value={heightCm}
-              onChange={(e) => setHeightCm(e.target.value)}
-              disabled={loading}
-              required
-            />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="height-cm" className="text-sm font-medium text-slate-700">
+                신장 (cm) <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="height-cm"
+                type="number"
+                placeholder="예: 180"
+                value={heightCm}
+                onChange={(e) => setHeightCm(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
 
             {/* 경력 수준 */}
             <div className="flex flex-col gap-1">
@@ -194,16 +199,20 @@ export default function ProfileForm({ initialProfile, initialPlayerProfile }: Pr
             </div>
 
             {/* 활동 지역 */}
-            <Input
-              id="region"
-              label="활동 지역 *"
-              type="text"
-              placeholder="예: 서울"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              disabled={loading}
-              required
-            />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="region" className="text-sm font-medium text-slate-700">
+                활동 지역 <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="region"
+                type="text"
+                placeholder="예: 서울"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
           </section>
 
           {/* ── 선택 항목 ── */}
@@ -324,12 +333,18 @@ export default function ProfileForm({ initialProfile, initialPlayerProfile }: Pr
 
           <Button
             type="submit"
-            disabled={loading || !allConsentsChecked}
+            disabled={loading || !allConsentsChecked || saved}
             className="w-full"
           >
             {loading ? "저장 중…" : "저장하고 계속"}
           </Button>
         </form>
+
+        {saved && (
+          <Button className="w-full" onClick={() => router.push("/onboarding/identity")}>
+            다음: 본인인증 →
+          </Button>
+        )}
       </Card>
 
       {toastMessage && (

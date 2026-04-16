@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { getUserWithRole } from "@/src/lib/auth/roles";
-import { isPlayerRole, isUserRole } from "@/src/lib/auth/roles";
-import { getMyProfile, isProfileCompleted } from "@/lib/api/profiles";
+import { getUserWithRole, isPlayerRole, isUserRole } from "@/src/lib/auth/roles";
+import { getMyPlayerProfile } from "@/lib/api/player-profile";
 import IdentityForm from "./IdentityForm";
+import OnboardingStepIndicator from "@/components/onboarding/OnboardingStepIndicator";
 
 export const dynamic = "force-dynamic";
 
@@ -29,17 +29,18 @@ export default async function OnboardingIdentityPage() {
   // user가 아닌 경우(organizer, manager 등) → 홈
   if (!isUserRole(result.role)) redirect("/");
 
-  // 프로필 미완료 → 프로필 입력 (display_name 미입력 시)
-  const profileResult = await getMyProfile();
-  if (!isProfileCompleted(profileResult.data)) {
+  // 선수 프로필 미완료 → 프로필 입력
+  const playerProfileResult = await getMyPlayerProfile();
+  if (!playerProfileResult.data) {
     redirect("/onboarding/profile");
   }
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="mx-auto flex max-w-md flex-col gap-6">
+        <OnboardingStepIndicator currentStep="player" />
+
         <header className="space-y-1">
-          <p className="text-xs text-slate-400">2단계 / 2단계</p>
           <h1 className="text-2xl font-semibold text-slate-900">
             선수 등록 — 본인인증
           </h1>

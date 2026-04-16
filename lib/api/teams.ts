@@ -89,6 +89,8 @@ export async function listMyManagedTeams(): Promise<{
 
 export async function createTeam(input: {
   name: string;
+  region?: string;
+  bio?: string;
   contact?: string;
 }): Promise<{ ok: true; teamId: string } | { ok: false; error: string }> {
   const supabase = await createSupabaseServerClient();
@@ -96,11 +98,13 @@ export async function createTeam(input: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { ok: false, error: "濡쒓렇?占쎌씠 ?占쎌슂?占쎈땲??" };
+  if (!user) return { ok: false, error: "로그인이 필요합니다." };
 
-  const { data, error } = await supabase.rpc("create_team_with_manager", {
+  const { data, error } = await supabase.rpc("create_team_with_captain", {
     p_team_name: input.name,
     p_contact: input.contact ?? "",
+    p_region: input.region ?? null,
+    p_bio: input.bio ?? null,
   });
 
   if (error) {
@@ -183,6 +187,8 @@ export type TeamDetail = {
   id: string;
   team_name: string;
   contact: string;
+  region: string | null;
+  bio: string | null;
   created_by: string;
 };
 
@@ -192,7 +198,7 @@ export async function getTeam(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("teams")
-    .select("id, team_name, contact, created_by")
+    .select("id, team_name, contact, region, bio, created_by")
     .eq("id", teamId)
     .maybeSingle();
 

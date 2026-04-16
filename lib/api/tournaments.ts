@@ -336,6 +336,81 @@ export async function getInProgressTournaments(): Promise<
   };
 }
 
+export type MyParticipatedTournamentRow = PublicTournamentRow & {
+  team_name: string;
+};
+
+export async function getMyParticipatedTournaments(): Promise<
+  ApiResult<{
+    participating: MyParticipatedTournamentRow[];
+    past: MyParticipatedTournamentRow[];
+  }>
+> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "로그인이 필요합니다." };
+
+  // 내 팀 목록
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("team_id, teams(team_name)")
+    .eq("user_id", user.id);
+
+  const teamIds = (members ?? []).map(
+    (m: Record<string, unknown>) => m.team_id as string
+  );
+  if (teamIds.length === 0)
+    return { data: { participating: [], past: [] }, error: null };
+
+  const teamNameMap = new Map(
+    (members ?? []).map((m: Record<string, unknown>) => {
+      const teams = m.teams as { team_name: string } | null;
+      return [m.team_id as string, teams?.team_name ?? ""];
+    })
+  );
+
+  // confirmed 신청이 있는 대회 조회
+  const { data: apps, error: appsError } = await supabase
+    .from("tournament_team_applications")
+    .select(
+      "tournament_id, team_id, tournaments(id, name, location, start_date, end_date, status, deleted_at)"
+    )
+    .in("team_id", teamIds)
+    .eq("status", "confirmed");
+
+  if (appsError) return { data: null, error: appsError.message };
+
+  const participating: MyParticipatedTournamentRow[] = [];
+  const past: MyParticipatedTournamentRow[] = [];
+  const seenIds = new Set<string>();
+
+  for (const app of (apps ?? []) as Record<string, unknown>[]) {
+    const t = app.tournaments as Record<string, unknown> | null;
+    if (!t || t.deleted_at) continue;
+
+    const tid = t.id as string;
+    if (seenIds.has(tid)) continue;
+    seenIds.add(tid);
+
+    const row: MyParticipatedTournamentRow = {
+      id: tid,
+      name: t.name as string,
+      location: (t.location as string | null) ?? null,
+      start_date: (t.start_date as string | null) ?? null,
+      end_date: (t.end_date as string | null) ?? null,
+      status: t.status as TournamentStatus,
+      team_name: teamNameMap.get(app.team_id as string) ?? "",
+    };
+
+    if (t.status === "closed") participating.push(row);
+    else if (t.status === "finished") past.push(row);
+  }
+
+  return { data: { participating, past }, error: null };
+}
+
 export async function getPublicTournamentById(
   tournamentId: string
 ): Promise<ApiResult<PublicTournamentRow>> {

@@ -3,6 +3,7 @@ import { getUserWithRole, isPlayerRole, isOperationRole } from "@/src/lib/auth/r
 import { getMyProfile } from "@/lib/api/profiles";
 import { getMyPlayerProfile } from "@/lib/api/player-profile";
 import ProfileForm from "./Form";
+import OnboardingStepIndicator from "@/components/onboarding/OnboardingStepIndicator";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,9 @@ export default async function OnboardingProfilePage() {
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="mx-auto flex max-w-md flex-col gap-6">
+        <OnboardingStepIndicator currentStep="player" />
+
         <header className="space-y-1">
-          <p className="text-xs text-slate-400">1단계 / 2단계 — 본인인증은 추후 지원 예정</p>
           <h1 className="text-2xl font-semibold text-slate-900">
             선수 등록 — 기본 정보 입력
           </h1>

@@ -4,7 +4,6 @@ import { requireIdentityVerification } from "@/src/lib/config/env";
 import { mockAdapter } from "@/src/lib/identity/adapter";
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { getUserWithRole } from "@/src/lib/auth/roles";
-import type { ActionResult } from "@/lib/types/api";
 
 type VerifyInput = {
   name: string;
@@ -12,9 +11,13 @@ type VerifyInput = {
   birthDate: string; // YYYY-MM-DD
 };
 
+type VerifyResult =
+  | { ok: true; redirectTo: string }
+  | { ok: false; error: string };
+
 export async function verifyIdentityAndPromote(
   input: VerifyInput
-): Promise<ActionResult> {
+): Promise<VerifyResult> {
   const userResult = await getUserWithRole();
   if (userResult.status !== "ready") {
     return { ok: false, error: "로그인이 필요합니다." };
@@ -64,5 +67,5 @@ export async function verifyIdentityAndPromote(
     return { ok: false, error: "승격 처리 중 오류가 발생했습니다." };
   }
 
-  return { ok: true };
+  return { ok: true, redirectTo: "/onboarding/completion?step=player" };
 }

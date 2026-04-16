@@ -210,16 +210,6 @@ export default function ApplyTeamForm({
                 ? `${selectedDivision.capacity}팀`
                 : "무제한"}
             </p>
-            {(selectedDivision.application_open_at || selectedDivision.application_close_at) && (
-              <p>
-                <span className="font-medium text-gray-800">신청 기간:</span>{" "}
-                {selectedDivision.application_open_at
-                  ? new Date(selectedDivision.application_open_at).toLocaleDateString("ko-KR")
-                  : ""}
-                {selectedDivision.application_close_at &&
-                  ` ~ ${new Date(selectedDivision.application_close_at).toLocaleDateString("ko-KR")}`}
-              </p>
-            )}
           </div>
         )}
 

@@ -44,7 +44,7 @@ export default async function TeamDetailPage({
     );
   }
 
-  const isManager = roleResult.role === "manager";
+  const isManager = roleResult.role === "captain";
 
   /* ── 데이터 로드 ───────────────────────────── */
   const [teamResult, playersResult] = await Promise.all([
@@ -93,7 +93,7 @@ export default async function TeamDetailPage({
                   : "bg-gray-100 text-gray-700"
               }
             >
-              {isManager ? "매니저" : "선수"}
+              {isManager ? "주장" : "선수"}
             </Badge>
           </div>
           {team.contact && (
