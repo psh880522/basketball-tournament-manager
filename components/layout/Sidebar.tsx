@@ -19,8 +19,8 @@ type NavSection = {
 type SidebarProps = {
   role: Role | null;
   userEmail: string | null;
-  teamRole?: "captain" | "player" | null;
-  teamId?: string | null;
+  hasTeam?: boolean;
+  isCaptain?: boolean;
 };
 
 const IconDashboard = () => (
@@ -81,8 +81,8 @@ const IconShield = () => (
 
 function buildMenuSections(
   role: Role | null,
-  teamRole: "captain" | "player" | null,
-  teamId: string | null
+  hasTeam: boolean,
+  isCaptain: boolean
 ): NavSection[] {
   if (role === "organizer" || role === "manager") {
     const sections: NavSection[] = [
@@ -106,14 +106,19 @@ function buildMenuSections(
   }
 
   // player
-  const hasteam = teamRole !== null && teamId !== null;
+  const tournamentItems: NavItem[] = [
+    { label: "대회 목록", href: "/tournaments", icon: <IconList /> },
+  ];
+  if (isCaptain) {
+    tournamentItems.push({ label: "내 신청 현황", href: "/my-applications", icon: <IconClipboard /> });
+  }
 
   const sections: NavSection[] = [
     { items: [{ label: "대시보드", href: "/dashboard", icon: <IconDashboard /> }] },
-    { title: "대회", items: [{ label: "대회 목록", href: "/tournaments", icon: <IconList /> }] },
+    { title: "대회", items: tournamentItems },
   ];
 
-  if (!hasteam) {
+  if (!hasTeam) {
     sections.push({
       title: "내 팀",
       items: [
@@ -124,28 +129,17 @@ function buildMenuSections(
     return sections;
   }
 
-  if (teamRole === "captain") {
-    sections.push({
-      title: "내 팀",
-      items: [
-        { label: "팀 정보", href: `/teams/${teamId}`, icon: <IconTeam /> },
-        { label: "선수 관리", href: "/team/players", icon: <IconUsers /> },
-        { label: "합류 신청 관리", href: `/teams/${teamId}/applications`, icon: <IconClipboard /> },
-      ],
-    });
-  } else {
-    sections.push({
-      title: "내 팀",
-      items: [{ label: "팀 정보", href: `/teams/${teamId}`, icon: <IconTeam /> }],
-    });
-  }
+  sections.push({
+    title: "내 팀",
+    items: [{ label: "내 팀 목록", href: "/teams", icon: <IconTeam /> }],
+  });
 
   return sections;
 }
 
-export default function Sidebar({ role, userEmail, teamRole = null, teamId = null }: SidebarProps) {
+export default function Sidebar({ role, userEmail, hasTeam = false, isCaptain = false }: SidebarProps) {
   const pathname = usePathname();
-  const sections = buildMenuSections(role, teamRole, teamId);
+  const sections = buildMenuSections(role, hasTeam, isCaptain);
   const allItems = sections.flatMap((s) => s.items);
 
   const matchLength = (href: string) => {
@@ -163,10 +157,10 @@ export default function Sidebar({ role, userEmail, teamRole = null, teamId = nul
   };
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-slate-200 bg-white">
+    <aside className="flex h-screen w-56 flex-col bg-[#f0f0f0]">
       {/* 로고 */}
-      <div className="flex h-14 shrink-0 items-center border-b border-slate-200 px-4">
-        <Link href="/" className="text-sm font-bold tracking-tight text-slate-900">
+      <div className="flex h-14 shrink-0 items-center px-4">
+        <Link href="/" className="text-sm font-bold tracking-tight text-slate-900 font-[var(--font-space-grotesk)]">
           🏀 23BOARD
         </Link>
       </div>
@@ -186,10 +180,10 @@ export default function Sidebar({ role, userEmail, teamRole = null, teamId = nul
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                      className={`flex items-center gap-3 rounded-[4px] px-3 py-2 text-sm transition-colors ${
                         isActive(item.href)
-                          ? "bg-slate-100 font-semibold text-slate-900"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          ? "bg-white font-semibold text-slate-900 shadow-sm"
+                          : "text-slate-600 hover:bg-white/60 hover:text-slate-900"
                       }`}
                     >
                       {item.icon}
@@ -204,7 +198,7 @@ export default function Sidebar({ role, userEmail, teamRole = null, teamId = nul
       </nav>
 
       {/* 하단 프로필 */}
-      <div className="shrink-0 border-t border-slate-200 p-3">
+      <div className="shrink-0 p-3">
         <ProfilePopup email={userEmail} role={role} />
       </div>
     </aside>

@@ -1,14 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --ui-bg: #f6f7fb;
+  /* Surface hierarchy (No-Line Rule: use tone shifts, not borders) */
+  --ui-bg: #f0f0f0;
   --ui-surface: #ffffff;
-  --ui-surface-muted: #f1f5f9;
-  --ui-border: #e2e8f0;
+  --ui-surface-low: #f0f0f0;
+  --ui-surface-mid: #e0e0e0;
+  --ui-surface-high: #d0d0d0;
+  --ui-surface-highest: #b8b8b8;
+
+  /* Legacy (kept for compatibility) */
+  --ui-surface-muted: #f0f0f0;
+  --ui-border: #e0e0e0;
+
+  /* Text */
   --ui-text: #0f172a;
   --ui-muted: #64748b;
-  --ui-accent: #f59e0b;
-  --ui-accent-strong: #f97316;
+
+  /* Brand colors */
+  --ui-accent: #FF6B00;
+  --ui-accent-strong: #FF8C33;
+  --ui-secondary: #1A237E;
+
+  /* Semantic */
   --ui-success: #10b981;
   --ui-warning: #f43f5e;
 }
@@ -16,9 +30,53 @@
 body {
   background: var(--ui-bg);
   color: var(--ui-text);
+  font-family: var(--font-inter), var(--font-space-grotesk), sans-serif;
   min-height: 100vh;
 }
 
 main {
   min-height: 100vh;
+}
+
+/* Typography scale */
+.display-lg {
+  font-family: var(--font-space-grotesk);
+  font-size: 3.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.headline-lg {
+  font-family: var(--font-space-grotesk);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.headline-md {
+  font-family: var(--font-space-grotesk);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.body-lg {
+  font-family: var(--font-inter);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.body-md {
+  font-family: var(--font-inter);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.label-md {
+  font-family: var(--font-inter);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }

@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getTeam, getMyRoleInTeam } from "@/lib/api/teams";
-import { getPlayersByTeam } from "@/lib/api/players";
+import { getTeamMembers } from "@/lib/api/rosters";
+import { getTeamApplicationsForCaptain } from "@/lib/api/team-applications";
 import Badge from "@/components/ui/Badge";
-import { PlayerList } from "./Form";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import TeamMemberTable from "@/components/team/TeamMemberTable";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -47,9 +51,10 @@ export default async function TeamDetailPage({
   const isManager = roleResult.role === "captain";
 
   /* ── 데이터 로드 ───────────────────────────── */
-  const [teamResult, playersResult] = await Promise.all([
+  const [teamResult, membersResult, appsResult] = await Promise.all([
     getTeam(teamId),
-    getPlayersByTeam(teamId),
+    getTeamMembers(teamId),
+    isManager ? getTeamApplicationsForCaptain(teamId) : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (teamResult.error || !teamResult.data) {
@@ -64,12 +69,12 @@ export default async function TeamDetailPage({
     );
   }
 
-  if (playersResult.error) {
+  if (membersResult.error) {
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-8">
         <div className="mx-auto max-w-3xl">
           <p className="text-sm text-red-600">
-            선수 목록을 불러올 수 없습니다: {playersResult.error}
+            선수 목록을 불러올 수 없습니다: {membersResult.error}
           </p>
         </div>
       </main>
@@ -77,7 +82,8 @@ export default async function TeamDetailPage({
   }
 
   const team = teamResult.data;
-  const players = playersResult.data ?? [];
+  const members = membersResult.data ?? [];
+  const pendingApps = (appsResult.data ?? []);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -102,11 +108,34 @@ export default async function TeamDetailPage({
         </header>
 
         {/* ── Players Section ───────────────── */}
-        <PlayerList
-          teamId={teamId}
-          players={players}
-          isManager={isManager}
-        />
+        <Card className="space-y-3">
+          <h2 className="text-lg font-semibold">선수 목록</h2>
+          <TeamMemberTable members={members} />
+        </Card>
+
+        {/* ── 합류신청 관리 섹션 (captain 전용) ─── */}
+        {isManager && (
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">신청 관리</h2>
+                {pendingApps.length > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
+                    {pendingApps.length}
+                  </span>
+                )}
+              </div>
+              <Link href={`/teams/${teamId}/applications`}>
+                <Button variant="secondary">관리하기</Button>
+              </Link>
+            </div>
+            <p className="text-sm text-slate-500">
+              {pendingApps.length > 0
+                ? `${pendingApps.length}건의 신청이 대기 중입니다.`
+                : "대기 중인 신청이 없습니다."}
+            </p>
+          </Card>
+        )}
       </div>
     </main>
   );

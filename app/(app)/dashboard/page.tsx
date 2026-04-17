@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getUserWithRole, isOperationRole, isUserRole } from "@/src/lib/auth/roles";
 import { listMyTeams } from "@/lib/api/teams";
 import { getUserTeamStatus } from "@/lib/api/team-applications";
+import { listMyApplications } from "@/lib/api/applications";
+import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import TeamSection from "./TeamSection";
@@ -45,12 +47,14 @@ export default async function DashboardPage() {
     redirect("/onboarding/profile");
   }
 
-  /* ── 내 팀 목록 + 팀 상태 병렬 조회 ─────────── */
-  const [teamsResult, teamStatusResult] = await Promise.all([
+  /* ── 내 팀 목록 + 팀 상태 + 최근 신청 병렬 조회 ── */
+  const [teamsResult, teamStatusResult, appsResult] = await Promise.all([
     listMyTeams(),
     getUserTeamStatus(result.user!.id),
+    listMyApplications(),
   ]);
   const teamStatus = teamStatusResult.data;
+  const recentApps = (appsResult.data ?? []).slice(0, 3);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -94,6 +98,51 @@ export default async function DashboardPage() {
           teams={teamsResult.data ?? []}
           fetchError={teamsResult.error}
         />
+
+        {/* ── 최근 신청 현황 ──────────────────── */}
+        {recentApps.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">최근 신청 현황</h2>
+              <Link href="/my-applications" className="text-sm text-blue-600 hover:underline">
+                전체 보기
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {recentApps.map((app) => {
+                const statusLabel: Record<string, string> = {
+                  payment_pending: "입금 대기",
+                  paid_pending_approval: "승인 대기",
+                  confirmed: "참가 확정",
+                  waitlisted: "대기자 명단",
+                  cancelled: "취소됨",
+                  expired: "만료됨",
+                };
+                const statusColor: Record<string, string> = {
+                  payment_pending: "bg-amber-100 text-amber-700",
+                  paid_pending_approval: "bg-blue-100 text-blue-700",
+                  confirmed: "bg-green-100 text-green-700",
+                  waitlisted: "bg-gray-100 text-gray-600",
+                  cancelled: "bg-red-100 text-red-600",
+                  expired: "bg-gray-100 text-gray-500",
+                };
+                return (
+                  <Link key={app.id} href={`/my-applications/${app.id}`}>
+                    <Card className="flex items-center justify-between hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <p className="text-sm font-medium">{app.tournament_name}</p>
+                        <p className="text-xs text-gray-500">{app.team_name} · {app.division_name}</p>
+                      </div>
+                      <Badge className={statusColor[app.status] ?? "bg-gray-100 text-gray-600"}>
+                        {statusLabel[app.status] ?? app.status}
+                      </Badge>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ── 기타 카드 ──────────────────────── */}
         <section className="grid gap-4 md:grid-cols-2">

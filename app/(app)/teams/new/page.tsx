@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getUserWithRole, isPlayerRole, isUserRole } from "@/src/lib/auth/roles";
-import { getUserTeamStatus } from "@/lib/api/team-applications";
 import Card from "@/components/ui/Card";
 import CreateTeamForm from "./Form";
 
@@ -27,10 +26,6 @@ export default async function TeamsNewPage() {
   if (isUserRole(result.role)) redirect("/onboarding/profile");
   // 운영 역할
   if (!isPlayerRole(result.role)) redirect("/");
-
-  // 이미 캡틴인 경우 대시보드로
-  const statusResult = await getUserTeamStatus(result.user!.id);
-  if (statusResult.data === "captain") redirect("/dashboard");
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import RosterPicker from "@/components/team/RosterPicker";
 import type { ManagedTeamRow } from "@/lib/api/teams";
 import type { MyApplicationRow } from "@/lib/api/applications";
 import type { DivisionRow } from "@/lib/api/divisions";
-import { applyTeamToTournament } from "./actions";
-import StatusCard from "./StatusCard";
+import type { TeamMemberForRoster } from "@/lib/api/rosters";
+import { applyWithRosterAction } from "./actions";
 
 /* ── 팀 없음 안내 ────────────────────────────── */
 
@@ -44,92 +45,71 @@ function NoDivisionsGuide() {
 
 export default function ApplyTeamForm({
   tournamentId,
+  tournamentStartDate,
   managedTeams,
   divisions,
-  existingApp,
+  myActiveApps = [],
+  teamMembersMap = {},
 }: {
   tournamentId: string;
+  tournamentStartDate: string | null;
   managedTeams: ManagedTeamRow[];
   divisions: DivisionRow[];
-  existingApp: MyApplicationRow | null;
+  myActiveApps?: MyApplicationRow[];
+  teamMembersMap?: Record<string, TeamMemberForRoster[] | null>;
 }) {
   const router = useRouter();
-  const [selectedTeamId, setSelectedTeamId] = useState(
-    managedTeams.length === 1 ? managedTeams[0].team_id : ""
-  );
+
+  // 대회 시작 여부 (로스터 잠금 기준)
+  const today = new Date().toISOString().split("T")[0];
+  const isRosterLocked = tournamentStartDate !== null && tournamentStartDate <= today;
+
   const [selectedDivisionId, setSelectedDivisionId] = useState(
     divisions.length === 1 ? divisions[0].id : ""
   );
+  const [selectedTeamId, setSelectedTeamId] = useState(
+    managedTeams.length === 1 ? managedTeams[0].team_id : ""
+  );
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  /* 신청 성공 후 자동으로 서버 데이터 갱신 */
-  useEffect(() => {
-    if (success) {
-      router.refresh();
-    }
-  }, [success, router]);
-
-  /* 취소/만료 후 router.refresh()로 existingApp이 null로 바뀌면 success 리셋
-     (신청 직후 existingApp=null 상태와 구분하기 위해 이전 값 추적) */
-  const prevExistingAppRef = useRef(existingApp);
-  useEffect(() => {
-    const prev = prevExistingAppRef.current;
-    prevExistingAppRef.current = existingApp;
-    if (success && prev !== null && existingApp === null) {
-      setSuccess(false);
-    }
-  }, [existingApp, success]);
-
-  /* 이미 신청한 경우 — 6-state StatusCard */
-  if (existingApp) {
-    return <StatusCard app={existingApp} tournamentId={tournamentId} />;
+  /* 팀이 바뀌면 선택된 선수 초기화 */
+  function handleTeamChange(teamId: string) {
+    setSelectedTeamId(teamId);
+    setSelectedMemberIds([]);
   }
 
-  /* 팀이 없는 경우 */
-  if (managedTeams.length === 0) {
-    return <NoTeamsGuide />;
-  }
-
-  /* Division 없는 경우 */
-  if (divisions.length === 0) {
-    return <NoDivisionsGuide />;
-  }
-
-  /* 신청 성공 후 (router.refresh() 결과 대기 중) */
-  if (success) {
-    return (
-      <Card className="space-y-3 text-center">
-        <p className="text-sm text-green-700 font-medium">
-          참가 신청이 완료되었습니다!
-        </p>
-        <p className="text-xs text-gray-500">신청 현황을 불러오는 중...</p>
-      </Card>
-    );
-  }
+  if (managedTeams.length === 0) return <NoTeamsGuide />;
+  if (divisions.length === 0) return <NoDivisionsGuide />;
 
   const selectedDivision = divisions.find((d) => d.id === selectedDivisionId);
+  const selectedTeamMembers = selectedTeamId
+    ? (teamMembersMap[selectedTeamId] ?? [])
+    : [];
+
   const canSubmit = !!selectedTeamId && !!selectedDivisionId && !loading;
+
+  // 다른 팀으로 이미 신청한 경우 경고
+  const duplicateWarning =
+    selectedTeamId && myActiveApps.length > 0
+      ? myActiveApps.find((a) => a.team_id !== selectedTeamId)
+      : null;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!selectedTeamId) {
-      setError("팀을 선택해주세요.");
-      return;
-    }
-    if (!selectedDivisionId) {
-      setError("참가 구분(division)을 선택해주세요.");
-      return;
-    }
+    if (!selectedTeamId) { setError("팀을 선택해주세요."); return; }
+    if (!selectedDivisionId) { setError("참가 구분(division)을 선택해주세요."); return; }
 
     setLoading(true);
     setError(null);
 
-    const result = await applyTeamToTournament({
+    const result = await applyWithRosterAction({
       tournamentId,
       teamId: selectedTeamId,
       divisionId: selectedDivisionId,
+      memberIds: selectedMemberIds,
     });
 
     if (!result.ok) {
@@ -138,51 +118,25 @@ export default function ApplyTeamForm({
       return;
     }
 
-    setSuccess(true);
-    setLoading(false);
+    // 일부 선수 추가 실패 시 warning은 신청 현황 페이지에서 확인
+    router.push(`/my-applications/${result.applicationId}`);
   }
 
   return (
-    <Card className="space-y-4">
+    <Card className="space-y-6">
       <h2 className="text-lg font-semibold">참가 신청</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Step 1: 팀 선택 */}
-        <div>
-          <label
-            htmlFor="team-select"
-            className="block text-sm font-medium text-gray-700"
-          >
-            팀 선택
-          </label>
-          <select
-            id="team-select"
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-            disabled={loading}
-          >
-            <option value="">-- 팀을 선택하세요 --</option>
-            {managedTeams.map((t) => (
-              <option key={t.team_id} value={t.team_id}>
-                {t.team_name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* Step 2: Division 선택 */}
-        <div>
-          <label
-            htmlFor="division-select"
-            className="block text-sm font-medium text-gray-700"
-          >
+        {/* Step 1: 참가 구분 */}
+        <div className="space-y-1.5">
+          <label htmlFor="division-select" className="block text-sm font-medium text-gray-700">
             참가 구분 (Division)
           </label>
           <select
             id="division-select"
             value={selectedDivisionId}
             onChange={(e) => setSelectedDivisionId(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
             disabled={loading}
           >
             <option value="">-- 참가 구분을 선택하세요 --</option>
@@ -193,23 +147,76 @@ export default function ApplyTeamForm({
               </option>
             ))}
           </select>
+          {selectedDivision && (
+            <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 space-y-0.5">
+              <p>
+                <span className="font-medium text-gray-800">참가비:</span>{" "}
+                {selectedDivision.entry_fee > 0
+                  ? `${selectedDivision.entry_fee.toLocaleString()}원`
+                  : "무료"}
+              </p>
+              <p>
+                <span className="font-medium text-gray-800">정원:</span>{" "}
+                {selectedDivision.capacity != null ? `${selectedDivision.capacity}팀` : "무제한"}
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Division 상세 정보 */}
-        {selectedDivision && (
-          <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 space-y-1">
-            <p>
-              <span className="font-medium text-gray-800">참가비:</span>{" "}
-              {selectedDivision.entry_fee > 0
-                ? `${selectedDivision.entry_fee.toLocaleString()}원`
-                : "무료"}
-            </p>
-            <p>
-              <span className="font-medium text-gray-800">정원:</span>{" "}
-              {selectedDivision.capacity != null
-                ? `${selectedDivision.capacity}팀`
-                : "무제한"}
-            </p>
+        {/* Step 2: 팀 선택 */}
+        <div className="space-y-1.5">
+          <label htmlFor="team-select" className="block text-sm font-medium text-gray-700">
+            팀 선택
+          </label>
+          <select
+            id="team-select"
+            value={selectedTeamId}
+            onChange={(e) => handleTeamChange(e.target.value)}
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+            disabled={loading}
+          >
+            <option value="">-- 팀을 선택하세요 --</option>
+            {managedTeams.map((t) => (
+              <option key={t.team_id} value={t.team_id}>
+                {t.team_name}
+              </option>
+            ))}
+          </select>
+
+          {/* 중복 신청 경고 배너 */}
+          {duplicateWarning && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <p className="font-medium">다른 팀으로 이미 신청한 대회입니다.</p>
+              <p className="mt-0.5 text-xs text-amber-700">
+                {duplicateWarning.team_name} 팀으로 신청 중입니다. 로스터 구성 시 중복 출전이 제한됩니다.{" "}
+                <Link href="/my-applications" className="underline">신청 현황 확인</Link>
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Step 3: 출전 선수 선택 */}
+        {selectedTeamId && (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-gray-700">출전 선수 선택</p>
+            {isRosterLocked ? (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                대회가 이미 시작되어 출전 선수를 선택할 수 없습니다.
+                <br />
+                신청 후 로스터는 수정되지 않습니다.
+              </div>
+            ) : (
+              <RosterPicker
+                allMembers={selectedTeamMembers}
+                selectedIds={selectedMemberIds}
+                onAdd={(userId) =>
+                  setSelectedMemberIds((prev) => [...prev, userId])
+                }
+                onRemove={(userId) =>
+                  setSelectedMemberIds((prev) => prev.filter((id) => id !== userId))
+                }
+              />
+            )}
           </div>
         )}
 

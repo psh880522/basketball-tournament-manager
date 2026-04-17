@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { getUserWithRole, isUserRole } from "@/src/lib/auth/roles";
 import { listMyManagedTeams } from "@/lib/api/teams";
-import { getMyApplicationStatus } from "@/lib/api/applications";
+import { getMyApplicationStatus, getMyTournamentApplicationsAsCaptain } from "@/lib/api/applications";
 import { getPublicTournamentById } from "@/lib/api/tournaments";
 import { getDivisionsByTournament } from "@/lib/api/divisions";
+import { getTeamMembersForRoster } from "@/lib/api/rosters";
 import ApplyTeamForm from "./Form";
 
 export const dynamic = "force-dynamic";
@@ -63,11 +64,26 @@ export default async function TournamentApplyPage({ params }: PageProps) {
   const tournament = tournamentResult.data;
 
   /* ── 데이터 로드 ───────────────────────────── */
-  const [teamsResult, appResult, divisionsResult] = await Promise.all([
+  const [teamsResult, appResult, divisionsResult, myAppsResult] = await Promise.all([
     listMyManagedTeams(),
     getMyApplicationStatus(tournamentId),
     getDivisionsByTournament(tournamentId),
+    getMyTournamentApplicationsAsCaptain(tournamentId),
   ]);
+
+  if (appResult.data) {
+    redirect(`/my-applications/${appResult.data.id}`);
+  }
+
+  /* ── 팀별 멤버 목록 (로스터 미리보기용) ──────── */
+  const managedTeams = teamsResult.data ?? [];
+  const teamMembersMap: Record<string, Awaited<ReturnType<typeof getTeamMembersForRoster>>["data"]> = {};
+  await Promise.all(
+    managedTeams.map(async (t) => {
+      const result = await getTeamMembersForRoster(t.team_id);
+      teamMembersMap[t.team_id] = result.data ?? [];
+    })
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
@@ -97,9 +113,11 @@ export default async function TournamentApplyPage({ params }: PageProps) {
 
         <ApplyTeamForm
           tournamentId={tournamentId}
-          managedTeams={teamsResult.data ?? []}
+          tournamentStartDate={tournament.start_date ?? null}
+          managedTeams={managedTeams}
           divisions={divisionsResult.data ?? []}
-          existingApp={appResult.data ?? null}
+          myActiveApps={myAppsResult.data ?? []}
+          teamMembersMap={teamMembersMap}
         />
       </div>
     </main>

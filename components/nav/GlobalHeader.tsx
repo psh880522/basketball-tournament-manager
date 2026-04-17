@@ -14,7 +14,7 @@ type GlobalHeaderProps = {
 export default async function GlobalHeader({ minimal = false }: GlobalHeaderProps) {
   if (minimal) {
     return (
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/85 backdrop-blur">
+      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur shadow-[0_1px_0_rgba(0,0,0,0.06)]">
         <div className="relative mx-auto flex h-14 max-w-6xl items-center px-4">
           <Link href="/" className="text-base font-bold tracking-tight text-slate-900">
             🏀 23Board
@@ -41,7 +41,7 @@ export default async function GlobalHeader({ minimal = false }: GlobalHeaderProp
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/85 backdrop-blur">
+    <header className="sticky top-0 z-50 bg-white/85 backdrop-blur shadow-[0_1px_0_rgba(0,0,0,0.06)]">
       <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link href="/" className="text-base font-bold tracking-tight text-slate-900">
           🏀 23Board

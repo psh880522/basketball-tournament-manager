@@ -22,3 +22,10 @@ export type UserTeamStatus =
   | "join_pending" // 합류 신청 중 (승인 대기)
   | "team_member"  // 일반 팀원
   | "captain";     // 팀 주장
+
+/** 다중 팀 소속 구조에서 팀 목록 항목 */
+export type TeamMembershipItem = {
+  team_id: string;
+  team_name: string;
+  role_in_team: "captain" | "player";
+};

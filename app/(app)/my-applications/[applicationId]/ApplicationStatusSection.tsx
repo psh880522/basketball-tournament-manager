@@ -8,41 +8,36 @@ import Card from "@/components/ui/Card";
 import type { MyApplicationRow } from "@/lib/api/applications";
 import { markPaymentDoneAction, cancelApplicationAction } from "./actions";
 
-const statusBadge: Record<string, { text: string; className: string }> = {
-  payment_pending: { text: "입금 대기", className: "bg-yellow-100 text-yellow-800" },
-  paid_pending_approval: { text: "승인 대기", className: "bg-blue-100 text-blue-800" },
-  confirmed: { text: "참가 확정", className: "bg-green-100 text-green-700" },
-  waitlisted: { text: "대기열", className: "bg-orange-100 text-orange-700" },
-  expired: { text: "만료됨", className: "bg-gray-100 text-gray-500" },
-  cancelled: { text: "취소됨", className: "bg-red-100 text-red-700" },
+const STATUS_BADGE: Record<string, { text: string; className: string }> = {
+  payment_pending:      { text: "입금 대기",     className: "bg-yellow-100 text-yellow-800" },
+  paid_pending_approval:{ text: "승인 대기",     className: "bg-blue-100 text-blue-800" },
+  confirmed:            { text: "참가 확정",     className: "bg-green-100 text-green-700" },
+  waitlisted:           { text: "대기자 명단",   className: "bg-orange-100 text-orange-700" },
+  expired:              { text: "만료됨",        className: "bg-gray-100 text-gray-500" },
+  cancelled:            { text: "취소됨",        className: "bg-red-100 text-red-700" },
 };
 
-export default function StatusCard({
+export default function ApplicationStatusSection({
   app,
   tournamentId,
+  isCaptain,
 }: {
   app: MyApplicationRow;
   tournamentId: string;
+  isCaptain: boolean;
 }) {
   const router = useRouter();
-  const badge = statusBadge[app.status] ?? statusBadge.payment_pending;
+  const badge = STATUS_BADGE[app.status] ?? STATUS_BADGE.payment_pending;
 
   return (
     <Card className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">참가 신청 현황</h2>
+        <h2 className="text-lg font-semibold">신청 현황</h2>
         <Badge className={badge.className}>{badge.text}</Badge>
       </div>
 
       <div className="space-y-1 text-sm text-gray-600">
-        <p>
-          <span className="font-medium text-gray-800">팀:</span> {app.team_name}
-        </p>
-        <p>
-          <span className="font-medium text-gray-800">부문:</span>{" "}
-          {app.division_name}
-        </p>
-        {app.final_amount != null && app.final_amount > 0 && (
+        {app.final_amount > 0 && (
           <p>
             <span className="font-medium text-gray-800">참가비:</span>{" "}
             {app.final_amount.toLocaleString()}원
@@ -50,8 +45,9 @@ export default function StatusCard({
         )}
       </div>
 
-      {app.status === "payment_pending" && app.final_amount > 0 && (
-        <PaymentSection app={app} tournamentId={tournamentId} onRefresh={() => router.refresh()} />
+      {/* 상태별 안내 */}
+      {app.status === "payment_pending" && app.final_amount > 0 && isCaptain && (
+        <PaymentForm app={app} tournamentId={tournamentId} onRefresh={() => router.refresh()} />
       )}
 
       {app.status === "payment_pending" && app.final_amount === 0 && (
@@ -75,9 +71,7 @@ export default function StatusCard({
         <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
           입금 확인 후 운영자가 참가를 확정합니다. 잠시 기다려주세요.
           {app.depositor_name && (
-            <p className="mt-1 text-xs text-blue-600">
-              입금자명: {app.depositor_name}
-            </p>
+            <p className="mt-1 text-xs text-blue-600">입금자명: {app.depositor_name}</p>
           )}
         </div>
       )}
@@ -97,9 +91,7 @@ export default function StatusCard({
         <div className="rounded-lg bg-orange-50 p-3 text-sm text-orange-700">
           현재 대기 중입니다.
           {app.waitlist_position != null && (
-            <span className="ml-1 font-semibold">
-              (대기 순번: {app.waitlist_position}번)
-            </span>
+            <span className="ml-1 font-semibold">(대기 순번: {app.waitlist_position}번)</span>
           )}
           <p className="mt-1 text-xs">빈 자리가 생기면 자동으로 신청 처리됩니다.</p>
         </div>
@@ -108,7 +100,6 @@ export default function StatusCard({
       {app.status === "expired" && (
         <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
           입금 기한이 만료되어 신청이 취소되었습니다.
-          <p className="mt-1 text-xs">다시 신청하시려면 새로 접수해주세요.</p>
         </div>
       )}
 
@@ -123,16 +114,17 @@ export default function StatusCard({
         </div>
       )}
 
-      {(app.status === "payment_pending" || app.status === "paid_pending_approval") && (
-        <CancelSection app={app} tournamentId={tournamentId} onRefresh={() => router.refresh()} />
-      )}
+      {/* 취소 버튼 (captain + 취소 가능 상태) */}
+      {isCaptain &&
+        (app.status === "payment_pending" || app.status === "paid_pending_approval") && (
+          <CancelButton applicationId={app.id} onRefresh={() => router.refresh()} />
+        )}
     </Card>
   );
 }
 
-function PaymentSection({
+function PaymentForm({
   app,
-  tournamentId,
   onRefresh,
 }: {
   app: MyApplicationRow;
@@ -159,9 +151,8 @@ function PaymentSection({
       setError("입금자명을 입력해주세요.");
       return;
     }
-
     startTransition(async () => {
-      const result = await markPaymentDoneAction(tournamentId, {
+      const result = await markPaymentDoneAction({
         applicationId: app.id,
         depositorName: depositorName.trim(),
         depositorNote: depositorNote.trim() || undefined,
@@ -182,9 +173,7 @@ function PaymentSection({
       <p className="text-sm font-semibold text-yellow-900">
         금액: {app.final_amount.toLocaleString()}원
       </p>
-      {dueDate && (
-        <p className="text-xs text-yellow-700">입금 기한: {dueDate}</p>
-      )}
+      {dueDate && <p className="text-xs text-yellow-700">입금 기한: {dueDate}</p>}
       <form onSubmit={handleSubmit} className="space-y-2">
         <div>
           <label className="text-xs font-medium text-gray-700">
@@ -217,13 +206,11 @@ function PaymentSection({
   );
 }
 
-function CancelSection({
-  app,
-  tournamentId,
+function CancelButton({
+  applicationId,
   onRefresh,
 }: {
-  app: MyApplicationRow;
-  tournamentId: string;
+  applicationId: string;
   onRefresh: () => void;
 }) {
   const [confirm, setConfirm] = useState(false);
@@ -250,7 +237,7 @@ function CancelSection({
           variant="secondary"
           onClick={() => {
             startTransition(async () => {
-              const result = await cancelApplicationAction(app.id, tournamentId);
+              const result = await cancelApplicationAction(applicationId);
               if (!result.ok) {
                 setError(result.error);
                 return;

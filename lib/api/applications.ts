@@ -34,6 +34,7 @@ export const ACTIVE_STATUSES: ApplicationStatus[] = [
 
 export type MyApplicationRow = {
   id: string;
+  tournament_id: string;
   team_id: string;
   team_name: string;
   division_id: string;
@@ -107,6 +108,7 @@ export type MarkPaymentInput = {
 
 const MY_APP_SELECT = [
   "id",
+  "tournament_id",
   "team_id",
   "status",
   "division_id",
@@ -125,6 +127,53 @@ const MY_APP_SELECT = [
   "teams(team_name)",
   "divisions(name)",
 ].join(", ");
+
+/**
+ * applicationId로 단일 신청 조회 (신청 상세 페이지에서 사용)
+ */
+export async function getApplicationById(
+  applicationId: string
+): Promise<ApiResult<MyApplicationRow>> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("tournament_team_applications")
+    .select(MY_APP_SELECT)
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: "신청 정보를 찾을 수 없습니다." };
+
+  const row = data as unknown as Record<string, unknown>;
+  const teams = row.teams as { team_name: string } | null;
+  const divisions = row.divisions as { name: string } | null;
+
+  return {
+    data: {
+      id: row.id as string,
+      tournament_id: row.tournament_id as string,
+      team_id: row.team_id as string,
+      team_name: teams?.team_name ?? "",
+      division_id: row.division_id as string,
+      division_name: divisions?.name ?? "",
+      status: row.status as ApplicationStatus,
+      base_entry_fee: (row.base_entry_fee as number) ?? 0,
+      discount_amount: (row.discount_amount as number) ?? 0,
+      final_amount: (row.final_amount as number) ?? 0,
+      waitlist_position: (row.waitlist_position as number | null) ?? null,
+      payment_due_at: (row.payment_due_at as string | null) ?? null,
+      depositor_name: (row.depositor_name as string | null) ?? null,
+      depositor_note: (row.depositor_note as string | null) ?? null,
+      paid_marked_at: (row.paid_marked_at as string | null) ?? null,
+      submitted_at: (row.submitted_at as string) ?? "",
+      confirmed_at: (row.confirmed_at as string | null) ?? null,
+      cancelled_at: (row.cancelled_at as string | null) ?? null,
+      expired_at: (row.expired_at as string | null) ?? null,
+    },
+    error: null,
+  };
+}
 
 /**
  * 현재 유저가 manager인 팀 중 해당 tournament에 신청한 application 조회
@@ -176,6 +225,7 @@ export async function getMyApplicationStatus(
   return {
     data: {
       id: row.id as string,
+      tournament_id: row.tournament_id as string,
       team_id: row.team_id as string,
       team_name: teams?.team_name ?? "",
       division_id: row.division_id as string,
@@ -205,7 +255,7 @@ export async function applyToTournament(input: {
   tournamentId: string;
   teamId: string;
   divisionId: string;
-}): Promise<{ ok: true; status: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; status: string; applicationId: string } | { ok: false; error: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -222,10 +272,14 @@ export async function applyToTournament(input: {
 
   if (error) return { ok: false, error: error.message };
 
-  const result = data as { ok: boolean; error?: string; status?: string };
+  const result = data as { ok: boolean; error?: string; status?: string; application_id?: string };
   if (!result.ok) return { ok: false, error: result.error ?? "신청에 실패했습니다." };
 
-  return { ok: true, status: result.status ?? "payment_pending" };
+  return {
+    ok: true,
+    status: result.status ?? "payment_pending",
+    applicationId: result.application_id ?? "",
+  };
 }
 
 const TOURNAMENT_APP_SELECT = [
@@ -596,6 +650,174 @@ export async function getDivisionApplicationCounts(
   }
 
   return { data: Array.from(countsMap.values()), error: null };
+}
+
+// ────────────────────────────────────────────────────────────
+// 캡틴용 신청 조회 함수
+// ────────────────────────────────────────────────────────────
+
+/**
+ * 현재 유저(캡틴)가 특정 대회에 낸 활성 신청 목록 조회.
+ * apply 페이지에서 "이미 다른 팀으로 신청함" 경고 배너에 사용.
+ */
+export async function getMyTournamentApplicationsAsCaptain(
+  tournamentId: string
+): Promise<ApiResult<MyApplicationRow[]>> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { data: null, error: "로그인이 필요합니다." };
+
+  const { data: memberships, error: memErr } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("user_id", user.id)
+    .eq("role_in_team", "captain");
+
+  if (memErr) return { data: null, error: memErr.message };
+
+  const teamIds = (memberships ?? []).map((m: { team_id: string }) => m.team_id);
+  if (teamIds.length === 0) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from("tournament_team_applications")
+    .select(MY_APP_SELECT)
+    .eq("tournament_id", tournamentId)
+    .in("team_id", teamIds)
+    .in("status", ACTIVE_STATUSES)
+    .order("submitted_at", { ascending: false });
+
+  if (error) return { data: null, error: error.message };
+
+  const rows: MyApplicationRow[] = ((data ?? []) as unknown as Record<string, unknown>[]).map(
+    (row) => {
+      const teams = row.teams as { team_name: string } | null;
+      const divisions = row.divisions as { name: string } | null;
+      return {
+        id: row.id as string,
+        tournament_id: row.tournament_id as string,
+        team_id: row.team_id as string,
+        team_name: teams?.team_name ?? "",
+        division_id: row.division_id as string,
+        division_name: divisions?.name ?? "",
+        status: row.status as ApplicationStatus,
+        base_entry_fee: (row.base_entry_fee as number) ?? 0,
+        discount_amount: (row.discount_amount as number) ?? 0,
+        final_amount: (row.final_amount as number) ?? 0,
+        waitlist_position: (row.waitlist_position as number | null) ?? null,
+        payment_due_at: (row.payment_due_at as string | null) ?? null,
+        depositor_name: (row.depositor_name as string | null) ?? null,
+        depositor_note: (row.depositor_note as string | null) ?? null,
+        paid_marked_at: (row.paid_marked_at as string | null) ?? null,
+        submitted_at: (row.submitted_at as string) ?? "",
+        confirmed_at: (row.confirmed_at as string | null) ?? null,
+        cancelled_at: (row.cancelled_at as string | null) ?? null,
+        expired_at: (row.expired_at as string | null) ?? null,
+      };
+    }
+  );
+
+  return { data: rows, error: null };
+}
+
+/** /my-applications 페이지용 신청 목록 항목 */
+export type MyApplicationListRow = {
+  id: string;
+  tournament_id: string;
+  tournament_name: string;
+  tournament_start_date: string | null;
+  division_id: string;
+  division_name: string;
+  team_id: string;
+  team_name: string;
+  status: ApplicationStatus;
+  submitted_at: string;
+  payment_due_at: string | null;
+  confirmed_at: string | null;
+  has_roster: boolean;
+  roster_member_count: number;
+};
+
+/**
+ * 현재 유저(캡틴)의 전체 대회 신청 목록 조회 (로스터 정보 포함).
+ * /my-applications 페이지에서 사용.
+ */
+export async function listMyApplications(): Promise<ApiResult<MyApplicationListRow[]>> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { data: null, error: "로그인이 필요합니다." };
+
+  const { data: memberships, error: memErr } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("user_id", user.id)
+    .eq("role_in_team", "captain");
+
+  if (memErr) return { data: null, error: memErr.message };
+
+  const teamIds = (memberships ?? []).map((m: { team_id: string }) => m.team_id);
+  if (teamIds.length === 0) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from("tournament_team_applications")
+    .select([
+      "id",
+      "tournament_id",
+      "team_id",
+      "division_id",
+      "status",
+      "submitted_at",
+      "payment_due_at",
+      "confirmed_at",
+      "teams(team_name)",
+      "divisions(name)",
+      "tournaments(name, start_date)",
+      "rosters(id, roster_members(id))",
+    ].join(", "))
+    .in("team_id", teamIds)
+    .order("submitted_at", { ascending: false });
+
+  if (error) return { data: null, error: error.message };
+
+  const rows: MyApplicationListRow[] = ((data ?? []) as unknown as Record<string, unknown>[]).map(
+    (row) => {
+      const teams = row.teams as { team_name: string } | null;
+      const divisions = row.divisions as { name: string } | null;
+      const tournaments = row.tournaments as { name: string; start_date: string | null } | null;
+      // rosters.application_id 에 UNIQUE 제약이 있어 PostgREST가 배열 대신 단일 객체로 반환
+      const rosterRaw = row.rosters as
+        | { id: string; roster_members: { id: string }[] }
+        | { id: string; roster_members: { id: string }[] }[]
+        | null;
+      const roster = Array.isArray(rosterRaw)
+        ? (rosterRaw[0] ?? null)
+        : (rosterRaw ?? null);
+
+      return {
+        id: row.id as string,
+        tournament_id: row.tournament_id as string,
+        tournament_name: tournaments?.name ?? "",
+        tournament_start_date: tournaments?.start_date ?? null,
+        division_id: row.division_id as string,
+        division_name: divisions?.name ?? "",
+        team_id: row.team_id as string,
+        team_name: teams?.team_name ?? "",
+        status: row.status as ApplicationStatus,
+        submitted_at: (row.submitted_at as string) ?? "",
+        payment_due_at: (row.payment_due_at as string | null) ?? null,
+        confirmed_at: (row.confirmed_at as string | null) ?? null,
+        has_roster: roster !== null,
+        roster_member_count: roster?.roster_members?.length ?? 0,
+      };
+    }
+  );
+
+  return { data: rows, error: null };
 }
 
 /**

@@ -7,14 +7,14 @@ type CardProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 const variantClasses: Record<CardVariant, string> = {
-  default: "border-slate-200 bg-white",
-  highlight: "border-amber-200 bg-amber-50",
-  muted: "border-slate-200 bg-slate-50",
+  default: "bg-white shadow-sm",
+  highlight: "bg-[#FFF5EC]",
+  muted: "bg-[#f0f0f0]",
 };
 
 export default function Card({ className, variant = "default", ...props }: CardProps) {
   const classes = [
-    "rounded-xl border p-5 shadow-sm",
+    "rounded-xl p-5",
     variantClasses[variant],
     className,
   ]

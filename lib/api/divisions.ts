@@ -31,6 +31,26 @@ export async function getDivisionsByTournament(
   };
 }
 
+export async function getDivisionApplicationCounts(
+  tournamentId: string
+): Promise<ApiResult<Record<string, number>>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("tournament_team_applications")
+    .select("division_id")
+    .eq("tournament_id", tournamentId)
+    .in("status", ["payment_pending", "paid_pending_approval", "confirmed"]);
+
+  if (error) return { data: null, error: error.message };
+
+  const counts = (data ?? []).reduce<Record<string, number>>((acc, row) => {
+    acc[row.division_id] = (acc[row.division_id] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return { data: counts, error: null };
+}
+
 export async function setDivisionStandingsDirty(
   divisionId: string,
   dirty: boolean

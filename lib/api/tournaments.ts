@@ -33,6 +33,8 @@ export type PublicTournamentRow = {
   start_date: string | null;
   end_date: string | null;
   status: TournamentStatus;
+  description: string | null;
+  poster_url: string | null;
 };
 
 type TournamentUpdatePayload = {
@@ -281,7 +283,7 @@ export async function getOpenTournaments(): Promise<
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status")
+    .select("id,name,location,start_date,end_date,status,description,poster_url")
     .eq("status", "open")
     .is("deleted_at", null)
     .order("start_date", { ascending: true });
@@ -298,7 +300,7 @@ export async function getInProgressTournaments(): Promise<
   const supabase = await createSupabaseServerClient();
   const { data: closedTournaments, error: closedError } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status")
+    .select("id,name,location,start_date,end_date,status,description,poster_url")
     .eq("status", "closed")
     .is("deleted_at", null)
     .order("start_date", { ascending: true });
@@ -375,7 +377,7 @@ export async function getMyParticipatedTournaments(): Promise<
   const { data: apps, error: appsError } = await supabase
     .from("tournament_team_applications")
     .select(
-      "tournament_id, team_id, tournaments(id, name, location, start_date, end_date, status, deleted_at)"
+      "tournament_id, team_id, tournaments(id, name, location, start_date, end_date, status, description, poster_url, deleted_at)"
     )
     .in("team_id", teamIds)
     .eq("status", "confirmed");
@@ -401,6 +403,8 @@ export async function getMyParticipatedTournaments(): Promise<
       start_date: (t.start_date as string | null) ?? null,
       end_date: (t.end_date as string | null) ?? null,
       status: t.status as TournamentStatus,
+      description: (t.description as string | null) ?? null,
+      poster_url: (t.poster_url as string | null) ?? null,
       team_name: teamNameMap.get(app.team_id as string) ?? "",
     };
 
@@ -417,7 +421,7 @@ export async function getPublicTournamentById(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status")
+    .select("id,name,location,start_date,end_date,status,description,poster_url")
     .eq("id", tournamentId)
     .is("deleted_at", null)
     .maybeSingle();
