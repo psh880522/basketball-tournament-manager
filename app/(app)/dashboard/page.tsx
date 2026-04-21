@@ -128,7 +128,7 @@ export default async function DashboardPage() {
                 };
                 return (
                   <Link key={app.id} href={`/my-applications/${app.id}`}>
-                    <Card className="flex items-center justify-between hover:bg-gray-50 cursor-pointer">
+                    <Card className="flex items-center justify-between hover:bg-white cursor-pointer">
                       <div>
                         <p className="text-sm font-medium">{app.tournament_name}</p>
                         <p className="text-xs text-gray-500">{app.team_name} · {app.division_name}</p>

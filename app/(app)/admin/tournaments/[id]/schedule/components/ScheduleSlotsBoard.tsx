@@ -285,7 +285,7 @@ export default function ScheduleSlotsBoard({
               return (
                 <Card
                   key={divisionGroup.division?.id ?? "unassigned"}
-                  className="bg-slate-50"
+                  className="bg-white"
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <h4 className="text-sm font-semibold text-slate-700">
@@ -498,7 +498,7 @@ function ScheduleTable({
               <col className="w-auto" />
               <col className="w-28" />
             </colgroup>
-            <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
+            <thead className="border-b bg-white text-left text-xs font-medium text-gray-500">
               <tr>
                 <th className="px-3 py-2">시간</th>
                 <th className="px-3 py-2">구분</th>
@@ -536,7 +536,7 @@ function ScheduleTable({
                 return (
                   <tr
                     key={slot.id}
-                    className={`hover:bg-gray-50 ${isDragging ? "opacity-60" : ""}`}
+                    className={`hover:bg-white ${isDragging ? "opacity-60" : ""}`}
                     onDragOver={(event) => {
                       if (!allowDrop) return;
                       event.preventDefault();
@@ -555,7 +555,7 @@ function ScheduleTable({
                     <td className="px-3 py-2 text-gray-800 truncate" title={label}>
                       {canDragMatch ? (
                         <span
-                          className="inline-flex items-center gap-1 rounded bg-gray-50 px-1.5 py-0.5 text-gray-700 ring-1 ring-gray-200 cursor-move"
+                          className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-gray-700 ring-1 ring-gray-200 cursor-move"
                           draggable
                           onDragStart={(event) => onDragStart(slot, event)}
                           onDragEnd={onDragEnd}

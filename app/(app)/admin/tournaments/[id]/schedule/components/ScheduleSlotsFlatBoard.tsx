@@ -246,7 +246,7 @@ function SortableSlotRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`border-b text-sm ${isDragging ? "bg-blue-50" : "hover:bg-gray-50"}`}
+      className={`border-b text-sm ${isDragging ? "bg-blue-50" : "hover:bg-white"}`}
     >
       {/* DnD handle */}
       <td className="px-2 py-1 w-8">

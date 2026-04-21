@@ -65,7 +65,7 @@ export default async function MyTeamsPage() {
         <div className="space-y-3">
           {(teamsResult.data ?? []).map((team) => (
             <Link key={team.team_id} href={`/teams/${team.team_id}`}>
-              <Card className="flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer">
+              <Card className="flex items-center justify-between hover:bg-white transition-colors cursor-pointer">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-900">{team.team_name}</span>

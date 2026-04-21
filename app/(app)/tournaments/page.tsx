@@ -25,7 +25,7 @@ function formatDateRange(start: string | null, end: string | null): string {
 function TournamentCard({ tournament, badge }: { tournament: PublicTournamentRow; badge?: string }) {
   return (
     <Link href={`/tournament/${tournament.id}`}>
-      <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-slate-50">
+      <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-white">
         <div className="min-w-0 space-y-0.5">
           <div className="flex items-center gap-2">
             <p className="truncate font-medium text-slate-900">{tournament.name}</p>

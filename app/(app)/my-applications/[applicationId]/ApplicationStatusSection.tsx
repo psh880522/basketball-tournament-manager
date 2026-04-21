@@ -88,7 +88,7 @@ export default function ApplicationStatusSection({
       )}
 
       {app.status === "waitlisted" && (
-        <div className="rounded-lg bg-orange-50 p-3 text-sm text-orange-700">
+        <div className="rounded-lg bg-white p-3 text-sm text-orange-700">
           현재 대기 중입니다.
           {app.waitlist_position != null && (
             <span className="ml-1 font-semibold">(대기 순번: {app.waitlist_position}번)</span>
@@ -98,7 +98,7 @@ export default function ApplicationStatusSection({
       )}
 
       {app.status === "expired" && (
-        <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
+        <div className="rounded-lg bg-white p-3 text-sm text-gray-600">
           입금 기한이 만료되어 신청이 취소되었습니다.
         </div>
       )}

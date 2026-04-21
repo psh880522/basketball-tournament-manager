@@ -158,7 +158,7 @@ async function TournamentDetail({ id }: { id: string }) {
                         className={`rounded-xl border p-4 ${
                           isMine
                             ? "border-amber-300 bg-amber-50"
-                            : "border-slate-200 bg-slate-50"
+                            : "border-slate-200 bg-white"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -226,7 +226,7 @@ async function TournamentDetail({ id }: { id: string }) {
 
                 {/* 내 신청 현황 */}
                 {teamApplication && appStatusConfig ? (
-                  <div className="mb-4 rounded-lg bg-slate-50 p-3">
+                  <div className="mb-4 rounded-lg bg-white p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-400">내 신청</span>
                       <Badge variant={appStatusConfig.variant}>

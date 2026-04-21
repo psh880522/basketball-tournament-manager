@@ -516,7 +516,7 @@ export default function ResultForm({
                       </thead>
                       <tbody className="divide-y">
                         {orderedMatches.map((match) => (
-                          <tr key={match.id} className="hover:bg-gray-50">
+                          <tr key={match.id} className="hover:bg-white">
                             <td className="px-2 py-1 text-gray-600 whitespace-nowrap">
                               {formatTime(match.scheduled_at)}
                             </td>
@@ -632,7 +632,7 @@ export default function ResultForm({
               </thead>
               <tbody>
                 {standings.map((row) => (
-                  <tr key={row.id} className="border-b hover:bg-gray-50">
+                  <tr key={row.id} className="border-b hover:bg-white">
                     <td className="px-2 py-2 text-gray-600">{row.rank}</td>
                     <td className="px-2 py-2 font-medium text-gray-800">{row.teams?.team_name ?? "-"}</td>
                     <td className="px-2 py-2 text-gray-600">{row.wins}</td>
@@ -722,7 +722,7 @@ export default function ResultForm({
                       ]
                     : "토너먼트";
                   return (
-                    <tr key={`${row.seedA}-${row.seedB}`} className="border-b hover:bg-gray-50">
+                    <tr key={`${row.seedA}-${row.seedB}`} className="border-b hover:bg-white">
                       <td className="px-2 py-1 text-gray-600">{roundLabel}</td>
                       <td className="px-2 py-1 text-gray-500">{row.seedA}위</td>
                       <td className="px-2 py-1 font-medium text-gray-800 truncate">{row.teamAName ?? "TBD"}</td>
@@ -870,7 +870,7 @@ export default function ResultForm({
                                 isAssignedTeam(match.team_b?.team_name);
 
                               return (
-                                <tr key={match.id} className="hover:bg-gray-50">
+                                <tr key={match.id} className="hover:bg-white">
                                   <td className="px-2 py-1 text-gray-600 whitespace-nowrap">
                                     {formatTime(match.scheduled_at)}
                                   </td>

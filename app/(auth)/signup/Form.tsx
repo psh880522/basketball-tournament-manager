@@ -231,7 +231,7 @@ export default function SignupForm() {
       />
 
       {/* 약관 동의 영역 */}
-      <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="space-y-2 rounded-lg border border-slate-200 bg-white px-4 py-3">
         {/* 전체 동의 */}
         <label className="flex cursor-pointer items-center gap-2">
           <input

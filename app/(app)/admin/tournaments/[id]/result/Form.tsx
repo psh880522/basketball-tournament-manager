@@ -171,7 +171,7 @@ export default function ResultForm({
         ) : (
           <div className="overflow-x-auto rounded-lg border bg-white">
             <table className="w-full text-sm">
-              <thead className="border-b bg-gray-50 text-left text-xs font-medium text-gray-500">
+              <thead className="border-b bg-white text-left text-xs font-medium text-gray-500">
                 <tr>
                   <th className="px-3 py-2">경기</th>
                   <th className="px-3 py-2 text-center" colSpan={3}>
@@ -182,7 +182,7 @@ export default function ResultForm({
               </thead>
               <tbody className="divide-y">
                 {editableMatches.map((match) => (
-                  <tr key={match.id} className="hover:bg-gray-50">
+                  <tr key={match.id} className="hover:bg-white">
                     <td className="px-3 py-2 whitespace-nowrap">
                       <span className="font-medium">
                         {match.team_a?.team_name ?? "TBD"}

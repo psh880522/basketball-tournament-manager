@@ -148,7 +148,7 @@ export default function ApplyTeamForm({
             ))}
           </select>
           {selectedDivision && (
-            <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 space-y-0.5">
+            <div className="rounded-lg bg-white px-3 py-2 text-sm text-gray-600 space-y-0.5">
               <p>
                 <span className="font-medium text-gray-800">참가비:</span>{" "}
                 {selectedDivision.entry_fee > 0
@@ -200,7 +200,7 @@ export default function ApplyTeamForm({
           <div className="space-y-1.5">
             <p className="text-sm font-medium text-gray-700">출전 선수 선택</p>
             {isRosterLocked ? (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+              <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
                 대회가 이미 시작되어 출전 선수를 선택할 수 없습니다.
                 <br />
                 신청 후 로스터는 수정되지 않습니다.

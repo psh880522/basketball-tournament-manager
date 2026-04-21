@@ -427,7 +427,7 @@ export default async function TournamentMatchesPage({
                                     {allRows.map((row) => {
                                       if (row._kind === "break") {
                                         return (
-                                          <tr key={row.id} className="border-b hover:bg-gray-50">
+                                          <tr key={row.id} className="border-b hover:bg-white">
                                             <td className="whitespace-nowrap px-2 py-1 text-gray-600">
                                               {formatTime(row.start_at)}
                                             </td>
@@ -474,7 +474,7 @@ export default async function TournamentMatchesPage({
                                         const labelA = vsIdx !== -1 ? matchLabel.slice(0, vsIdx) : matchLabel;
                                         const labelB = vsIdx !== -1 ? matchLabel.slice(vsIdx + 4) : null;
                                         return (
-                                          <tr key={m.id} className="border-b hover:bg-gray-50">
+                                          <tr key={m.id} className="border-b hover:bg-white">
                                             <td className="whitespace-nowrap px-2 py-1 text-gray-600">
                                               {formatTime(m.scheduled_at)}
                                             </td>
@@ -508,7 +508,7 @@ export default async function TournamentMatchesPage({
                                         );
                                       } else {
                                         return (
-                                          <tr key={m.id} className="border-b hover:bg-gray-50">
+                                          <tr key={m.id} className="border-b hover:bg-white">
                                             <td className="whitespace-nowrap px-2 py-1 text-gray-600">
                                               {formatTime(m.scheduled_at)}
                                             </td>

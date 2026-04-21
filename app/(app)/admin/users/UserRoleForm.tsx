@@ -33,7 +33,7 @@ export default function UserRoleForm({ userId, currentRole }: Props) {
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-white disabled:opacity-50"
       >
         {isPending ? "처리 중..." : label}
       </button>

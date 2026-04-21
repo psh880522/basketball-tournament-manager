@@ -133,7 +133,7 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
             {divisions.map((division) => (
               <div
                 key={division.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 bg-gray-50 px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 bg-white px-3 py-2"
               >
                 <span className="font-medium text-gray-700">{division.name}</span>
                 <div className="flex flex-wrap gap-3 text-xs text-gray-500">
@@ -382,7 +382,7 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
                         {rows.map((row) => {
                           if (row._kind === "league") {
                             return (
-                              <tr key={row.match.id} className="border-b hover:bg-gray-50">
+                              <tr key={row.match.id} className="border-b hover:bg-white">
                                 <td className="px-2 py-1">
                                   <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">리그</span>
                                 </td>
@@ -403,7 +403,7 @@ export function BracketConsoleForm({ tournamentId, summary }: Props) {
                           }
                           const { match, roundName, isInitialRound } = row;
                           return (
-                            <tr key={match.id} className="border-b hover:bg-gray-50">
+                            <tr key={match.id} className="border-b hover:bg-white">
                               <td className="px-2 py-1">
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">토너먼트</span>
                               </td>

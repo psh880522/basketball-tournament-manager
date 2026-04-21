@@ -259,7 +259,7 @@ function AddDivisionForm({
 
   return (
     <form
-      className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4"
+      className="rounded-lg border border-gray-200 bg-white p-4 space-y-4"
       onSubmit={handleSubmit}
     >
       <DivisionFields

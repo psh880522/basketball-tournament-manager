@@ -78,7 +78,7 @@ export default async function MyApplicationsPage() {
 
             return (
               <Link key={app.id} href={`/my-applications/${app.id}`}>
-                <Card className="hover:bg-gray-50 transition-colors cursor-pointer">
+                <Card className="hover:bg-white transition-colors cursor-pointer">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1.5 min-w-0">
                       <p className="font-medium text-slate-900 truncate">
