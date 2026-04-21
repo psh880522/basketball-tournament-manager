@@ -41,8 +41,9 @@ export default async function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-slate-50 px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
+    <main className="min-h-[calc(100vh-3.5rem)] bg-gray-50 px-4 py-12">
+      <div className="mx-auto w-full max-w-sm space-y-6">
+        <div className="h-9" />
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-bold text-slate-900">새 비밀번호 설정</h1>
           <p className="text-sm text-slate-500">

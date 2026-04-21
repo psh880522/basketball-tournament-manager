@@ -77,11 +77,11 @@ export default async function OnboardingCompletionPage({
   const config = STEP_CONFIG[step];
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
+    <main className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="mx-auto flex max-w-md flex-col gap-6">
         <OnboardingStepIndicator currentStep={config.completedStep} />
 
-        <div className="flex flex-col items-center gap-2 py-4 text-center">
+        <div className="mt-4 flex flex-col items-center gap-2 py-4 text-center">
           <span className="text-5xl">✓</span>
           <h1 className="text-2xl font-semibold text-slate-900">
             {config.title}

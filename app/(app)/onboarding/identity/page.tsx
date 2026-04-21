@@ -36,11 +36,11 @@ export default async function OnboardingIdentityPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
+    <main className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="mx-auto flex max-w-md flex-col gap-6">
         <OnboardingStepIndicator currentStep="player" />
 
-        <header className="space-y-1">
+        <header className="mt-4 space-y-1">
           <h1 className="text-2xl font-semibold text-slate-900">
             선수 등록 — 본인인증
           </h1>

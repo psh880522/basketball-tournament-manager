@@ -38,13 +38,13 @@ export default async function OnboardingProfilePage() {
 
   // 3. 렌더링
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
+    <main className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="mx-auto flex max-w-md flex-col gap-6">
         <OnboardingStepIndicator currentStep="player" />
 
-        <header className="space-y-1">
+        <header className="mt-4 space-y-1 text-center">
           <h1 className="text-2xl font-semibold text-slate-900">
-            선수 등록 — 기본 정보 입력
+            기본 정보 입력
           </h1>
           <p className="text-sm text-slate-500">
             닉네임과 선수 정보를 입력하세요.

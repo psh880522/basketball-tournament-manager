@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FieldHint from "@/components/ui/FieldHint";
+import StepIndicator from "@/components/ui/StepIndicator";
 import {
   TOURNAMENT_SIZE_LABELS,
   TOURNAMENT_SIZE_OPTIONS,
@@ -91,40 +92,7 @@ function validateStep2(courts: CourtDraft[]): string | null {
   return null;
 }
 
-function StepIndicator({ currentStep }: { currentStep: number }) {
-  const steps = ["기본정보", "디비전", "운영설정"];
-  return (
-    <div className="flex items-center justify-center gap-1 mb-2">
-      {steps.map((label, i) => (
-        <div key={i} className="flex items-center gap-1">
-          <div
-            className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-              i <= currentStep
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-500"
-            }`}
-          >
-            {i + 1}
-          </div>
-          <span
-            className={`text-xs ${
-              i === currentStep ? "font-semibold text-blue-600" : "text-gray-400"
-            }`}
-          >
-            {label}
-          </span>
-          {i < steps.length - 1 && (
-            <div
-              className={`mx-1 h-0.5 w-8 ${
-                i < currentStep ? "bg-blue-600" : "bg-gray-200"
-              }`}
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
+const NEW_TOURNAMENT_STEPS = ["기본정보", "디비전", "운영설정"];
 
 export default function NewTournamentForm() {
   const router = useRouter();
@@ -299,7 +267,7 @@ export default function NewTournamentForm() {
       </div>
 
       {/* 진행 표시 */}
-      <StepIndicator currentStep={step} />
+      <StepIndicator steps={NEW_TOURNAMENT_STEPS} currentStep={step} />
 
       {/* Step 0: 기본정보 + 포스터 */}
       {step === 0 && (
@@ -506,7 +474,7 @@ export default function NewTournamentForm() {
                   return (
                     <div
                       key={division.id}
-                      className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3"
+                      className="rounded-lg border border-gray-200 bg-white p-4 space-y-3"
                     >
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">디비전 {index + 1}</p>
@@ -661,7 +629,7 @@ export default function NewTournamentForm() {
                 {courts.map((court, index) => (
                   <div
                     key={court.id}
-                    className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white p-3"
                   >
                     <div className="min-w-[160px] flex-1 space-y-1">
                       <label className="text-xs font-medium text-gray-600">

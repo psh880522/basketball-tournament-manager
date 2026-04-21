@@ -19,6 +19,10 @@ const config: Config = {
           container: "#3949AB",
           on: "#FFFFFF",
         },
+        tertiary: {
+          DEFAULT: "#7a5400",
+          container: "#fbb423",
+        },
         surface: {
           DEFAULT: "#ffffff",
           low: "#f0f0f0",

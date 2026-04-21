@@ -7,6 +7,7 @@ import { logoutAction } from "@/app/actions/auth";
 type ProfilePopupProps = {
   email: string | null;
   role: Role | null;
+  collapsed?: boolean;
 };
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -16,7 +17,7 @@ const ROLE_LABEL: Record<Role, string> = {
   player: "플레이어",
 };
 
-export default function ProfilePopup({ email, role }: ProfilePopupProps) {
+export default function ProfilePopup({ email, role, collapsed = false }: ProfilePopupProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -36,29 +37,34 @@ export default function ProfilePopup({ email, role }: ProfilePopupProps) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
+        title={collapsed ? (email ?? "프로필") : undefined}
+        className={`flex w-full items-center rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-50 ${collapsed ? "justify-center" : "gap-3"}`}
       >
         {/* 아바타 */}
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
           {email ? email[0].toUpperCase() : "?"}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-medium text-slate-800">
-            {email ?? "사용자"}
-          </span>
-          {role && (
-            <span className="block text-xs text-slate-400">
-              {ROLE_LABEL[role]}
+        {!collapsed && (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-medium text-slate-800">
+                {email ?? "사용자"}
+              </span>
+              {role && (
+                <span className="block text-xs text-slate-400">
+                  {ROLE_LABEL[role]}
+                </span>
+              )}
             </span>
-          )}
-        </span>
-        {/* 화살표 */}
-        <svg
-          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+            {/* 화살표 */}
+            <svg
+              className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </>
+        )}
       </button>
 
       {/* 팝업 메뉴 */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/src/lib/auth/roles";
@@ -138,6 +139,7 @@ function buildMenuSections(
 }
 
 export default function Sidebar({ role, userEmail, hasTeam = false, isCaptain = false }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const sections = buildMenuSections(role, hasTeam, isCaptain);
   const allItems = sections.flatMap((s) => s.items);
@@ -157,20 +159,39 @@ export default function Sidebar({ role, userEmail, hasTeam = false, isCaptain = 
   };
 
   return (
-    <aside className="flex h-screen w-56 flex-col bg-[#f0f0f0]">
-      {/* 로고 */}
-      <div className="flex h-14 shrink-0 items-center px-4">
-        <Link href="/" className="text-sm font-bold tracking-tight text-slate-900 font-[var(--font-space-grotesk)]">
-          🏀 23BOARD
-        </Link>
+    <aside
+      style={{ boxShadow: "4px 0 12px rgba(0,0,0,0.05)", zIndex: 10 }}
+      className={`relative flex h-screen flex-col bg-white transition-all duration-200 ${collapsed ? "w-14" : "w-56"}`}
+    >
+      {/* 로고 + 토글 버튼 */}
+      <div className="flex h-14 shrink-0 items-center justify-between px-3">
+        {!collapsed && (
+          <Link href="/" className="text-sm font-bold tracking-tight text-slate-900 font-[var(--font-space-grotesk)]">
+            🏀 23BOARD
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={() => setCollapsed((prev) => !prev)}
+          className={`flex h-7 w-7 items-center justify-center rounded-[4px] text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors ${collapsed ? "mx-auto" : ""}`}
+          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {collapsed ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            )}
+          </svg>
+        </button>
       </div>
 
       {/* 메뉴 */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-2 py-4">
         <div className="space-y-4">
           {sections.map((section, si) => (
             <div key={si}>
-              {section.title && (
+              {!collapsed && section.title && (
                 <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   {section.title}
                 </p>
@@ -180,14 +201,17 @@ export default function Sidebar({ role, userEmail, hasTeam = false, isCaptain = 
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`flex items-center gap-3 rounded-[4px] px-3 py-2 text-sm transition-colors ${
+                      title={collapsed ? item.label : undefined}
+                      className={`flex items-center rounded-[4px] px-3 py-2 text-sm transition-colors ${
+                        collapsed ? "justify-center" : "gap-3"
+                      } ${
                         isActive(item.href)
-                          ? "bg-white font-semibold text-slate-900 shadow-sm"
-                          : "text-slate-600 hover:bg-white/60 hover:text-slate-900"
+                          ? "bg-slate-100 font-semibold text-slate-900"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                       }`}
                     >
                       {item.icon}
-                      {item.label}
+                      {!collapsed && item.label}
                     </Link>
                   </li>
                 ))}
@@ -198,8 +222,8 @@ export default function Sidebar({ role, userEmail, hasTeam = false, isCaptain = 
       </nav>
 
       {/* 하단 프로필 */}
-      <div className="shrink-0 p-3">
-        <ProfilePopup email={userEmail} role={role} />
+      <div className="shrink-0 p-2">
+        <ProfilePopup email={userEmail} role={role} collapsed={collapsed} />
       </div>
     </aside>
   );

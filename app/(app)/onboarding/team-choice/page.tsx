@@ -40,11 +40,11 @@ export default async function TeamChoicePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
+    <main className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="mx-auto flex max-w-md flex-col gap-6">
         <OnboardingStepIndicator currentStep="team" />
 
-        <header className="space-y-1">
+        <header className="mt-4 space-y-1">
           <h1 className="text-2xl font-semibold text-slate-900">팀을 선택하세요</h1>
           <p className="text-sm text-slate-500">
             팀을 만들거나, 기존 팀에 합류 신청을 할 수 있습니다.

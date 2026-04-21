@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  /* 페이지 기본 배경색 — bg-page 로 사용 */
+  --color-page: #f9fafb; /* = gray-50 */
+}
+
 :root {
   /* Surface hierarchy (No-Line Rule: use tone shifts, not borders) */
-  --ui-bg: #f0f0f0;
+  --ui-bg: #f9fafb; /* gray-50 */
   --ui-surface: #ffffff;
   --ui-surface-low: #f0f0f0;
   --ui-surface-mid: #e0e0e0;
@@ -27,6 +32,10 @@
   --ui-warning: #f43f5e;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--ui-bg);
   color: var(--ui-text);
@@ -36,6 +45,15 @@ body {
 
 main {
   min-height: 100vh;
+}
+
+/* Gradient utilities */
+.arena-gradient {
+  background: linear-gradient(135deg, #FF8C33 0%, #FF6B00 100%);
+}
+
+.hero-bg {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 50%, #fffbeb 100%);
 }
 
 /* Typography scale */

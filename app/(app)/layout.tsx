@@ -21,14 +21,14 @@ export default async function AppLayout({
   }
 
   return isLoggedIn ? (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen bg-gray-50">
       <Sidebar
         role={userResult.role}
         userEmail={userResult.user?.email ?? null}
         hasTeam={hasTeam}
         isCaptain={isCaptain}
       />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-gray-50">{children}</main>
     </div>
   ) : (
     <>
