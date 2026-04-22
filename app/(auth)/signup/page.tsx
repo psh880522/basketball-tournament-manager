@@ -1,17 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
 import Card from "@/components/ui/Card";
 import SignupForm from "./Form";
 import OnboardingStepIndicator from "@/components/onboarding/OnboardingStepIndicator";
 
 export default async function SignupPage() {
-  const result = await getUserWithRole();
-
-  if (result.status === "ready") {
-    redirect(isOperationRole(result.role) ? "/admin" : "/dashboard");
-  }
-
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-gray-50 px-4 py-12">
       <div className="mx-auto w-full max-w-sm space-y-6">

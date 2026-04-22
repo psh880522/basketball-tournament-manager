@@ -89,19 +89,19 @@ async function TournamentDetail({ id }: { id: string }) {
       <div className="mx-auto max-w-5xl">
 
         {/* Hero */}
-        <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mb-3">
 
           {/* 포스터 카드: 이미지 + 상태/이름/기간/장소/부문 오버레이 */}
-          <div className="relative overflow-hidden rounded-xl shadow-sm sm:col-span-2">
+          <div className="relative h-72 overflow-hidden rounded-xl bg-white shadow-sm sm:h-100">
             {tournament.poster_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={tournament.poster_url}
                 alt={tournament.name}
-                className="block h-auto w-full"
+                className="mx-auto block h-full w-auto"
               />
             ) : (
-              <div className="flex min-h-64 items-center justify-center bg-gradient-to-br from-slate-800 to-slate-600">
+              <div className="flex h-full items-center justify-center">
                 <span className="text-5xl">🏀</span>
               </div>
             )}
@@ -218,7 +218,7 @@ async function TournamentDetail({ id }: { id: string }) {
 
           {/* 사이드바 (1/3) */}
           <div className="md:col-span-1">
-            <div className="sticky top-6 flex flex-col gap-3">
+            <div className="sticky flex flex-col gap-3" style={{ top: "calc(var(--header-height, 0px) + 0.5rem)" }}>
               <Card>
                 <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                   참가 안내

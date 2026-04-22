@@ -24,7 +24,7 @@ export default async function MyApplicationDetailPage({
 
   /* ── 인증 ──────────────────────────────────── */
   const auth = await getUserWithRole();
-  if (auth.status === "unauthenticated" || auth.status === "empty") {
+  if (auth.status === "empty") {
     redirect("/login");
   }
   if (auth.status === "error") {

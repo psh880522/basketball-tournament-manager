@@ -1,17 +1,8 @@
 ﻿import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getUserWithRole, isOperationRole, isPlayerRole } from "@/src/lib/auth/roles";
 import Card from "@/components/ui/Card";
 import LoginForm from "./Form";
 
 export default async function LoginPage() {
-  const result = await getUserWithRole();
-  if (result.status === "ready") {
-    if (isOperationRole(result.role)) redirect("/admin");
-    if (isPlayerRole(result.role)) redirect("/dashboard");
-    redirect("/");
-  }
-
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-gray-50 px-4 py-12">
       <div className="mx-auto w-full max-w-sm space-y-6">

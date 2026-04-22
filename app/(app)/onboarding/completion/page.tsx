@@ -36,7 +36,7 @@ export default async function OnboardingCompletionPage({
 }) {
   const result = await getUserWithRole();
 
-  if (result.status === "unauthenticated" || result.status === "empty") {
+  if (result.status === "empty") {
     redirect("/login");
   }
 

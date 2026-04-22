@@ -9,8 +9,6 @@ export const dynamic = "force-dynamic";
 export default async function OnboardingIdentityPage() {
   const result = await getUserWithRole();
 
-  // 비로그인 → 로그인
-  if (result.status === "unauthenticated") redirect("/login");
   if (result.status === "empty") redirect("/login");
 
   if (result.status === "error") {

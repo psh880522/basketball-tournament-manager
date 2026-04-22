@@ -6,6 +6,7 @@
 }
 
 :root {
+  --header-height: 0px;
   /* Surface hierarchy (No-Line Rule: use tone shifts, not borders) */
   --ui-bg: #f9fafb; /* gray-50 */
   --ui-surface: #ffffff;

@@ -7,8 +7,6 @@ import { getMyTeamsWithTournament } from "@/lib/api/teams";
 async function TeamContent() {
   const result = await getUserWithRole();
 
-  if (result.status === "unauthenticated") redirect("/login");
-
   if (result.status === "error") {
     return (
       <main style={{ padding: 24 }}>

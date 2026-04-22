@@ -10,6 +10,7 @@ import {
 import { getInProgressTournaments, getOpenTournaments } from "@/lib/api/tournaments";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import DragScroll from "@/components/ui/DragScroll";
 import type { Role } from "@/src/lib/auth/roles";
 
 // 히어로 배경 이미지 — 추후 적합한 이미지로 교체 시 이 경로만 변경
@@ -73,11 +74,11 @@ async function OpenTournamentsList({ role }: { role: Role | null }) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <DragScroll className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {data.map((tournament) => (
         <div
           key={tournament.id}
-          className="bg-white rounded-xl border-l-4 border-[#FF6B00] shadow-md p-5 space-y-2"
+          className="w-72 shrink-0 flex flex-col bg-white rounded-xl border-l-4 border-[#FF6B00] shadow-md p-5 gap-2"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-lg">🏀</span>
@@ -85,11 +86,9 @@ async function OpenTournamentsList({ role }: { role: Role | null }) {
               모집 중
             </Badge>
           </div>
-          <Link href={`/tournament/${tournament.id}`}>
-            <h3 className="font-space-grotesk text-lg font-bold text-gray-900 hover:text-[#FF6B00] transition-colors leading-tight">
-              {tournament.name}
-            </h3>
-          </Link>
+          <h3 className="font-space-grotesk text-lg font-bold text-gray-900 leading-tight">
+            {tournament.name}
+          </h3>
           <div className="space-y-1">
             <p className="text-xs text-gray-500 uppercase tracking-widest">
               {formatDateRange(tournament.start_date, tournament.end_date)}
@@ -98,7 +97,7 @@ async function OpenTournamentsList({ role }: { role: Role | null }) {
               {tournament.location || "TBD"}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="mt-auto flex flex-wrap gap-2 pt-1">
             <Link href={`/tournament/${tournament.id}`}>
               <Button variant="secondary">상세보기</Button>
             </Link>
@@ -118,7 +117,7 @@ async function OpenTournamentsList({ role }: { role: Role | null }) {
           </div>
         </div>
       ))}
-    </div>
+    </DragScroll>
   );
 }
 
@@ -142,11 +141,11 @@ async function InProgressTournamentsList() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <DragScroll className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {data.map((tournament) => (
         <div
           key={tournament.id}
-          className="bg-white rounded-xl border-l-4 border-secondary shadow-md p-5 space-y-2"
+          className="w-72 shrink-0 flex flex-col bg-white rounded-xl border-l-4 border-secondary shadow-md p-5 gap-2"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-lg">🏆</span>
@@ -154,11 +153,9 @@ async function InProgressTournamentsList() {
               진행 중
             </Badge>
           </div>
-          <Link href={`/tournament/${tournament.id}`}>
-            <h3 className="font-space-grotesk text-xl font-bold text-gray-900 hover:text-[#1A237E] transition-colors leading-tight">
-              {tournament.name}
-            </h3>
-          </Link>
+          <h3 className="font-space-grotesk text-xl font-bold text-gray-900 leading-tight">
+            {tournament.name}
+          </h3>
           <div className="space-y-1">
             <p className="text-xs text-gray-500 uppercase tracking-widest">
               {formatDateRange(tournament.start_date, tournament.end_date)}
@@ -167,7 +164,7 @@ async function InProgressTournamentsList() {
               {tournament.location || "TBD"}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="mt-auto flex flex-wrap gap-2 pt-1">
             <Link href={`/tournament/${tournament.id}`}>
               <Button variant="secondary">대회 보기</Button>
             </Link>
@@ -177,7 +174,7 @@ async function InProgressTournamentsList() {
           </div>
         </div>
       ))}
-    </div>
+    </DragScroll>
   );
 }
 
@@ -274,9 +271,9 @@ export default async function HomePage() {
           </div>
           <Suspense
             fallback={
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-3">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-44 rounded-xl bg-gray-200 animate-pulse" />
+                  <div key={i} className="w-72 shrink-0 h-44 rounded-xl bg-gray-200 animate-pulse" />
                 ))}
               </div>
             }
@@ -298,9 +295,9 @@ export default async function HomePage() {
           </div>
           <Suspense
             fallback={
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-3">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-44 rounded-xl bg-gray-200 animate-pulse" />
+                  <div key={i} className="w-72 shrink-0 h-44 rounded-xl bg-gray-200 animate-pulse" />
                 ))}
               </div>
             }

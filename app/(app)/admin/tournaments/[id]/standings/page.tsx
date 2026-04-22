@@ -137,7 +137,6 @@ export default async function TournamentStandingsPage({
 }: PageProps) {
   const userResult = await getUserWithRole();
 
-  if (userResult.status === "unauthenticated") redirect("/login");
   if (userResult.status === "error") {
     return (
       <main className="p-6">

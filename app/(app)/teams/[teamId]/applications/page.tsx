@@ -15,7 +15,7 @@ export default async function TeamApplicationsPage({
   const { teamId } = await params;
 
   const auth = await getUserWithRole();
-  if (auth.status === "unauthenticated" || auth.status === "empty") {
+  if (auth.status === "empty") {
     redirect("/login");
   }
 

@@ -17,8 +17,6 @@ export default async function AdminUsersPage({
 }) {
   const result = await getUserWithRole();
 
-  if (result.status === "unauthenticated") redirect("/login");
-
   if (result.status === "error") {
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-8">

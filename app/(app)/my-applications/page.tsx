@@ -29,7 +29,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default async function MyApplicationsPage() {
   const result = await getUserWithRole();
 
-  if (result.status === "unauthenticated" || result.status === "empty") {
+  if (result.status === "empty") {
     redirect("/login");
   }
 

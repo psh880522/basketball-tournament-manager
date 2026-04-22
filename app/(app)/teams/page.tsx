@@ -12,7 +12,7 @@ export const revalidate = 0;
 export default async function MyTeamsPage() {
   const result = await getUserWithRole();
 
-  if (result.status === "unauthenticated" || result.status === "empty") {
+  if (result.status === "empty") {
     redirect("/login");
   }
 

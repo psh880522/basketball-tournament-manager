@@ -23,7 +23,6 @@ export default async function TournamentResultPage({
 }: PageProps) {
   const userResult = await getUserWithRole();
 
-  if (userResult.status === "unauthenticated") redirect("/login");
   if (userResult.status === "error") {
     return <Card className="text-sm text-red-600">{userResult.error}</Card>;
   }

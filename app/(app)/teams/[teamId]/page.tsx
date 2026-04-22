@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import { getTeam, getMyRoleInTeam } from "@/lib/api/teams";
 import { getTeamMembers } from "@/lib/api/rosters";
@@ -21,8 +20,6 @@ export default async function TeamDetailPage({
 
   /* ── 인증 ──────────────────────────────────── */
   const auth = await getUserWithRole();
-  if (auth.status === "unauthenticated") redirect("/login");
-
   if (auth.status === "error") {
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-8">

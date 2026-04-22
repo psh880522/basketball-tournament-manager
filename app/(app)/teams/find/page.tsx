@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function TeamsFindPage() {
   const result = await getUserWithRole();
 
-  if (result.status === "unauthenticated" || result.status === "empty") {
+  if (result.status === "empty") {
     redirect("/login");
   }
 

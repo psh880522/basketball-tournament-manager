@@ -11,7 +11,6 @@ export default async function OnboardingProfilePage() {
   // 1. 인증 가드
   const userResult = await getUserWithRole();
 
-  if (userResult.status === "unauthenticated") redirect("/login");
   if (userResult.status === "empty") redirect("/login");
 
   if (userResult.status === "error") {
