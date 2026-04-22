@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
 export const createSupabaseServerClient = cache(async () => {
   const cookieStore = await cookies();
@@ -26,6 +27,14 @@ export const createSupabaseServerClient = cache(async () => {
     }
   );
 });
+
+export function createSupabaseAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export type TournamentStatus = "draft" | "open" | "closed";
 

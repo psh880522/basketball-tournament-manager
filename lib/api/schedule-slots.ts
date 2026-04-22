@@ -1192,7 +1192,7 @@ export async function generateScheduleSlots(input: {
         hasTournamentSlots = true;
       }
 
-      if (hasGroupSlots || hasTournamentSlots) {
+      if ((hasGroupSlots || hasTournamentSlots) && breakDurationMinutes > 0) {
         const stageTypeForBreak = hasTournamentSlots ? "tournament" : "group";
         const cursor = courtCursors.get(courtKey) ?? new Date(startDate);
         const startAt = new Date(cursor);

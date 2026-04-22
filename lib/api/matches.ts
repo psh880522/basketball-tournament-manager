@@ -571,3 +571,128 @@ export async function updateMatchSeeds(
     error: error ? error.message : null,
   };
 }
+
+/* ── 선수 대시보드용 조회 ────────────────────────────────────────────────── */
+
+import type { UpcomingMatch, CompletedMatch } from "@/lib/types/dashboard";
+
+export async function getMyUpcomingMatches(): Promise<ApiResult<UpcomingMatch[]>> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "로그인이 필요합니다." };
+
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("user_id", user.id);
+
+  const teamIds = (members ?? []).map((m: { team_id: string }) => m.team_id);
+  if (teamIds.length === 0) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from("matches")
+    .select(
+      "id,group_id,scheduled_at,tournament_id,tournaments(name),divisions(name),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name),court:courts(name),team_a_id,team_b_id"
+    )
+    .or(`team_a_id.in.(${teamIds.join(",")}),team_b_id.in.(${teamIds.join(",")})`)
+    .eq("status", "scheduled")
+    .not("scheduled_at", "is", null)
+    .gte("scheduled_at", new Date().toISOString())
+    .order("scheduled_at", { ascending: true })
+    .limit(20);
+
+  if (error) return { data: null, error: error.message };
+
+  const teamIdSet = new Set(teamIds);
+
+  const rows: UpcomingMatch[] = ((data ?? []) as Record<string, unknown>[]).map((row) => {
+    const teamA = row.team_a as { id: string; team_name: string } | null;
+    const teamB = row.team_b as { id: string; team_name: string } | null;
+    const tournament = row.tournaments as { name: string } | null;
+    const division = row.divisions as { name: string } | null;
+    const court = row.court as { name: string } | null;
+
+    const aIsMe = teamIdSet.has(row.team_a_id as string);
+    const myTeamId = aIsMe ? (row.team_a_id as string) : (row.team_b_id as string);
+    const myTeamName = aIsMe ? (teamA?.team_name ?? "") : (teamB?.team_name ?? "");
+    const opponentTeamId = aIsMe ? (row.team_b_id as string) : (row.team_a_id as string);
+    const opponentTeamName = aIsMe ? (teamB?.team_name ?? "TBD") : (teamA?.team_name ?? "TBD");
+
+    return {
+      matchId: row.id as string,
+      tournamentId: row.tournament_id as string,
+      tournamentName: tournament?.name ?? "",
+      divisionName: division?.name ?? "",
+      myTeamId,
+      myTeamName,
+      opponentTeamId,
+      opponentTeamName,
+      scheduledAt: row.scheduled_at as string,
+      courtName: court?.name ?? null,
+      roundLabel: row.group_id ? "조별리그" : null,
+    };
+  });
+
+  return { data: rows, error: null };
+}
+
+export async function getMyRecentResults(): Promise<ApiResult<CompletedMatch[]>> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "로그인이 필요합니다." };
+
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("user_id", user.id);
+
+  const teamIds = (members ?? []).map((m: { team_id: string }) => m.team_id);
+  if (teamIds.length === 0) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from("matches")
+    .select(
+      "id,team_a_id,team_b_id,score_a,score_b,winner_team_id,tournaments(name),divisions(name),team_a:teams!matches_team_a_id_fkey(id,team_name),team_b:teams!matches_team_b_id_fkey(id,team_name)"
+    )
+    .or(`team_a_id.in.(${teamIds.join(",")}),team_b_id.in.(${teamIds.join(",")})`)
+    .eq("status", "completed")
+    .not("winner_team_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  if (error) return { data: null, error: error.message };
+
+  const teamIdSet = new Set(teamIds);
+
+  const rows: CompletedMatch[] = ((data ?? []) as Record<string, unknown>[]).map((row) => {
+    const teamA = row.team_a as { id: string; team_name: string } | null;
+    const teamB = row.team_b as { id: string; team_name: string } | null;
+    const tournament = row.tournaments as { name: string } | null;
+    const division = row.divisions as { name: string } | null;
+
+    const aIsMe = teamIdSet.has(row.team_a_id as string);
+    const myTeamId = aIsMe ? (row.team_a_id as string) : (row.team_b_id as string);
+    const myTeamName = aIsMe ? (teamA?.team_name ?? "") : (teamB?.team_name ?? "");
+    const opponentTeamName = aIsMe ? (teamB?.team_name ?? "TBD") : (teamA?.team_name ?? "TBD");
+    const myScore = aIsMe ? ((row.score_a as number) ?? 0) : ((row.score_b as number) ?? 0);
+    const opponentScore = aIsMe ? ((row.score_b as number) ?? 0) : ((row.score_a as number) ?? 0);
+
+    return {
+      matchId: row.id as string,
+      tournamentName: tournament?.name ?? "",
+      divisionName: division?.name ?? "",
+      myTeamId,
+      myTeamName,
+      opponentTeamName,
+      myScore,
+      opponentScore,
+      isWin: teamIdSet.has(row.winner_team_id as string),
+    };
+  });
+
+  return { data: rows, error: null };
+}

@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseAdminClient } from "@/src/lib/supabase/server";
 import { getUserWithRole } from "@/src/lib/auth/roles";
 import type { ApiResult } from "@/lib/types/api";
 
@@ -127,6 +127,7 @@ export async function createDummyTeam(input: {
   }
 
   const supabase = await createSupabaseServerClient();
+  const adminSupabase = createSupabaseAdminClient();
 
   const { data: division, error: divisionError } = await supabase
     .from("divisions")
@@ -153,7 +154,7 @@ export async function createDummyTeam(input: {
     teamName = `DUMMY-${nextIndex}`;
   }
 
-  const { data: team, error: teamError } = await supabase
+  const { data: team, error: teamError } = await adminSupabase
     .from("teams")
     .insert({
       team_name: teamName,
@@ -166,7 +167,7 @@ export async function createDummyTeam(input: {
 
   if (teamError) return { ok: false, error: teamError.message };
 
-  const { error: applicationError } = await supabase
+  const { error: applicationError } = await adminSupabase
     .from("tournament_team_applications")
     .insert({
       tournament_id: input.tournamentId,

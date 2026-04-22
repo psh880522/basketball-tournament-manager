@@ -728,6 +728,7 @@ export type MyApplicationListRow = {
   tournament_id: string;
   tournament_name: string;
   tournament_start_date: string | null;
+  tournament_status: string | null;
   division_id: string;
   division_name: string;
   team_id: string;
@@ -776,7 +777,7 @@ export async function listMyApplications(): Promise<ApiResult<MyApplicationListR
       "confirmed_at",
       "teams(team_name)",
       "divisions(name)",
-      "tournaments(name, start_date)",
+      "tournaments(name, start_date, status)",
       "rosters(id, roster_members(id))",
     ].join(", "))
     .in("team_id", teamIds)
@@ -788,7 +789,7 @@ export async function listMyApplications(): Promise<ApiResult<MyApplicationListR
     (row) => {
       const teams = row.teams as { team_name: string } | null;
       const divisions = row.divisions as { name: string } | null;
-      const tournaments = row.tournaments as { name: string; start_date: string | null } | null;
+      const tournaments = row.tournaments as { name: string; start_date: string | null; status: string | null } | null;
       // rosters.application_id 에 UNIQUE 제약이 있어 PostgREST가 배열 대신 단일 객체로 반환
       const rosterRaw = row.rosters as
         | { id: string; roster_members: { id: string }[] }
@@ -803,6 +804,7 @@ export async function listMyApplications(): Promise<ApiResult<MyApplicationListR
         tournament_id: row.tournament_id as string,
         tournament_name: tournaments?.name ?? "",
         tournament_start_date: tournaments?.start_date ?? null,
+        tournament_status: tournaments?.status ?? null,
         division_id: row.division_id as string,
         division_name: divisions?.name ?? "",
         team_id: row.team_id as string,
@@ -840,4 +842,89 @@ export async function listStatusHistory(
     data: (data ?? []) as ApplicationStatusHistoryRow[],
     error: null,
   };
+}
+
+/**
+ * 현재 유저가 소속된 모든 팀(캡틴+팀원)의 대회 신청 목록 조회.
+ * 대시보드에서 사용 (listMyApplications는 캡틴 팀만 반환).
+ */
+export async function listAllMyTeamApplications(): Promise<
+  ApiResult<MyApplicationListRow[]>
+> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "로그인이 필요합니다." };
+
+  const { data: memberships, error: memErr } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("user_id", user.id);
+
+  if (memErr) return { data: null, error: memErr.message };
+
+  const teamIds = (memberships ?? []).map((m: { team_id: string }) => m.team_id);
+  if (teamIds.length === 0) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from("tournament_team_applications")
+    .select(
+      [
+        "id",
+        "tournament_id",
+        "team_id",
+        "division_id",
+        "status",
+        "submitted_at",
+        "payment_due_at",
+        "confirmed_at",
+        "teams(team_name)",
+        "divisions(name)",
+        "tournaments(name, start_date, status)",
+        "rosters(id, roster_members(id))",
+      ].join(", ")
+    )
+    .in("team_id", teamIds)
+    .order("submitted_at", { ascending: false });
+
+  if (error) return { data: null, error: error.message };
+
+  const rows: MyApplicationListRow[] = (
+    (data ?? []) as unknown as Record<string, unknown>[]
+  ).map((row) => {
+    const teams = row.teams as { team_name: string } | null;
+    const divisions = row.divisions as { name: string } | null;
+    const tournaments = row.tournaments as {
+      name: string;
+      start_date: string | null;
+      status: string | null;
+    } | null;
+    // rosters.application_id에 UNIQUE 제약이 있어 PostgREST가 배열 대신 단일 객체로 반환할 수 있음
+    const rosterRaw = row.rosters as
+      | { id: string; roster_members: { id: string }[] }
+      | { id: string; roster_members: { id: string }[] }[]
+      | null;
+    const roster = Array.isArray(rosterRaw) ? (rosterRaw[0] ?? null) : (rosterRaw ?? null);
+
+    return {
+      id: row.id as string,
+      tournament_id: row.tournament_id as string,
+      tournament_name: tournaments?.name ?? "",
+      tournament_start_date: tournaments?.start_date ?? null,
+      tournament_status: tournaments?.status ?? null,
+      division_id: row.division_id as string,
+      division_name: divisions?.name ?? "",
+      team_id: row.team_id as string,
+      team_name: teams?.team_name ?? "",
+      status: row.status as ApplicationStatus,
+      submitted_at: row.submitted_at as string,
+      payment_due_at: row.payment_due_at as string | null,
+      confirmed_at: row.confirmed_at as string | null,
+      has_roster: roster !== null,
+      roster_member_count: roster?.roster_members?.length ?? 0,
+    };
+  });
+
+  return { data: rows, error: null };
 }
