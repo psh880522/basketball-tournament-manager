@@ -277,6 +277,32 @@ export async function changeTournamentStatus(
   return { ok: true };
 }
 
+type DivisionSummary = {
+  id: string;
+  name: string;
+  entry_fee: number;
+  capacity: number | null;
+};
+
+export type TournamentListItem = {
+  id: string;
+  name: string;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: TournamentStatus;
+  poster_url: string | null;
+  divisions: DivisionSummary[];
+};
+
+export type TournamentListParams = {
+  status?: TournamentStatus | TournamentStatus[];
+  keyword?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  ids?: string[];
+};
+
 export async function getOpenTournaments(): Promise<
   ApiResult<PublicTournamentRow[]>
 > {
@@ -413,6 +439,93 @@ export async function getMyParticipatedTournaments(): Promise<
   }
 
   return { data: { participating, past }, error: null };
+}
+
+const LIST_STATUS_ORDER: Record<TournamentStatus, number> = {
+  open: 0,
+  closed: 1,
+  finished: 2,
+  draft: 3,
+};
+
+export async function getTournamentList(
+  params: TournamentListParams
+): Promise<ApiResult<TournamentListItem[]>> {
+  const supabase = await createSupabaseServerClient();
+
+  let query = supabase
+    .from("tournaments")
+    .select(
+      "id, name, location, start_date, end_date, status, poster_url, divisions(id, name, entry_fee, capacity, sort_order)"
+    )
+    .is("deleted_at", null);
+
+  if (params.ids) {
+    query = query.in("id", params.ids);
+  } else if (!params.status) {
+    query = query.in("status", ["open", "closed", "finished"]);
+  } else if (Array.isArray(params.status)) {
+    query = query.in("status", params.status);
+  } else {
+    query = query.eq("status", params.status);
+  }
+
+  if (params.keyword) {
+    const kw = params.keyword;
+    query = query.or(`name.ilike.%${kw}%,location.ilike.%${kw}%`);
+  }
+
+  if (params.dateFrom) {
+    query = query.gte("start_date", params.dateFrom);
+  }
+
+  if (params.dateTo) {
+    query = query.lte("start_date", params.dateTo);
+  }
+
+  const { data, error } = await query;
+
+  if (error) return { data: null, error: error.message };
+
+  const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map(
+    (row) => {
+      const rawDivisions = (
+        row.divisions as Record<string, unknown>[] | null ?? []
+      )
+        .slice()
+        .sort(
+          (a, b) =>
+            ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0)
+        )
+        .map((d) => ({
+          id: d.id as string,
+          name: d.name as string,
+          entry_fee: (d.entry_fee as number) ?? 0,
+          capacity: (d.capacity as number | null) ?? null,
+        }));
+
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        location: (row.location as string | null) ?? null,
+        start_date: (row.start_date as string | null) ?? null,
+        end_date: (row.end_date as string | null) ?? null,
+        status: row.status as TournamentStatus,
+        poster_url: (row.poster_url as string | null) ?? null,
+        divisions: rawDivisions,
+      };
+    }
+  );
+
+  rows.sort((a, b) => {
+    const statusDelta = LIST_STATUS_ORDER[a.status] - LIST_STATUS_ORDER[b.status];
+    if (statusDelta !== 0) return statusDelta;
+    const aDate = a.start_date ? Date.parse(a.start_date) : Number.MAX_SAFE_INTEGER;
+    const bDate = b.start_date ? Date.parse(b.start_date) : Number.MAX_SAFE_INTEGER;
+    return aDate - bDate;
+  });
+
+  return { data: rows, error: null };
 }
 
 export async function getPublicTournamentById(
