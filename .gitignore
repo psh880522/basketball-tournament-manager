@@ -45,4 +45,7 @@ next-env.d.ts
 
 .vercel
 .env*.local
-.claude/settings.local.json
+.claude/
+
+# Supabase CLI 로컬 상태 (link 정보, 버전 캐시 등)
+supabase/.temp/
