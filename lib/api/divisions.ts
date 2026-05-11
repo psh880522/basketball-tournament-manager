@@ -1,11 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
-type ActionResult = { ok: true } | { ok: false; error: string };
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
 export type DivisionRow = {
   id: string;
@@ -15,6 +9,10 @@ export type DivisionRow = {
   tournament_size: number | null;
   sort_order: number;
   standings_dirty: boolean;
+  entry_fee: number;
+  capacity: number | null;
+  min_roster_size: number;
+  max_roster_size: number | null;
 };
 
 export async function getDivisionsByTournament(
@@ -24,7 +22,7 @@ export async function getDivisionsByTournament(
   const { data, error } = await supabase
     .from("divisions")
     .select(
-      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty"
+      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty,entry_fee,capacity,min_roster_size,max_roster_size"
     )
     .eq("tournament_id", tournamentId)
     .order("sort_order", { ascending: true });
@@ -33,6 +31,42 @@ export async function getDivisionsByTournament(
     data,
     error: error ? error.message : null,
   };
+}
+
+export async function getDivisionById(
+  divisionId: string
+): Promise<ApiResult<DivisionRow>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("divisions")
+    .select(
+      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty,entry_fee,capacity,min_roster_size,max_roster_size"
+    )
+    .eq("id", divisionId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: "해당 division을 찾을 수 없습니다." };
+  return { data: data as DivisionRow, error: null };
+}
+
+export async function getDivisionApplicationCounts(
+  tournamentId: string
+): Promise<ApiResult<Record<string, number>>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_division_application_counts", {
+    p_tournament_id: tournamentId,
+  });
+
+  if (error) return { data: null, error: error.message };
+
+  const rows = (data ?? []) as { division_id: string; cnt: number }[];
+  const counts = rows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.division_id] = row.cnt;
+    return acc;
+  }, {});
+
+  return { data: counts, error: null };
 }
 
 export async function setDivisionStandingsDirty(
@@ -55,8 +89,10 @@ export async function createDivision(
     name: string;
     group_size?: number;
     tournament_size?: number | null;
+    entry_fee?: number;
+    capacity?: number | null;
   }
-): Promise<ActionResult> {
+): Promise<{ ok: false; error: string } | { ok: true; id: string; sort_order: number }> {
   const groupSize = input.group_size ?? 4;
   if (typeof groupSize !== "number" || groupSize < 2) {
     return { ok: false, error: "그룹 크기는 2 이상이어야 합니다." };
@@ -66,6 +102,14 @@ export async function createDivision(
     if (!Number.isInteger(input.tournament_size) || input.tournament_size < 2) {
       return { ok: false, error: "토너먼트 크기는 2 이상의 정수여야 합니다." };
     }
+  }
+
+  if (input.entry_fee !== undefined && input.entry_fee < 0) {
+    return { ok: false, error: "참가비는 0 이상이어야 합니다." };
+  }
+
+  if (input.capacity !== undefined && input.capacity !== null && input.capacity < 0) {
+    return { ok: false, error: "정원은 0 이상이어야 합니다." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -81,16 +125,18 @@ export async function createDivision(
 
   const nextOrder = (existing?.sort_order ?? -1) + 1;
 
-  const { error } = await supabase.from("divisions").insert({
+  const { data, error } = await supabase.from("divisions").insert({
     tournament_id: tournamentId,
     name: input.name.trim(),
     group_size: groupSize,
     tournament_size: input.tournament_size ?? null,
     sort_order: nextOrder,
-  });
+    entry_fee: input.entry_fee ?? 0,
+    capacity: input.capacity ?? null,
+  }).select("id,sort_order").single();
 
   if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  return { ok: true, id: data.id, sort_order: data.sort_order };
 }
 
 export async function updateDivision(
@@ -99,6 +145,8 @@ export async function updateDivision(
     name?: string;
     group_size?: number;
     tournament_size?: number | null;
+    entry_fee?: number;
+    capacity?: number | null;
   }
 ): Promise<ActionResult> {
   if (input.group_size !== undefined && (typeof input.group_size !== "number" || input.group_size < 2)) {
@@ -111,21 +159,42 @@ export async function updateDivision(
     }
   }
 
+  if (input.entry_fee !== undefined && input.entry_fee < 0) {
+    return { ok: false, error: "참가비는 0 이상이어야 합니다." };
+  }
+
+  // capacity 감소 유효성 검증
+  if (input.capacity !== undefined && input.capacity !== null) {
+    if (input.capacity < 0) {
+      return { ok: false, error: "정원은 0 이상이어야 합니다." };
+    }
+    const { getOccupiedCount } = await import("@/lib/api/applications");
+    const occupied = await getOccupiedCount(divisionId);
+    if (input.capacity < occupied) {
+      return {
+        ok: false,
+        error: `현재 ${occupied}팀이 자리를 차지하고 있어 그 수보다 낮게 줄일 수 없습니다.`,
+      };
+    }
+  }
+
   const payload: Record<string, unknown> = {};
   if (input.name !== undefined) payload.name = input.name.trim();
   if (input.group_size !== undefined) payload.group_size = input.group_size;
-  if (input.tournament_size !== undefined) {
-    payload.tournament_size = input.tournament_size;
-  }
+  if (input.tournament_size !== undefined) payload.tournament_size = input.tournament_size;
+  if (input.entry_fee !== undefined) payload.entry_fee = input.entry_fee;
+  if ("capacity" in input) payload.capacity = input.capacity ?? null;
 
   const supabase = await createSupabaseServerClient();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("divisions")
     .update(payload)
-    .eq("id", divisionId);
+    .eq("id", divisionId)
+    .select("id");
 
   if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "권한이 없거나 해당 division을 찾을 수 없습니다." };
   return { ok: true };
 }
 
@@ -135,6 +204,8 @@ export async function updateDivisionConfig(
     name?: string;
     group_size?: number;
     tournament_size?: number | null;
+    entry_fee?: number;
+    capacity?: number | null;
   }
 ): Promise<ActionResult> {
   return updateDivision(divisionId, input);
@@ -174,7 +245,7 @@ export async function listDivisionsWithStats(
           .select("id", { count: "exact", head: true })
           .eq("tournament_id", tournamentId)
           .eq("division_id", d.id)
-          .eq("status", "approved"),
+          .eq("status", "confirmed"),
         supabase
           .from("matches")
           .select("id", { count: "exact", head: true })

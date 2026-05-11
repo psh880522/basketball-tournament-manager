@@ -91,7 +91,7 @@ export async function assertTournamentStepAllowed(
       .from("tournament_team_applications")
       .select("team_id", { count: "exact", head: true })
       .eq("division_id", input.divisionId)
-      .eq("status", "approved");
+      .eq("status", "confirmed");
 
     if (approvedTeamsResult.error) {
       return { ok: false, error: approvedTeamsResult.error.message };

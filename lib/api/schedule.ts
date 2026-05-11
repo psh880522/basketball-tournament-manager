@@ -1,6 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-
-type ActionResult = { ok: true } | { ok: false; error: string };
+import type { ActionResult } from "@/lib/types/api";
 
 /* ─── Schedule match row (for schedule page) ─── */
 

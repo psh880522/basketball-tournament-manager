@@ -8,6 +8,7 @@ import { logoutAction } from "@/app/actions/auth";
 type NavItem = {
   label: string;
   href: string;
+  disabled?: boolean;
 };
 
 type NavMenuProps = {
@@ -28,11 +29,17 @@ export default function NavMenu({ items, isLoggedIn }: NavMenuProps) {
     <>
       {/* Desktop */}
       <nav className="hidden items-center gap-6 md:flex">
-        {items.map((item) => (
-          <Link key={item.href} href={item.href} className={linkClass(item.href)}>
-            {item.label}
-          </Link>
-        ))}
+        {items.map((item) =>
+          item.disabled ? (
+            <span key={item.href} className="text-sm text-slate-300 cursor-not-allowed select-none">
+              {item.label}
+            </span>
+          ) : (
+            <Link key={item.href} href={item.href} className={linkClass(item.href)}>
+              {item.label}
+            </Link>
+          )
+        )}
       </nav>
 
       <div className="hidden items-center gap-3 md:flex">
@@ -40,7 +47,7 @@ export default function NavMenu({ items, isLoggedIn }: NavMenuProps) {
           <form action={logoutAction}>
             <button
               type="submit"
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-orange-200 px-3 py-1.5 text-sm text-[#FF6B00] hover:bg-orange-50"
             >
               로그아웃
             </button>
@@ -48,7 +55,7 @@ export default function NavMenu({ items, isLoggedIn }: NavMenuProps) {
         ) : (
           <Link
             href="/login"
-            className="rounded-lg bg-black px-3 py-1.5 text-sm text-white hover:opacity-90"
+            className="rounded-lg bg-[#FF6B00] px-3 py-1.5 text-sm text-white hover:opacity-90"
           >
             로그인
           </Link>
@@ -80,21 +87,27 @@ export default function NavMenu({ items, isLoggedIn }: NavMenuProps) {
       {open && (
         <div className="absolute left-0 top-14 z-50 w-full border-b bg-white px-4 py-3 shadow-sm md:hidden">
           <nav className="flex flex-col gap-3">
-            {items.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={linkClass(item.href)}
-                onClick={() => setOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {items.map((item) =>
+              item.disabled ? (
+                <span key={item.href} className="text-sm text-slate-300 cursor-not-allowed select-none">
+                  {item.label}
+                </span>
+              ) : (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={linkClass(item.href)}
+                  onClick={() => setOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              )
+            )}
             {isLoggedIn ? (
               <form action={logoutAction}>
                 <button
                   type="submit"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+                  className="w-full rounded-lg border border-orange-200 px-3 py-1.5 text-sm text-[#FF6B00] hover:bg-orange-50"
                 >
                   로그아웃
                 </button>
@@ -102,7 +115,7 @@ export default function NavMenu({ items, isLoggedIn }: NavMenuProps) {
             ) : (
               <Link
                 href="/login"
-                className="block rounded-lg bg-black px-3 py-1.5 text-center text-sm text-white hover:opacity-90"
+                className="block rounded-lg bg-[#FF6B00] px-3 py-1.5 text-center text-sm text-white hover:opacity-90"
                 onClick={() => setOpen(false)}
               >
                 로그인

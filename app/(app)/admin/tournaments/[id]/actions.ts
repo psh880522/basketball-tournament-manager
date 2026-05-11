@@ -1,0 +1,53 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { changeTournamentStatus } from "@/lib/api/tournaments";
+
+export async function finishTournamentAction(
+  formData: FormData
+): Promise<void> {
+  const tournamentId = toText(formData.get("tournamentId"));
+  const confirm = toText(formData.get("confirm"));
+
+  if (!tournamentId) {
+    redirect("/admin");
+  }
+
+  if (confirm !== "yes") {
+    return redirectWithError(tournamentId, "종료 확인이 필요합니다.");
+  }
+
+  const result = await changeTournamentStatus(tournamentId, "finished");
+
+  if (!result.ok) {
+    return redirectWithError(tournamentId, result.error);
+  }
+
+  return redirectWithSuccess(tournamentId);
+}
+
+const toText = (value: FormDataEntryValue | null) => {
+  if (typeof value !== "string") return "";
+  return value.trim();
+};
+
+const buildRedirectUrl = (
+  tournamentId: string,
+  extra?: { error?: string; success?: boolean }
+) => {
+  const params = new URLSearchParams();
+  if (extra?.error) params.set("finishError", extra.error);
+  if (extra?.success) params.set("finishSuccess", "1");
+  return `/admin/tournaments/${tournamentId}?${params.toString()}`;
+};
+
+const redirectWithError = (
+  tournamentId: string,
+  message: string
+): never => {
+  redirect(buildRedirectUrl(tournamentId, { error: message }));
+};
+
+const redirectWithSuccess = (tournamentId: string): never => {
+  redirect(buildRedirectUrl(tournamentId, { success: true }));
+};

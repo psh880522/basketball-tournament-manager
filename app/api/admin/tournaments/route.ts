@@ -8,7 +8,6 @@ type CreateTournamentPayload = {
   start_date: string;
   end_date: string;
   format: string | null;
-  max_teams: number | null;
   divisions?: {
     name: string;
     group_size?: number;
@@ -125,7 +124,6 @@ export async function POST(request: Request) {
       start_date: payload.start_date,
       end_date: payload.end_date,
       format: payload.format ?? null,
-      max_teams: payload.max_teams ?? null,
       status: "draft",
       created_by: userResult.user.id,
     })

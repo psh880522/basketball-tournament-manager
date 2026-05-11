@@ -1,5 +1,6 @@
-import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseAdminClient } from "@/src/lib/supabase/server";
 import { getUserWithRole } from "@/src/lib/auth/roles";
+import type { ApiResult } from "@/lib/types/api";
 
 export type TeamStatus = "pending" | "approved" | "rejected";
 
@@ -42,6 +43,26 @@ export async function listMyTeams(): Promise<{
   });
 
   return { data: rows, error: null };
+}
+
+export async function getTeamMemberCounts(
+  teamIds: string[]
+): Promise<Record<string, number>> {
+  if (teamIds.length === 0) return {};
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .in("team_id", teamIds);
+
+  if (error || !data) return {};
+
+  const counts: Record<string, number> = {};
+  for (const row of data as { team_id: string }[]) {
+    counts[row.team_id] = (counts[row.team_id] ?? 0) + 1;
+  }
+  return counts;
 }
 
 /* ?占?占?My Managed Teams (manager占? ?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?*/
@@ -88,6 +109,8 @@ export async function listMyManagedTeams(): Promise<{
 
 export async function createTeam(input: {
   name: string;
+  region?: string;
+  bio?: string;
   contact?: string;
 }): Promise<{ ok: true; teamId: string } | { ok: false; error: string }> {
   const supabase = await createSupabaseServerClient();
@@ -95,11 +118,13 @@ export async function createTeam(input: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { ok: false, error: "濡쒓렇?占쎌씠 ?占쎌슂?占쎈땲??" };
+  if (!user) return { ok: false, error: "로그인이 필요합니다." };
 
-  const { data, error } = await supabase.rpc("create_team_with_manager", {
+  const { data, error } = await supabase.rpc("create_team_with_captain", {
     p_team_name: input.name,
     p_contact: input.contact ?? "",
+    p_region: input.region ?? null,
+    p_bio: input.bio ?? null,
   });
 
   if (error) {
@@ -122,6 +147,7 @@ export async function createDummyTeam(input: {
   }
 
   const supabase = await createSupabaseServerClient();
+  const adminSupabase = createSupabaseAdminClient();
 
   const { data: division, error: divisionError } = await supabase
     .from("divisions")
@@ -148,7 +174,7 @@ export async function createDummyTeam(input: {
     teamName = `DUMMY-${nextIndex}`;
   }
 
-  const { data: team, error: teamError } = await supabase
+  const { data: team, error: teamError } = await adminSupabase
     .from("teams")
     .insert({
       team_name: teamName,
@@ -161,14 +187,14 @@ export async function createDummyTeam(input: {
 
   if (teamError) return { ok: false, error: teamError.message };
 
-  const { error: applicationError } = await supabase
+  const { error: applicationError } = await adminSupabase
     .from("tournament_team_applications")
     .insert({
       tournament_id: input.tournamentId,
       division_id: input.divisionId,
       team_id: team.id,
       applied_by: auth.user.id,
-      status: "approved",
+      status: "confirmed",
     });
 
   if (applicationError) return { ok: false, error: applicationError.message };
@@ -182,6 +208,8 @@ export type TeamDetail = {
   id: string;
   team_name: string;
   contact: string;
+  region: string | null;
+  bio: string | null;
   created_by: string;
 };
 
@@ -191,7 +219,7 @@ export async function getTeam(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("teams")
-    .select("id, team_name, contact, created_by")
+    .select("id, team_name, contact, region, bio, created_by")
     .eq("id", teamId)
     .maybeSingle();
 
@@ -262,11 +290,6 @@ export type TeamApplicationSummary = {
   id: string;
   team_name: string;
   status: TeamStatus;
-};
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
 };
 
 export async function getExistingTeamApplication(

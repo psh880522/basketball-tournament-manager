@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/src/lib/auth/roles";
@@ -11,17 +12,16 @@ type NavItem = {
   icon: React.ReactNode;
 };
 
+type NavSection = {
+  title?: string;
+  items: NavItem[];
+};
+
 type SidebarProps = {
   role: Role | null;
   userEmail: string | null;
+  isCaptain?: boolean;
 };
-
-const IconTournament = () => (
-  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
 
 const IconDashboard = () => (
   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,27 +51,81 @@ const IconList = () => (
   </svg>
 );
 
-function buildMenuItems(role: Role | null): NavItem[] {
-  if (role === "organizer" || role === "manager") {
-    const items: NavItem[] = [
-      { label: "대시보드", href: "/admin", icon: <IconDashboard /> },
-    ];
-    if (role === "organizer") {
-      items.push({ label: "권한 관리", href: "/admin/users", icon: <IconUsers /> });
-    }
-    return items;
-  }
+const IconPlus = () => (
+  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+      d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const IconSearch = () => (
+  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const IconClipboard = () => (
+  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+  </svg>
+);
+
+const IconShield = () => (
+  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  </svg>
+);
+
+// ── 역할별 메뉴 정의 ─────────────────────────────────────────
+const ORGANIZER_SECTIONS: NavSection[] = [
+  { items:                [{ label: "대시보드",  href: "/dashboard",    icon: <IconDashboard /> }] },
+  { title: "대회", items: [{ label: "대회관리",  href: "/admin",        icon: <IconList />      }] },
+];
+
+const ORGANIZER_ONLY_SECTIONS: NavSection[] = [
+  ...ORGANIZER_SECTIONS,
+  { title: "운영", items: [{ label: "권한관리", href: "/admin/users",  icon: <IconShield />    }] },
+];
+
+const USER_SECTIONS: NavSection[] = [
+  { title: "대회", items: [{ label: "대회 목록",    href: "/tournaments",       icon: <IconList />  }] },
+  { items:         [{ label: "선수 등록하기", href: "/onboarding/profile", icon: <IconUsers /> }] },
+];
+// ─────────────────────────────────────────────────────────────
+
+function buildMenuSections(
+  role: Role | null,
+  isCaptain: boolean
+): NavSection[] {
+  if (role === "organizer") return ORGANIZER_ONLY_SECTIONS;
+  if (role === "manager")   return ORGANIZER_SECTIONS;
+  if (role === "user")      return USER_SECTIONS;
 
   // player
   return [
-    { label: "대시보드", href: "/dashboard", icon: <IconDashboard /> },
-    { label: "내 팀", href: "/team", icon: <IconTeam /> },
+    { items:         [{ label: "대시보드", href: "/dashboard", icon: <IconDashboard /> }] },
+    { title: "대회", items: [
+        { label: "대회 목록", href: "/tournaments",   icon: <IconList />      },
+        ...(isCaptain ? [{ label: "신청 현황", href: "/my-applications", icon: <IconClipboard /> }] : []),
+      ],
+    },
+    { title: "팀",   items: [
+        { label: "팀 목록",   href: "/teams",     icon: <IconTeam />   },
+        { label: "팀 만들기", href: "/teams/new",  icon: <IconPlus />   },
+        { label: "팀 찾기",   href: "/teams/find", icon: <IconSearch /> },
+      ],
+    },
   ];
 }
 
-export default function Sidebar({ role, userEmail }: SidebarProps) {
+export default function Sidebar({ role, userEmail, isCaptain = false }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-  const menuItems = buildMenuItems(role);
+  const sections = buildMenuSections(role, isCaptain);
+  const allItems = sections.flatMap((s) => s.items);
 
   const matchLength = (href: string) => {
     if (href === "/") return pathname === "/" ? 1 : 0;
@@ -80,7 +134,7 @@ export default function Sidebar({ role, userEmail }: SidebarProps) {
     return 0;
   };
 
-  const bestMatchLength = Math.max(...menuItems.map((item) => matchLength(item.href)));
+  const bestMatchLength = Math.max(...allItems.map((item) => matchLength(item.href)));
 
   const isActive = (href: string) => {
     const len = matchLength(href);
@@ -88,38 +142,71 @@ export default function Sidebar({ role, userEmail }: SidebarProps) {
   };
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-slate-200 bg-white">
-      {/* 로고 */}
-      <div className="flex h-14 shrink-0 items-center border-b border-slate-200 px-4">
-        <Link href="/" className="text-sm font-bold tracking-tight text-slate-900">
-          🏀 23BOARD
-        </Link>
+    <aside
+      style={{ boxShadow: "4px 0 12px rgba(0,0,0,0.05)", zIndex: 10 }}
+      className={`relative flex h-screen flex-col bg-white transition-all duration-200 ${collapsed ? "w-14" : "w-56"}`}
+    >
+      {/* 로고 + 토글 버튼 */}
+      <div className="flex h-14 shrink-0 items-center justify-between px-3">
+        {!collapsed && (
+          <Link href="/" className="text-sm font-bold tracking-tight text-slate-900 font-[var(--font-space-grotesk)]">
+            🏀 23BOARD
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={() => setCollapsed((prev) => !prev)}
+          className={`flex h-7 w-7 items-center justify-center rounded-[4px] text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors ${collapsed ? "mx-auto" : ""}`}
+          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {collapsed ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            )}
+          </svg>
+        </button>
       </div>
 
       {/* 메뉴 */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          {menuItems.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  isActive(item.href)
-                    ? "bg-slate-100 font-semibold text-slate-900"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            </li>
+      <nav className="flex-1 overflow-y-auto px-2 py-4">
+        <div className="space-y-4">
+          {sections.map((section, si) => (
+            <div key={si}>
+              {!collapsed && section.title && (
+                <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  {section.title}
+                </p>
+              )}
+              <ul className="space-y-0.5">
+                {section.items.map((item) => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      title={collapsed ? item.label : undefined}
+                      className={`flex items-center rounded-[4px] px-3 py-2 text-sm transition-colors ${
+                        collapsed ? "justify-center" : "gap-3"
+                      } ${
+                        isActive(item.href)
+                          ? "bg-slate-100 font-semibold text-slate-900"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      }`}
+                    >
+                      {item.icon}
+                      {!collapsed && item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       </nav>
 
       {/* 하단 프로필 */}
-      <div className="shrink-0 border-t border-slate-200 p-3">
-        <ProfilePopup email={userEmail} role={role} />
+      <div className="shrink-0 p-2">
+        <ProfilePopup email={userEmail} role={role} collapsed={collapsed} />
       </div>
     </aside>
   );

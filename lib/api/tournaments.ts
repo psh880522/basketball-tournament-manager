@@ -1,13 +1,8 @@
-import { getUserWithRole } from "@/src/lib/auth/roles";
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
+import { requireOrganizer } from "@/src/lib/auth/guards";
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
 export type TournamentStatus = "draft" | "open" | "closed" | "finished";
-
-export type TournamentAdminRow = {
-  id: string;
-  name: string;
-  status: TournamentStatus;
-};
 
 export type AdminTournamentListRow = {
   id: string;
@@ -26,7 +21,6 @@ export type TournamentEditRow = {
   start_date: string | null;
   end_date: string | null;
   status: TournamentStatus;
-  max_teams: number | null;
   schedule_start_at: string | null;
   description: string | null;
   poster_url: string | null;
@@ -39,18 +33,8 @@ export type PublicTournamentRow = {
   start_date: string | null;
   end_date: string | null;
   status: TournamentStatus;
-};
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
-type ActionResult = {
-  ok: true;
-} | {
-  ok: false;
-  error: string;
+  description: string | null;
+  poster_url: string | null;
 };
 
 type TournamentUpdatePayload = {
@@ -58,7 +42,6 @@ type TournamentUpdatePayload = {
   location: string | null;
   start_date: string;
   end_date: string;
-  max_teams: number | null;
   schedule_start_at: string | null;
   description: string | null;
 };
@@ -76,21 +59,6 @@ export function isTournamentStatus(value: string): value is TournamentStatus {
 
 export function getTournamentStatuses(): TournamentStatus[] {
   return [...tournamentStatuses];
-}
-
-export async function getAdminTournaments(): Promise<
-  ApiResult<TournamentAdminRow[]>
-> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .select("id,name,status")
-    .order("name", { ascending: true });
-
-  return {
-    data,
-    error: error ? error.message : null,
-  };
 }
 
 const adminStatusOrder: Record<TournamentStatus, number> = {
@@ -150,7 +118,7 @@ export async function getTournamentForEdit(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status,max_teams,schedule_start_at,description,poster_url")
+    .select("id,name,location,start_date,end_date,status,schedule_start_at,description,poster_url")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -160,35 +128,10 @@ export async function getTournamentForEdit(
   };
 }
 
-async function ensureOrganizer(): Promise<ActionResult> {
-  const result = await getUserWithRole();
-
-  if (result.status === "unauthenticated") {
-    return { ok: false, error: "로그인이 필요합니다." };
-  }
-
-  if (result.status === "error") {
-    return {
-      ok: false,
-      error: result.error ?? "사용자 정보를 불러오지 못했습니다.",
-    };
-  }
-
-  if (result.status === "empty") {
-    return { ok: false, error: "프로필이 없습니다." };
-  }
-
-  if (result.role !== "organizer") {
-    return { ok: false, error: "권한이 없습니다." };
-  }
-
-  return { ok: true };
-}
-
 export async function softDeleteTournament(
   tournamentId: string
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -208,7 +151,7 @@ export async function softDeleteTournament(
 export async function restoreTournament(
   tournamentId: string
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -229,7 +172,7 @@ export async function updateTournament(
   tournamentId: string,
   payload: TournamentUpdatePayload
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -241,12 +184,6 @@ export async function updateTournament(
     return { ok: false, error: "시작일과 종료일을 입력해 주세요." };
   }
 
-  if (payload.max_teams !== null) {
-    if (!Number.isInteger(payload.max_teams) || payload.max_teams < 2) {
-      return { ok: false, error: "최대 팀 수는 2 이상의 정수여야 합니다." };
-    }
-  }
-
   const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase
@@ -256,7 +193,6 @@ export async function updateTournament(
       location: payload.location,
       start_date: payload.start_date,
       end_date: payload.end_date,
-      max_teams: payload.max_teams,
       schedule_start_at: payload.schedule_start_at,
       description: payload.description,
     })
@@ -273,6 +209,8 @@ export async function updateTournamentPosterUrl(
   tournamentId: string,
   posterUrl: string | null
 ): Promise<ActionResult> {
+  const authResult = await requireOrganizer();
+  if (!authResult.ok) return authResult;
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
     .from("tournaments")
@@ -287,7 +225,7 @@ export async function changeTournamentStatus(
   tournamentId: string,
   nextStatus: TournamentStatus
 ): Promise<ActionResult> {
-  const authResult = await ensureOrganizer();
+  const authResult = await requireOrganizer();
 
   if (!authResult.ok) return authResult;
 
@@ -303,13 +241,13 @@ export async function changeTournamentStatus(
   }
 
   if (!data) {
-    return { ok: false, error: "?占?占쏙옙? 李얠쓣 ???占쎌뒿?占쎈떎." };
+    return { ok: false, error: "대회를 찾을 수 없습니다." };
   }
 
   const currentStatus = data.status;
 
   if (currentStatus === "finished") {
-    return { ok: false, error: "醫낅즺???占?占쎈뒗 蹂寃쏀븷 ???占쎌뒿?占쎈떎." };
+    return { ok: false, error: "종료된 대회는 변경할 수 없습니다." };
   }
 
   if (currentStatus === nextStatus) {
@@ -317,13 +255,13 @@ export async function changeTournamentStatus(
   }
 
   if (!isTournamentStatus(nextStatus)) {
-    return { ok: false, error: "?占쎈せ???占쏀깭 媛믪엯?占쎈떎." };
+    return { ok: false, error: "유효하지 않은 상태입니다." };
   }
 
   if (nextStatus !== "finished") {
     const allowed = ["draft", "open", "closed"].includes(nextStatus);
     if (!allowed) {
-      return { ok: false, error: "?占쎌슜?占쏙옙? ?占쏙옙? ?占쏀깭 ?占쎌씠?占쎈땲??" };
+      return { ok: false, error: "허용되지 않는 상태 전환입니다." };
     }
   }
 
@@ -339,13 +277,39 @@ export async function changeTournamentStatus(
   return { ok: true };
 }
 
+type DivisionSummary = {
+  id: string;
+  name: string;
+  entry_fee: number;
+  capacity: number | null;
+};
+
+export type TournamentListItem = {
+  id: string;
+  name: string;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: TournamentStatus;
+  poster_url: string | null;
+  divisions: DivisionSummary[];
+};
+
+export type TournamentListParams = {
+  status?: TournamentStatus | TournamentStatus[];
+  keyword?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  ids?: string[];
+};
+
 export async function getOpenTournaments(): Promise<
   ApiResult<PublicTournamentRow[]>
 > {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status")
+    .select("id,name,location,start_date,end_date,status,description,poster_url")
     .eq("status", "open")
     .is("deleted_at", null)
     .order("start_date", { ascending: true });
@@ -360,10 +324,12 @@ export async function getInProgressTournaments(): Promise<
   ApiResult<PublicTournamentRow[]>
 > {
   const supabase = await createSupabaseServerClient();
+  const today = new Date().toISOString().split("T")[0];
   const { data: closedTournaments, error: closedError } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status")
+    .select("id,name,location,start_date,end_date,status,description,poster_url")
     .eq("status", "closed")
+    .lte("start_date", today)
     .is("deleted_at", null)
     .order("start_date", { ascending: true });
 
@@ -400,13 +366,177 @@ export async function getInProgressTournaments(): Promise<
   };
 }
 
+export type MyParticipatedTournamentRow = PublicTournamentRow & {
+  team_name: string;
+};
+
+export async function getMyParticipatedTournaments(): Promise<
+  ApiResult<{
+    participating: MyParticipatedTournamentRow[];
+    past: MyParticipatedTournamentRow[];
+  }>
+> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "로그인이 필요합니다." };
+
+  // 내 팀 목록
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("team_id, teams(team_name)")
+    .eq("user_id", user.id);
+
+  const teamIds = (members ?? []).map(
+    (m: Record<string, unknown>) => m.team_id as string
+  );
+  if (teamIds.length === 0)
+    return { data: { participating: [], past: [] }, error: null };
+
+  const teamNameMap = new Map(
+    (members ?? []).map((m: Record<string, unknown>) => {
+      const teams = m.teams as { team_name: string } | null;
+      return [m.team_id as string, teams?.team_name ?? ""];
+    })
+  );
+
+  // confirmed 신청이 있는 대회 조회
+  const { data: apps, error: appsError } = await supabase
+    .from("tournament_team_applications")
+    .select(
+      "tournament_id, team_id, tournaments(id, name, location, start_date, end_date, status, description, poster_url, deleted_at)"
+    )
+    .in("team_id", teamIds)
+    .eq("status", "confirmed");
+
+  if (appsError) return { data: null, error: appsError.message };
+
+  const participating: MyParticipatedTournamentRow[] = [];
+  const past: MyParticipatedTournamentRow[] = [];
+  const seenIds = new Set<string>();
+
+  for (const app of (apps ?? []) as Record<string, unknown>[]) {
+    const t = app.tournaments as Record<string, unknown> | null;
+    if (!t || t.deleted_at) continue;
+
+    const tid = t.id as string;
+    if (seenIds.has(tid)) continue;
+    seenIds.add(tid);
+
+    const row: MyParticipatedTournamentRow = {
+      id: tid,
+      name: t.name as string,
+      location: (t.location as string | null) ?? null,
+      start_date: (t.start_date as string | null) ?? null,
+      end_date: (t.end_date as string | null) ?? null,
+      status: t.status as TournamentStatus,
+      description: (t.description as string | null) ?? null,
+      poster_url: (t.poster_url as string | null) ?? null,
+      team_name: teamNameMap.get(app.team_id as string) ?? "",
+    };
+
+    if (t.status === "closed") participating.push(row);
+    else if (t.status === "finished") past.push(row);
+  }
+
+  return { data: { participating, past }, error: null };
+}
+
+const LIST_STATUS_ORDER: Record<TournamentStatus, number> = {
+  open: 0,
+  closed: 1,
+  finished: 2,
+  draft: 3,
+};
+
+export async function getTournamentList(
+  params: TournamentListParams
+): Promise<ApiResult<TournamentListItem[]>> {
+  const supabase = await createSupabaseServerClient();
+
+  let query = supabase
+    .from("tournaments")
+    .select(
+      "id, name, location, start_date, end_date, status, poster_url, divisions(id, name, entry_fee, capacity, sort_order)"
+    )
+    .is("deleted_at", null);
+
+  if (params.ids) {
+    query = query.in("id", params.ids);
+  } else if (!params.status) {
+    query = query.in("status", ["open", "closed", "finished"]);
+  } else if (Array.isArray(params.status)) {
+    query = query.in("status", params.status);
+  } else {
+    query = query.eq("status", params.status);
+  }
+
+  if (params.keyword) {
+    const kw = params.keyword;
+    query = query.or(`name.ilike.%${kw}%,location.ilike.%${kw}%`);
+  }
+
+  if (params.dateFrom) {
+    query = query.gte("start_date", params.dateFrom);
+  }
+
+  if (params.dateTo) {
+    query = query.lte("start_date", params.dateTo);
+  }
+
+  const { data, error } = await query;
+
+  if (error) return { data: null, error: error.message };
+
+  const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map(
+    (row) => {
+      const rawDivisions = (
+        row.divisions as Record<string, unknown>[] | null ?? []
+      )
+        .slice()
+        .sort(
+          (a, b) =>
+            ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0)
+        )
+        .map((d) => ({
+          id: d.id as string,
+          name: d.name as string,
+          entry_fee: (d.entry_fee as number) ?? 0,
+          capacity: (d.capacity as number | null) ?? null,
+        }));
+
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        location: (row.location as string | null) ?? null,
+        start_date: (row.start_date as string | null) ?? null,
+        end_date: (row.end_date as string | null) ?? null,
+        status: row.status as TournamentStatus,
+        poster_url: (row.poster_url as string | null) ?? null,
+        divisions: rawDivisions,
+      };
+    }
+  );
+
+  rows.sort((a, b) => {
+    const statusDelta = LIST_STATUS_ORDER[a.status] - LIST_STATUS_ORDER[b.status];
+    if (statusDelta !== 0) return statusDelta;
+    const aDate = a.start_date ? Date.parse(a.start_date) : Number.MAX_SAFE_INTEGER;
+    const bDate = b.start_date ? Date.parse(b.start_date) : Number.MAX_SAFE_INTEGER;
+    return aDate - bDate;
+  });
+
+  return { data: rows, error: null };
+}
+
 export async function getPublicTournamentById(
   tournamentId: string
 ): Promise<ApiResult<PublicTournamentRow>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status")
+    .select("id,name,location,start_date,end_date,status,description,poster_url")
     .eq("id", tournamentId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -417,37 +547,3 @@ export async function getPublicTournamentById(
   };
 }
 
-export async function updateTournamentStatus(
-  tournamentId: string,
-  status: TournamentStatus
-): Promise<ApiResult<TournamentAdminRow>> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .update({ status })
-    .eq("id", tournamentId)
-    .select("id,name,status")
-    .single();
-
-  return {
-    data,
-    error: error ? error.message : null,
-  };
-}
-
-export async function finishTournament(
-  tournamentId: string
-): Promise<ApiResult<TournamentAdminRow>> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .update({ status: "finished" })
-    .eq("id", tournamentId)
-    .select("id,name,status")
-    .single();
-
-  return {
-    data,
-    error: error ? error.message : null,
-  };
-}

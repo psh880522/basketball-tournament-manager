@@ -1,0 +1,139 @@
+import Link from "next/link";
+import { getUserWithRole } from "@/src/lib/auth/roles";
+import { getTeam, getMyRoleInTeam } from "@/lib/api/teams";
+import { getTeamMembers } from "@/lib/api/rosters";
+import { getTeamApplicationsForCaptain } from "@/lib/api/team-applications";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import TeamMemberTable from "@/components/team/TeamMemberTable";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function TeamDetailPage({
+  params,
+}: {
+  params: Promise<{ teamId: string }>;
+}) {
+  const { teamId } = await params;
+
+  /* ── 인증 ──────────────────────────────────── */
+  const auth = await getUserWithRole();
+  if (auth.status === "error") {
+    return (
+      <main className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-sm text-red-600">프로필을 불러올 수 없습니다: {auth.error}</p>
+        </div>
+      </main>
+    );
+  }
+
+  /* ── 팀 멤버 권한 확인 ─────────────────────── */
+  const roleResult = await getMyRoleInTeam(teamId);
+
+  if (roleResult.error || !roleResult.role) {
+    return (
+      <main className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-sm text-red-600">
+            {roleResult.error ?? "이 팀에 접근할 권한이 없습니다."}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const isManager = roleResult.role === "captain";
+
+  /* ── 데이터 로드 ───────────────────────────── */
+  const [teamResult, membersResult, appsResult] = await Promise.all([
+    getTeam(teamId),
+    getTeamMembers(teamId),
+    isManager ? getTeamApplicationsForCaptain(teamId) : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (teamResult.error || !teamResult.data) {
+    return (
+      <main className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-sm text-red-600">
+            팀 정보를 불러올 수 없습니다: {teamResult.error ?? "팀을 찾을 수 없습니다."}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (membersResult.error) {
+    return (
+      <main className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-sm text-red-600">
+            선수 목록을 불러올 수 없습니다: {membersResult.error}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const team = teamResult.data;
+  const members = membersResult.data ?? [];
+  const pendingApps = (appsResult.data ?? []);
+
+  return (
+    <main className="min-h-screen bg-gray-50 px-4 py-8">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6">
+        {/* ── Team Header ───────────────────── */}
+        <header className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold">{team.team_name}</h1>
+            <Badge
+              className={
+                isManager
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-gray-100 text-gray-700"
+              }
+            >
+              {isManager ? "주장" : "선수"}
+            </Badge>
+          </div>
+          {team.contact && (
+            <p className="text-sm text-gray-600">연락처: {team.contact}</p>
+          )}
+        </header>
+
+        {/* ── Players Section ───────────────── */}
+        <Card className="space-y-3">
+          <h2 className="text-lg font-semibold">선수 목록</h2>
+          <TeamMemberTable members={members} />
+        </Card>
+
+        {/* ── 합류신청 관리 섹션 (captain 전용) ─── */}
+        {isManager && (
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">신청 관리</h2>
+                {pendingApps.length > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
+                    {pendingApps.length}
+                  </span>
+                )}
+              </div>
+              <Link href={`/teams/${teamId}/applications`}>
+                <Button variant="secondary">관리하기</Button>
+              </Link>
+            </div>
+            <p className="text-sm text-slate-500">
+              {pendingApps.length > 0
+                ? `${pendingApps.length}건의 신청이 대기 중입니다.`
+                : "대기 중인 신청이 없습니다."}
+            </p>
+          </Card>
+        )}
+      </div>
+    </main>
+  );
+}

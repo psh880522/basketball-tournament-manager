@@ -1,9 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
 export type Court = {
   id: string;
@@ -99,10 +95,6 @@ export async function deleteCourt(
     error: error ? error.message : null,
   };
 }
-
-/* ?占?占?占?ActionResult-based helpers for edit page ?占?占?占?*/
-
-type ActionResult = { ok: true } | { ok: false; error: string };
 
 export async function createCourtForTournament(
   tournamentId: string,

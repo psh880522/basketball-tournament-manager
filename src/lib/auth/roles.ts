@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
-export type Role = "organizer" | "manager" | "player";
+export type Role = "organizer" | "manager" | "user" | "player";
 
 type AuthUser = {
   id: string;
@@ -93,4 +93,14 @@ export function isOperationRole(role: Role | null): boolean {
 /** organizer 전용 기능 여부 확인 */
 export function isOrganizerRole(role: Role | null): boolean {
   return role === "organizer";
+}
+
+/** 선수 등록 완료 사용자 여부 확인 */
+export function isPlayerRole(role: Role | null): boolean {
+  return role === "player";
+}
+
+/** 가입 후 선수 등록 미완료 사용자 여부 확인 */
+export function isUserRole(role: Role | null): boolean {
+  return role === "user";
 }

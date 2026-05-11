@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-import { getUserWithRole } from "@/src/lib/auth/roles";
+import { requireOrganizer } from "@/src/lib/auth/guards";
 import { listApprovedTeamsByDivision } from "@/lib/api/applications";
+import type { ApiResult } from "@/lib/types/api";
 
 export type Division = {
   id: string;
@@ -67,23 +68,10 @@ export type BracketGenerationSummary = {
 
 type TournamentStatus = "draft" | "open" | "closed";
 
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
 type CountResult = {
   count: number;
   error: string | null;
 };
-
-async function requireOrganizer(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const auth = await getUserWithRole();
-  if (auth.status !== "ready" || auth.role !== "organizer") {
-    return { ok: false, error: "권한이 없습니다." };
-  }
-  return { ok: true };
-}
 
 export async function getDivisionById(
   divisionId: string
@@ -147,7 +135,7 @@ export async function getApprovedTeamsByDivision(
     .from("tournament_team_applications")
     .select("team_id, teams(id, team_name)")
     .eq("division_id", divisionId)
-    .eq("status", "approved");
+    .eq("status", "confirmed");
 
   if (error) return { data: null, error: error.message };
 

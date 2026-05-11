@@ -1,9 +1,5 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-
-type ApiResult<T> = {
-    data: T | null;
-    error: string | null;
-};
+import type { ApiResult } from "@/lib/types/api";
 
 type DivisionGroupRow = {
     id: string;

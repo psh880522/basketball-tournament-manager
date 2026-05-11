@@ -1,17 +1,11 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-import { getUserWithRole, isOperationRole } from "@/src/lib/auth/roles";
+import { requireOperationRole } from "@/src/lib/auth/guards";
 import { setDivisionStandingsDirty } from "@/lib/api/divisions";
 import { replaceDivisionStandings } from "@/lib/api/standings";
 import {
   compareTournamentMatchOrder,
 } from "@/lib/formatters/tournamentMatchOrder";
-
-type ApiResult<T> = {
-  data: T | null;
-  error: string | null;
-};
-
-type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
+import type { ApiResult, ActionResult } from "@/lib/types/api";
 
 type DivisionRow = {
   id: string;
@@ -116,14 +110,6 @@ type TeamStats = {
   points_against: number;
   points_diff: number;
 };
-
-async function requireOperationRole(): Promise<ActionResult> {
-  const auth = await getUserWithRole();
-  if (auth.status !== "ready" || !isOperationRole(auth.role)) {
-    return { ok: false, error: "권한이 없습니다." };
-  }
-  return { ok: true };
-}
 
 async function getDivision(divisionId: string): Promise<ApiResult<DivisionRow>> {
   const supabase = await createSupabaseServerClient();
