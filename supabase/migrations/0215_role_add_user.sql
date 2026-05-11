@@ -5,8 +5,12 @@
 -- is_player() DB 함수 신규 추가
 
 -- 0) storage 정책 임시 삭제 (app_role 타입 참조 의존성 제거)
+DROP POLICY IF EXISTS poster_upload_organizer ON storage.objects;
 DROP POLICY IF EXISTS poster_update_organizer ON storage.objects;
 DROP POLICY IF EXISTS poster_delete_organizer ON storage.objects;
+
+-- 0-1) user_profiles 뷰 임시 삭제 (profiles.role 타입 의존성 제거)
+DROP VIEW IF EXISTS public.user_profiles;
 
 -- 1) 신규 enum 생성 (4종)
 CREATE TYPE public.app_role_v3 AS ENUM ('organizer', 'manager', 'user', 'player');
@@ -35,6 +39,13 @@ DROP TYPE public.app_role;
 ALTER TYPE public.app_role_v3 RENAME TO app_role;
 
 -- 6) storage 정책 재생성
+CREATE POLICY poster_upload_organizer ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'tournament-posters'
+    AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'organizer'::public.app_role
+  );
+
 CREATE POLICY poster_update_organizer ON storage.objects
   FOR UPDATE USING (
     bucket_id = 'tournament-posters'
@@ -46,6 +57,19 @@ CREATE POLICY poster_delete_organizer ON storage.objects
     bucket_id = 'tournament-posters'
     AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'organizer'::public.app_role
   );
+
+-- 6-1) user_profiles 뷰 재생성
+CREATE OR REPLACE VIEW public.user_profiles AS
+  SELECT
+    p.id,
+    p.role,
+    p.created_at,
+    u.email
+  FROM public.profiles p
+  JOIN auth.users u ON u.id = p.id
+  WHERE
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'organizer'::public.app_role
+    OR p.id = auth.uid();
 
 -- 7) is_organizer(), is_manager() — 변경 없음 (app_role enum 참조 없이 text 비교 방식이므로 재생성 불필요)
 

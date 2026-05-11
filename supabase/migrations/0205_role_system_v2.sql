@@ -4,6 +4,7 @@
 -- 신규 가입 기본 역할: player
 
 -- 0) storage 정책 임시 삭제 (app_role 타입 참조로 인한 의존성 제거)
+DROP POLICY IF EXISTS poster_upload_organizer ON storage.objects;
 DROP POLICY IF EXISTS poster_update_organizer ON storage.objects;
 DROP POLICY IF EXISTS poster_delete_organizer ON storage.objects;
 
@@ -37,6 +38,13 @@ DROP TYPE public.app_role;
 ALTER TYPE public.app_role_v2 RENAME TO app_role;
 
 -- 6) storage 정책 재생성
+CREATE POLICY poster_upload_organizer ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'tournament-posters'
+    AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'organizer'::public.app_role
+  );
+
 CREATE POLICY poster_update_organizer ON storage.objects
   FOR UPDATE USING (
     bucket_id = 'tournament-posters'
