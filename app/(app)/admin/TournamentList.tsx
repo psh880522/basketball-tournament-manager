@@ -11,6 +11,7 @@ import {
   type AdminTournamentListRow,
   type TournamentStatus,
 } from "@/lib/api/tournaments";
+import { getTournamentStatusDisplay } from "@/lib/utils/tournament";
 import { type Role } from "@/src/lib/auth/roles";
 import {
   changeTournamentStatusAction,
@@ -27,17 +28,11 @@ type TournamentListProps = {
 
 const statusLabels: Record<TournamentStatus, string> = {
   open: "모집중",
-  closed: "진행중",
+  closed: "모집마감",
   draft: "준비중",
   finished: "완료",
 };
 
-const statusBadgeClasses: Record<TournamentStatus, string> = {
-  open: "bg-emerald-100 text-emerald-700",
-  closed: "bg-blue-100 text-blue-700",
-  draft: "bg-gray-100 text-gray-700",
-  finished: "bg-amber-100 text-amber-700",
-};
 
 const statusOptions: TournamentStatus[] = [
   "draft",
@@ -253,9 +248,10 @@ export default function TournamentList({
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-semibold">{tournament.name}</h3>
-                    <Badge className={statusBadgeClasses[tournament.status]}>
-                      {statusLabels[tournament.status]}
-                    </Badge>
+                    {(() => {
+                      const d = getTournamentStatusDisplay(tournament.status, tournament.start_date);
+                      return <Badge variant={d.variant}>{d.label}</Badge>;
+                    })()}
                     {tournament.deleted_at ? (
                       <Badge className="bg-rose-100 text-rose-700">삭제됨</Badge>
                     ) : null}

@@ -44,6 +44,7 @@ export default function IdentityForm() {
 
       setIsSuccess(true);
       setToastMessage("본인인증 완료. 선수로 등록되었습니다.");
+      router.refresh();
       setTimeout(() => router.push(result.redirectTo), 1500);
     });
   }

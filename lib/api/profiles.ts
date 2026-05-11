@@ -52,6 +52,24 @@ export async function getMyProfile(): Promise<ApiResult<Profile>> {
 }
 
 /**
+ * 특정 사용자의 본인인증 여부만 경량 조회
+ * apply/page.tsx의 서버 컴포넌트에서 identity_verified_at 체크 전용
+ */
+export async function getProfileVerification(
+  userId: string
+): Promise<ApiResult<{ identity_verified_at: string | null }>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("identity_verified_at")
+    .eq("id", userId)
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as { identity_verified_at: string | null }, error: null };
+}
+
+/**
  * 특정 사용자의 프로필 조회
  * RLS: organizer는 전체 조회 가능, 일반 사용자는 본인만 조회 가능
  */

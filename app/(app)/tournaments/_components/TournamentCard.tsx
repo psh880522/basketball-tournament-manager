@@ -3,7 +3,8 @@ import { Calendar, MapPin } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import type { TournamentListItem, TournamentStatus } from "@/lib/api/tournaments";
+import type { TournamentListItem } from "@/lib/api/tournaments";
+import { getTournamentStatusDisplay } from "@/lib/utils/tournament";
 import type { MyApplicationListRow, ApplicationStatus } from "@/lib/api/applications";
 import type { Role } from "@/src/lib/auth/roles";
 
@@ -46,20 +47,6 @@ function calcTotalCapacity(divisions: DivisionSummary[]): number | null {
   return divisions.reduce((sum, d) => sum + (d.capacity ?? 0), 0);
 }
 
-type StatusConfig = { label: string; variant: "live" | "info" | "default" };
-
-function getTournamentStatusConfig(status: TournamentStatus): StatusConfig {
-  switch (status) {
-    case "open":
-      return { label: "모집중", variant: "live" };
-    case "closed":
-      return { label: "진행중", variant: "info" };
-    case "finished":
-      return { label: "종료", variant: "default" };
-    default:
-      return { label: status, variant: "default" };
-  }
-}
 
 type AppStatusConfig = { label: string; variant: "success" | "warning" | "info" | "default" };
 
@@ -135,7 +122,7 @@ type Props = {
 };
 
 export default function TournamentCard({ tournament, myApplication, role }: Props) {
-  const statusConfig = getTournamentStatusConfig(tournament.status);
+  const statusConfig = getTournamentStatusDisplay(tournament.status, tournament.start_date ?? null);
   const feeRange = calcEntryFeeRange(tournament.divisions);
   const totalCapacity = calcTotalCapacity(tournament.divisions);
   const cta = getCtaConfig(tournament, myApplication, role);

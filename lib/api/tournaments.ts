@@ -324,10 +324,12 @@ export async function getInProgressTournaments(): Promise<
   ApiResult<PublicTournamentRow[]>
 > {
   const supabase = await createSupabaseServerClient();
+  const today = new Date().toISOString().split("T")[0];
   const { data: closedTournaments, error: closedError } = await supabase
     .from("tournaments")
     .select("id,name,location,start_date,end_date,status,description,poster_url")
     .eq("status", "closed")
+    .lte("start_date", today)
     .is("deleted_at", null)
     .order("start_date", { ascending: true });
 

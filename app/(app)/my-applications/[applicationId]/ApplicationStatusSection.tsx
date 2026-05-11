@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
 import type { MyApplicationRow } from "@/lib/api/applications";
 import { markPaymentDoneAction, cancelApplicationAction } from "./actions";
+import PaymentDueCountdown from "./PaymentDueCountdown";
 
 const STATUS_BADGE: Record<string, { text: string; className: string }> = {
   payment_pending:      { text: "입금 대기",     className: "bg-yellow-100 text-yellow-800" },
@@ -30,7 +32,7 @@ export default function ApplicationStatusSection({
   const badge = STATUS_BADGE[app.status] ?? STATUS_BADGE.payment_pending;
 
   return (
-    <Card className="space-y-4">
+    <Card id="payment-section" className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">신청 현황</h2>
         <Badge className={badge.className}>{badge.text}</Badge>
@@ -174,29 +176,24 @@ function PaymentForm({
         금액: {app.final_amount.toLocaleString()}원
       </p>
       {dueDate && <p className="text-xs text-yellow-700">입금 기한: {dueDate}</p>}
+      <PaymentDueCountdown dueAt={app.payment_due_at} />
       <form onSubmit={handleSubmit} className="space-y-2">
-        <div>
-          <label className="text-xs font-medium text-gray-700">
-            입금자명 <span className="text-red-500">*</span>
-          </label>
-          <input
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-            value={depositorName}
-            onChange={(e) => setDepositorName(e.target.value)}
-            placeholder="계좌 이체 시 입력한 이름"
-            disabled={isPending}
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-700">메모 (선택)</label>
-          <input
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-            value={depositorNote}
-            onChange={(e) => setDepositorNote(e.target.value)}
-            placeholder="추가 전달 사항"
-            disabled={isPending}
-          />
-        </div>
+        <Input
+          id="depositor-name"
+          label="입금자명 *"
+          value={depositorName}
+          onChange={(e) => setDepositorName(e.target.value)}
+          placeholder="계좌 이체 시 입력한 이름"
+          disabled={isPending}
+        />
+        <Input
+          id="depositor-note"
+          label="메모 (선택)"
+          value={depositorNote}
+          onChange={(e) => setDepositorNote(e.target.value)}
+          placeholder="추가 전달 사항"
+          disabled={isPending}
+        />
         {error && <p className="text-xs text-red-600">{error}</p>}
         <Button type="submit" disabled={isPending || !depositorName.trim()}>
           {isPending ? "처리 중..." : "입금 완료 신고"}

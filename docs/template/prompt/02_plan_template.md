@@ -1,7 +1,8 @@
 # 구현 플랜 요청 템플릿
 
-`docs/ai-history/01-research/YYYYMMDD_[기능명]_Research.md` 문서를
-충분히 검토했어. 이제 이 리서치를 바탕으로 구현 상세 계획을 세워줘.
+`docs/ai-history/01-research/YYYYMMDD_[기능명]_Research.md`,
+`docs/ai-history/04-ui-spec/YYYYMMDD_[기능명]_ui_spec.md`
+문서를 충분히 검토했어. 이제 이 리서치를 바탕으로 구현 상세 계획을 세워줘.
 
 ## 메모 작성 규칙 (참고)
 
@@ -95,6 +96,7 @@
 - 의사코드는 실제 파일 경로와 함수명 기준으로 써.
   - 좋은 예: "`src/actions/application.ts`의 `createApplication()` 함수에서 트랜잭션 처리"
   - 나쁜 예: "신청 생성 함수에서 처리"
+- 코드 구현 범위를 임의로 결정해서 줄이지 말고 참고 문서에 충실해 필요하면 보고해.
 - **절대 아직 구현하지 마.**
 - 플랜 작성이 완료되면 채팅창에 한 줄로 알려줘:
   "플랜 작성 완료: `docs/ai-history/02-plans/YYYYMMDD_[기능명]_Plan_v1.md`"

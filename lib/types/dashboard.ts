@@ -46,18 +46,22 @@ export type CompletedMatch = {
   isWin: boolean;
 };
 
-export type TeamApplication = {
+export type ActiveTournamentCard = {
   applicationId: string;
   tournamentId: string;
   tournamentName: string;
+  teamName: string;
   divisionName: string;
   status: string;
-  nextMatch: UpcomingMatch | null;
+  tournamentStatus: string | null;
+  tournamentStartDate: string | null;
 };
 
 export type MyTeamWithApplications = {
   teamId: string;
   teamName: string;
   roleInTeam: "captain" | "player";
-  activeApplications: TeamApplication[];
+  memberCount: number;
+  totalTournamentCount: number;
+  pendingJoinCount: number;
 };

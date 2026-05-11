@@ -5,6 +5,7 @@ import { getMyApplicationStatus, getMyTournamentApplicationsAsCaptain } from "@/
 import { getPublicTournamentById } from "@/lib/api/tournaments";
 import { getDivisionsByTournament } from "@/lib/api/divisions";
 import { getTeamMembersForRoster } from "@/lib/api/rosters";
+import { getProfileVerification } from "@/lib/api/profiles";
 import ApplyTeamForm from "./Form";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +13,17 @@ export const revalidate = 0;
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ division?: string }>;
 };
 
-export default async function TournamentApplyPage({ params }: PageProps) {
+export default async function TournamentApplyPage({ params, searchParams }: PageProps) {
   const { id: tournamentId } = await params;
+  const { division: divisionId } = await searchParams;
+
+  /* division 없으면 대회 상세로 돌려보냄 */
+  if (!divisionId) {
+    redirect(`/tournament/${tournamentId}`);
+  }
 
   /* ── 인증 ──────────────────────────────────── */
   const userResult = await getUserWithRole();
@@ -46,6 +54,13 @@ export default async function TournamentApplyPage({ params }: PageProps) {
     );
   }
 
+  /* ── 본인인증 확인 ──────────────────────────── */
+  const verificationResult = await getProfileVerification(userResult.user!.id);
+  if (!verificationResult.data?.identity_verified_at) {
+    const redirectTo = encodeURIComponent(`/tournament/${tournamentId}/apply?division=${divisionId}`);
+    redirect(`/onboarding/identity?redirectTo=${redirectTo}`);
+  }
+
   /* ── 대회 조회 ─────────────────────────────── */
   const tournamentResult = await getPublicTournamentById(tournamentId);
 
@@ -73,6 +88,14 @@ export default async function TournamentApplyPage({ params }: PageProps) {
 
   if (appResult.data) {
     redirect(`/my-applications/${appResult.data.id}`);
+  }
+
+  /* ── divisionId 유효성 확인 ────────────────── */
+  const divisions = divisionsResult.data ?? [];
+  const division = divisions.find((d) => d.id === divisionId);
+
+  if (!division) {
+    redirect(`/tournament/${tournamentId}`);
   }
 
   /* ── 팀별 멤버 목록 (로스터 미리보기용) ──────── */
@@ -105,17 +128,11 @@ export default async function TournamentApplyPage({ params }: PageProps) {
           </p>
         )}
 
-        {divisionsResult.error && (
-          <p className="text-sm text-red-600">
-            참가 구분을 불러오지 못했습니다: {divisionsResult.error}
-          </p>
-        )}
-
         <ApplyTeamForm
           tournamentId={tournamentId}
           tournamentStartDate={tournament.start_date ?? null}
           managedTeams={managedTeams}
-          divisions={divisionsResult.data ?? []}
+          division={division}
           myActiveApps={myAppsResult.data ?? []}
           teamMembersMap={teamMembersMap}
         />

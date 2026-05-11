@@ -35,6 +35,7 @@ type ProgressSummary = {
 type ProgressResult = {
   tournamentId: string;
   tournamentName: string;
+  tournamentStartDate: string | null;
   state: TournamentProgressState;
   nextAction: NextAction;
   summary: ProgressSummary;
@@ -46,7 +47,7 @@ export async function getTournamentProgressState(
   const supabase = await createSupabaseServerClient();
   const { data: tournament, error: tournamentError } = await supabase
     .from("tournaments")
-    .select("id,name,status")
+    .select("id,name,status,start_date")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -199,6 +200,7 @@ export async function getTournamentProgressState(
     data: {
       tournamentId,
       tournamentName: tournament.name,
+      tournamentStartDate: tournament.start_date ?? null,
       state,
       nextAction,
       summary,

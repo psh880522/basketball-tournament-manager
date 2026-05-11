@@ -204,6 +204,30 @@ export async function getTeamMembersForRoster(
   return { data: members, error: null };
 }
 
+/* ── checkTournamentRosterConflicts ─────────────────────────────────────── */
+
+export type RosterConflict = {
+  user_id: string;
+  display_name: string | null;
+  verified_name: string | null;
+};
+
+export async function checkTournamentRosterConflicts(
+  tournamentId: string,
+  userIds: string[]
+): Promise<RosterConflict[]> {
+  if (userIds.length === 0) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("check_tournament_roster_conflicts", {
+    p_tournament_id: tournamentId,
+    p_user_ids: userIds,
+  });
+
+  if (error || !data) return [];
+  return data as RosterConflict[];
+}
+
 /* ── addRosterMember ────────────────────────────────────────────────────── */
 
 /**

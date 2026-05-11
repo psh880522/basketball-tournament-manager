@@ -11,12 +11,10 @@ export default async function AppLayout({
   const userResult = await getUserWithRole();
   const isLoggedIn = userResult.status === "ready";
 
-  let hasTeam = false;
   let isCaptain = false;
 
   if (isLoggedIn && userResult.role === "player") {
     const { data: teams } = await listMyTeams();
-    hasTeam = (teams?.length ?? 0) > 0;
     isCaptain = (teams ?? []).some((t) => t.role_in_team === "captain");
   }
 
@@ -25,7 +23,6 @@ export default async function AppLayout({
       <Sidebar
         role={userResult.role}
         userEmail={userResult.user?.email ?? null}
-        hasTeam={hasTeam}
         isCaptain={isCaptain}
       />
       <main className="flex-1 overflow-y-auto bg-gray-50">{children}</main>

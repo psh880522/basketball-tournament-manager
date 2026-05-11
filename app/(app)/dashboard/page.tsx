@@ -1,16 +1,17 @@
 import { redirect } from "next/navigation";
 import { getUserWithRole, isOperationRole, isUserRole } from "@/src/lib/auth/roles";
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-import { listMyTeams } from "@/lib/api/teams";
+import { listMyTeams, getTeamMemberCounts } from "@/lib/api/teams";
 import { getUserTeamStatus } from "@/lib/api/team-applications";
 import { listAllMyTeamApplications } from "@/lib/api/applications";
 import { getMyDashboardSummary, getMyPendingActions } from "@/lib/api/dashboard";
 import { getMyUpcomingMatches, getMyRecentResults } from "@/lib/api/matches";
-import type { MyTeamWithApplications, UpcomingMatch } from "@/lib/types/dashboard";
+import type { MyTeamWithApplications, ActiveTournamentCard } from "@/lib/types/dashboard";
 
 import EmptyDashboard from "./EmptyDashboard";
 import SummaryCards from "./SummaryCards";
 import ActionItems from "./ActionItems";
+import ActiveTournaments from "./ActiveTournaments";
 import UpcomingMatches from "./UpcomingMatches";
 import MyTeamsGrid from "./MyTeamsGrid";
 import RecentResults from "./RecentResults";
@@ -70,10 +71,12 @@ export default async function DashboardPage() {
     getMyRecentResults(),
   ]);
 
+  const teams = teamsResult.data ?? [];
+  const memberCounts = await getTeamMemberCounts(teams.map((t) => t.team_id));
+
   const pendingActions = actionsResult.data ?? [];
   const summaryResult = await getMyDashboardSummary(pendingActions.length);
 
-  const teams = teamsResult.data ?? [];
   const teamStatus = teamStatusResult.data;
   const applications = applicationsResult.data ?? [];
   const upcomingMatches = upcomingResult.data ?? [];
@@ -112,33 +115,45 @@ export default async function DashboardPage() {
     );
   }
 
-  /* ── MyTeamWithApplications 조합 ── */
-  const upcomingByTeam = new Map<string, UpcomingMatch>();
-  for (const match of upcomingMatches) {
-    if (!upcomingByTeam.has(match.myTeamId)) {
-      upcomingByTeam.set(match.myTeamId, match);
+  /* ── 참가 중인 대회 카드 목록 ── */
+  const activeTournaments: ActiveTournamentCard[] = applications
+    .filter(isActiveApp)
+    .map((a) => ({
+      applicationId: a.id,
+      tournamentId: a.tournament_id,
+      tournamentName: a.tournament_name,
+      teamName: a.team_name,
+      divisionName: a.division_name,
+      status: a.status,
+      tournamentStatus: a.tournament_status,
+      tournamentStartDate: a.tournament_start_date,
+    }));
+
+  /* ── 팀별 가입 신청 대기 건수 (ActionItems의 team_join_approval에서 추출) ── */
+  const joinCountByTeam = new Map<string, number>();
+  for (const action of pendingActions) {
+    if (action.type === "team_join_approval") {
+      const count = parseInt(action.meta ?? "0", 10);
+      joinCountByTeam.set(action.teamId, count);
     }
   }
 
-  const teamsWithApps: MyTeamWithApplications[] = teams.map((team) => {
-    const teamApps = applications
-      .filter((a) => a.team_id === team.team_id && isActiveApp(a))
-      .map((a) => ({
-        applicationId: a.id,
-        tournamentId: a.tournament_id,
-        tournamentName: a.tournament_name,
-        divisionName: a.division_name,
-        status: a.status,
-        nextMatch: upcomingByTeam.get(team.team_id) ?? null,
-      }));
+  /* ── 팀별 전체 대회 참가 수 (취소/만료 제외) ── */
+  const tournamentCountByTeam = new Map<string, number>();
+  for (const app of applicationsResult.data ?? []) {
+    if (app.status === "cancelled" || app.status === "expired") continue;
+    tournamentCountByTeam.set(app.team_id, (tournamentCountByTeam.get(app.team_id) ?? 0) + 1);
+  }
 
-    return {
-      teamId: team.team_id,
-      teamName: team.team_name,
-      roleInTeam: team.role_in_team as "captain" | "player",
-      activeApplications: teamApps,
-    };
-  });
+  /* ── MyTeamWithApplications 조합 ── */
+  const teamsWithApps: MyTeamWithApplications[] = teams.map((team) => ({
+    teamId: team.team_id,
+    teamName: team.team_name,
+    roleInTeam: team.role_in_team as "captain" | "player",
+    memberCount: memberCounts[team.team_id] ?? 0,
+    totalTournamentCount: tournamentCountByTeam.get(team.team_id) ?? 0,
+    pendingJoinCount: joinCountByTeam.get(team.team_id) ?? 0,
+  }));
 
   return (
     <main className="min-h-screen bg-page px-4 py-8">
@@ -150,6 +165,8 @@ export default async function DashboardPage() {
         )}
 
         <ActionItems actions={pendingActions} />
+
+        <ActiveTournaments tournaments={activeTournaments} />
 
         <UpcomingMatches matches={upcomingMatches} />
 

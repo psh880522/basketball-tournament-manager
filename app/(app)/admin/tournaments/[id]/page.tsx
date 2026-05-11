@@ -10,6 +10,7 @@ import {
   type TournamentStatus,
 } from "@/lib/api/tournaments";
 import Badge from "@/components/ui/Badge";
+import { getTournamentStatusDisplay } from "@/lib/utils/tournament";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import ProgressIndicator, {
@@ -32,15 +33,8 @@ type PageProps = {
 const statusLabels: Record<TournamentStatus, string> = {
   draft: "준비중",
   open: "모집중",
-  closed: "진행중",
+  closed: "모집마감",
   finished: "완료",
-};
-
-const statusBadgeClasses: Record<TournamentStatus, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  open: "bg-emerald-100 text-emerald-700",
-  closed: "bg-blue-100 text-blue-700",
-  finished: "bg-amber-100 text-amber-700",
 };
 
 const statusOptions: TournamentStatus[] = [
@@ -407,9 +401,10 @@ async function TournamentDashboardContent({
               <h1 className="text-2xl font-semibold">
                 {progress.data.tournamentName}
               </h1>
-              <Badge className={statusBadgeClasses[summary.tournamentStatus]}>
-                {statusLabels[summary.tournamentStatus]}
-              </Badge>
+              {(() => {
+                const d = getTournamentStatusDisplay(summary.tournamentStatus, progress.data.tournamentStartDate);
+                return <Badge variant={d.variant}>{d.label}</Badge>;
+              })()}
             </div>
             <p className="text-sm text-gray-600">현재 단계: {currentStage}</p>
           </div>

@@ -3,11 +3,12 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 const TABS = [
-  { value: "all", label: "전체" },
-  { value: "open", label: "모집중", dotColor: "#FF6B00" },
-  { value: "closed", label: "진행중" },
-  { value: "finished", label: "종료" },
-  { value: "mine", label: "내 신청" },
+  { value: "all",        label: "전체" },
+  { value: "open",       label: "모집중",   dotColor: "#FF6B00" },
+  { value: "deadline",   label: "모집마감" },
+  { value: "inprogress", label: "진행중" },
+  { value: "finished",   label: "종료" },
+  { value: "mine",       label: "내 신청" },
 ];
 
 type Props = {

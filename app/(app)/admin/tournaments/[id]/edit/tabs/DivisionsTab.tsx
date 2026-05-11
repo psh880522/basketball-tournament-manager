@@ -253,6 +253,8 @@ function AddDivisionForm({
         standings_dirty: false,
         entry_fee: entryFee,
         capacity: capacityValue,
+        min_roster_size: 5,
+        max_roster_size: null,
       });
     });
   };

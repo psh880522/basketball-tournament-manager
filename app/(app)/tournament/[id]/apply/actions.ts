@@ -1,7 +1,8 @@
 "use server";
 
 import { applyToTournament } from "@/lib/api/applications";
-import { getOrCreateRoster, addRosterMember } from "@/lib/api/rosters";
+import { getOrCreateRoster, addRosterMember, checkTournamentRosterConflicts } from "@/lib/api/rosters";
+import { getDivisionById } from "@/lib/api/divisions";
 
 type ApplyInput = {
   tournamentId: string;
@@ -50,6 +51,31 @@ export async function applyWithRosterAction(input: {
   if (!input.tournamentId) return { ok: false, error: "대회 ID가 없습니다." };
   if (!input.teamId) return { ok: false, error: "팀을 선택해주세요." };
   if (!input.divisionId) return { ok: false, error: "참가 구분(division)을 선택해주세요." };
+
+  // 디비전 조회 + 최소 로스터 인원 검증
+  const divisionResult = await getDivisionById(input.divisionId);
+  if (!divisionResult.data) {
+    return { ok: false, error: divisionResult.error ?? "유효하지 않은 디비전입니다." };
+  }
+  const minSize = divisionResult.data.min_roster_size;
+  if (input.memberIds.length < minSize) {
+    return { ok: false, error: `최소 ${minSize}명 이상의 선수를 선택해주세요.` };
+  }
+
+  // 충돌 선수 사전 체크 (같은 대회 다른 팀 로스터에 이미 등록된 선수)
+  const conflicts = await checkTournamentRosterConflicts(input.tournamentId, input.memberIds);
+  if (conflicts.length > 0) {
+    const remaining = input.memberIds.length - conflicts.length;
+    if (remaining < minSize) {
+      const names = conflicts
+        .map((c) => c.verified_name ?? c.display_name ?? "알 수 없음")
+        .join(", ");
+      return {
+        ok: false,
+        error: `이미 이 대회에 다른 팀으로 참가 중인 선수가 있어 최소 인원(${minSize}명)을 충족할 수 없습니다. 해당 선수를 제외해주세요: ${names}`,
+      };
+    }
+  }
 
   // 1. 신청
   const applyResult = await applyToTournament({

@@ -11,6 +11,8 @@ export type DivisionRow = {
   standings_dirty: boolean;
   entry_fee: number;
   capacity: number | null;
+  min_roster_size: number;
+  max_roster_size: number | null;
 };
 
 export async function getDivisionsByTournament(
@@ -20,7 +22,7 @@ export async function getDivisionsByTournament(
   const { data, error } = await supabase
     .from("divisions")
     .select(
-      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty,entry_fee,capacity"
+      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty,entry_fee,capacity,min_roster_size,max_roster_size"
     )
     .eq("tournament_id", tournamentId)
     .order("sort_order", { ascending: true });
@@ -31,20 +33,36 @@ export async function getDivisionsByTournament(
   };
 }
 
+export async function getDivisionById(
+  divisionId: string
+): Promise<ApiResult<DivisionRow>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("divisions")
+    .select(
+      "id,tournament_id,name,group_size,tournament_size,sort_order,standings_dirty,entry_fee,capacity,min_roster_size,max_roster_size"
+    )
+    .eq("id", divisionId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: "해당 division을 찾을 수 없습니다." };
+  return { data: data as DivisionRow, error: null };
+}
+
 export async function getDivisionApplicationCounts(
   tournamentId: string
 ): Promise<ApiResult<Record<string, number>>> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("tournament_team_applications")
-    .select("division_id")
-    .eq("tournament_id", tournamentId)
-    .in("status", ["payment_pending", "paid_pending_approval", "confirmed"]);
+  const { data, error } = await supabase.rpc("get_division_application_counts", {
+    p_tournament_id: tournamentId,
+  });
 
   if (error) return { data: null, error: error.message };
 
-  const counts = (data ?? []).reduce<Record<string, number>>((acc, row) => {
-    acc[row.division_id] = (acc[row.division_id] ?? 0) + 1;
+  const rows = (data ?? []) as { division_id: string; cnt: number }[];
+  const counts = rows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.division_id] = row.cnt;
     return acc;
   }, {});
 

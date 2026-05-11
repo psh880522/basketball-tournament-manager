@@ -45,6 +45,26 @@ export async function listMyTeams(): Promise<{
   return { data: rows, error: null };
 }
 
+export async function getTeamMemberCounts(
+  teamIds: string[]
+): Promise<Record<string, number>> {
+  if (teamIds.length === 0) return {};
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .in("team_id", teamIds);
+
+  if (error || !data) return {};
+
+  const counts: Record<string, number> = {};
+  for (const row of data as { team_id: string }[]) {
+    counts[row.team_id] = (counts[row.team_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /* ?占?占?My Managed Teams (manager占? ?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?占?*/
 
 export type ManagedTeamRow = {

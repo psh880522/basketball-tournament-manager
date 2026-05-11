@@ -928,3 +928,59 @@ export async function listAllMyTeamApplications(): Promise<
 
   return { data: rows, error: null };
 }
+
+export type PlayerParticipation =
+  | { participating: false }
+  | { participating: true; applicationId: string; status: ApplicationStatus; teamName: string; divisionId: string; divisionName: string };
+
+/**
+ * 현재 유저가 (캡틴이 아닌) 팀원으로 참가 중인 대회 신청 여부 조회
+ * getMyApplicationStatus가 null일 때 보조 체크용
+ */
+export async function getMyParticipationAsPlayer(
+  tournamentId: string
+): Promise<PlayerParticipation> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { participating: false };
+
+  const { data: memberships, error: memErr } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("user_id", user.id);
+
+  if (memErr || !memberships?.length) return { participating: false };
+
+  const teamIds = memberships.map((m: { team_id: string }) => m.team_id);
+
+  const { data } = await supabase
+    .from("tournament_team_applications")
+    .select("id, status, division_id, teams(team_name), divisions(name)")
+    .eq("tournament_id", tournamentId)
+    .in("team_id", teamIds)
+    .in("status", ACTIVE_STATUSES)
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return { participating: false };
+
+  const row = data as unknown as {
+    id: string;
+    status: ApplicationStatus;
+    division_id: string;
+    teams: { team_name: string } | null;
+    divisions: { name: string } | null;
+  };
+
+  return {
+    participating: true,
+    applicationId: row.id,
+    status: row.status,
+    teamName: row.teams?.team_name ?? "",
+    divisionId: row.division_id,
+    divisionName: row.divisions?.name ?? "",
+  };
+}

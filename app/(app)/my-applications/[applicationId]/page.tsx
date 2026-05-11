@@ -11,16 +11,20 @@ import {
 } from "@/lib/api/rosters";
 import ApplicationStatusSection from "./ApplicationStatusSection";
 import RosterSection from "./RosterSection";
+import CompletionBanner from "./CompletionBanner";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function MyApplicationDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ applicationId: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { applicationId } = await params;
+  const { from } = await searchParams;
 
   /* ── 인증 ──────────────────────────────────── */
   const auth = await getUserWithRole();
@@ -121,6 +125,9 @@ export default async function MyApplicationDetailPage({
             {app.division_name} · {app.team_name}
           </p>
         </header>
+
+        {/* ── 신청 완료 배너 ─────────────────────── */}
+        {from === "apply" && <CompletionBanner />}
 
         {/* ── 신청 현황 섹션 ─────────────────────── */}
         <ApplicationStatusSection

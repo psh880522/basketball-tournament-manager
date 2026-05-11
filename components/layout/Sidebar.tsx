@@ -20,7 +20,6 @@ type NavSection = {
 type SidebarProps = {
   role: Role | null;
   userEmail: string | null;
-  hasTeam?: boolean;
   isCaptain?: boolean;
 };
 
@@ -80,68 +79,52 @@ const IconShield = () => (
   </svg>
 );
 
+// ── 역할별 메뉴 정의 ─────────────────────────────────────────
+const ORGANIZER_SECTIONS: NavSection[] = [
+  { items:                [{ label: "대시보드",  href: "/dashboard",    icon: <IconDashboard /> }] },
+  { title: "대회", items: [{ label: "대회관리",  href: "/admin",        icon: <IconList />      }] },
+];
+
+const ORGANIZER_ONLY_SECTIONS: NavSection[] = [
+  ...ORGANIZER_SECTIONS,
+  { title: "운영", items: [{ label: "권한관리", href: "/admin/users",  icon: <IconShield />    }] },
+];
+
+const USER_SECTIONS: NavSection[] = [
+  { title: "대회", items: [{ label: "대회 목록",    href: "/tournaments",       icon: <IconList />  }] },
+  { items:         [{ label: "선수 등록하기", href: "/onboarding/profile", icon: <IconUsers /> }] },
+];
+// ─────────────────────────────────────────────────────────────
+
 function buildMenuSections(
   role: Role | null,
-  hasTeam: boolean,
   isCaptain: boolean
 ): NavSection[] {
-  if (role === "organizer" || role === "manager") {
-    const sections: NavSection[] = [
-      { items: [{ label: "대시보드", href: "/dashboard", icon: <IconDashboard /> }] },
-      { title: "대회", items: [{ label: "대회관리", href: "/admin", icon: <IconList /> }] },
-    ];
-    if (role === "organizer") {
-      sections.push({
-        title: "운영",
-        items: [{ label: "권한관리", href: "/admin/users", icon: <IconShield /> }],
-      });
-    }
-    return sections;
-  }
-
-  if (role === "user") {
-    return [
-      { title: "대회", items: [{ label: "대회 목록", href: "/tournaments", icon: <IconList /> }] },
-      { items: [{ label: "선수 등록하기", href: "/onboarding/profile", icon: <IconUsers /> }] },
-    ];
-  }
+  if (role === "organizer") return ORGANIZER_ONLY_SECTIONS;
+  if (role === "manager")   return ORGANIZER_SECTIONS;
+  if (role === "user")      return USER_SECTIONS;
 
   // player
-  const tournamentItems: NavItem[] = [
-    { label: "대회 목록", href: "/tournaments", icon: <IconList /> },
-  ];
-  if (isCaptain) {
-    tournamentItems.push({ label: "내 신청 현황", href: "/my-applications", icon: <IconClipboard /> });
-  }
-
-  const sections: NavSection[] = [
-    { items: [{ label: "대시보드", href: "/dashboard", icon: <IconDashboard /> }] },
-    { title: "대회", items: tournamentItems },
-  ];
-
-  if (!hasTeam) {
-    sections.push({
-      title: "내 팀",
-      items: [
-        { label: "팀 만들기", href: "/teams/new", icon: <IconPlus /> },
-        { label: "팀 찾기", href: "/teams/find", icon: <IconSearch /> },
+  return [
+    { items:         [{ label: "대시보드", href: "/dashboard", icon: <IconDashboard /> }] },
+    { title: "대회", items: [
+        { label: "대회 목록", href: "/tournaments",   icon: <IconList />      },
+        ...(isCaptain ? [{ label: "신청 현황", href: "/my-applications", icon: <IconClipboard /> }] : []),
       ],
-    });
-    return sections;
-  }
-
-  sections.push({
-    title: "내 팀",
-    items: [{ label: "내 팀 목록", href: "/teams", icon: <IconTeam /> }],
-  });
-
-  return sections;
+    },
+    { title: "팀",   items: [
+        { label: "팀 목록",   href: "/teams",     icon: <IconTeam />   },
+        { label: "팀 만들기", href: "/teams/new",  icon: <IconPlus />   },
+        { label: "팀 찾기",   href: "/teams/find", icon: <IconSearch /> },
+      ],
+    },
+  ];
 }
 
-export default function Sidebar({ role, userEmail, hasTeam = false, isCaptain = false }: SidebarProps) {
+export default function Sidebar({ role, userEmail, isCaptain = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-  const sections = buildMenuSections(role, hasTeam, isCaptain);
+  const sections = buildMenuSections(role, isCaptain);
   const allItems = sections.flatMap((s) => s.items);
 
   const matchLength = (href: string) => {

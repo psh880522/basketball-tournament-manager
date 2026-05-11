@@ -9,6 +9,7 @@ import {
 } from "@/src/lib/auth/roles";
 import { getInProgressTournaments, getOpenTournaments } from "@/lib/api/tournaments";
 import Badge from "@/components/ui/Badge";
+import { getTournamentStatusDisplay } from "@/lib/utils/tournament";
 import Button from "@/components/ui/Button";
 import DragScroll from "@/components/ui/DragScroll";
 import type { Role } from "@/src/lib/auth/roles";
@@ -80,12 +81,17 @@ async function OpenTournamentsList({ role }: { role: Role | null }) {
           key={tournament.id}
           className="w-72 shrink-0 flex flex-col bg-white rounded-xl border-l-4 border-[#FF6B00] shadow-md p-5 gap-2"
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-lg">🏀</span>
-            <Badge className="bg-orange-100 text-[#FF6B00] text-xs font-bold uppercase tracking-wider">
-              모집 중
-            </Badge>
-          </div>
+          {(() => {
+            const d = getTournamentStatusDisplay(tournament.status, tournament.start_date);
+            return (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-lg">🏀</span>
+                <Badge variant={d.variant} className="text-xs font-bold uppercase tracking-wider">
+                  {d.label}
+                </Badge>
+              </div>
+            );
+          })()}
           <h3 className="font-space-grotesk text-lg font-bold text-gray-900 leading-tight">
             {tournament.name}
           </h3>
@@ -147,12 +153,17 @@ async function InProgressTournamentsList() {
           key={tournament.id}
           className="w-72 shrink-0 flex flex-col bg-white rounded-xl border-l-4 border-secondary shadow-md p-5 gap-2"
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-lg">🏆</span>
-            <Badge className="bg-blue-100 text-blue-700 text-xs font-bold uppercase tracking-wider">
-              진행 중
-            </Badge>
-          </div>
+          {(() => {
+            const d = getTournamentStatusDisplay(tournament.status, tournament.start_date);
+            return (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-lg">🏆</span>
+                <Badge variant={d.variant} className="text-xs font-bold uppercase tracking-wider">
+                  {d.label}
+                </Badge>
+              </div>
+            );
+          })()}
           <h3 className="font-space-grotesk text-xl font-bold text-gray-900 leading-tight">
             {tournament.name}
           </h3>

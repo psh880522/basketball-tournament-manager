@@ -41,14 +41,11 @@ function getActiveApplicationTournamentIds(apps: MyApplicationListRow[]): string
 
 function tabToStatus(tab: string): TournamentStatus | TournamentStatus[] | undefined {
   switch (tab) {
-    case "open":
-      return "open";
-    case "closed":
-      return "closed";
-    case "finished":
-      return "finished";
-    default:
-      return undefined;
+    case "open":       return "open";
+    case "deadline":   return "closed";
+    case "inprogress": return "closed";
+    case "finished":   return "finished";
+    default:           return undefined;
   }
 }
 
@@ -65,10 +62,11 @@ function EmptyMessage({ tab }: { tab: string }) {
     );
   }
   const messages: Record<string, string> = {
-    all: "현재 진행 중인 대회가 없습니다.",
-    open: "현재 모집 중인 대회가 없습니다.",
-    closed: "현재 진행 중인 대회가 없습니다.",
-    finished: "종료된 대회가 없습니다.",
+    all:        "현재 진행 중인 대회가 없습니다.",
+    open:       "현재 모집 중인 대회가 없습니다.",
+    deadline:   "모집이 마감된 대회가 없습니다.",
+    inprogress: "현재 진행 중인 대회가 없습니다.",
+    finished:   "종료된 대회가 없습니다.",
   };
   return (
     <p className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
@@ -110,6 +108,19 @@ export default async function TournamentListSection({ tab, q, dateFrom, dateTo, 
     });
     tournaments = result.data ?? [];
     fetchError = result.error;
+
+    if (!fetchError) {
+      const today = new Date().toISOString().split("T")[0];
+      if (tab === "deadline") {
+        tournaments = tournaments.filter(
+          (t) => t.start_date === null || t.start_date > today
+        );
+      } else if (tab === "inprogress") {
+        tournaments = tournaments.filter(
+          (t) => t.start_date !== null && t.start_date <= today
+        );
+      }
+    }
   }
 
   if (fetchError) {
