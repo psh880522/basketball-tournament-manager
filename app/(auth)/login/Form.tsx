@@ -5,10 +5,16 @@ import Link from "next/link";
 import { signInWithPassword } from "./actions";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import OAuthButtons from "@/components/auth/OAuthButtons";
+import OAuthDivider from "@/components/auth/OAuthDivider";
 
 type Message = {
   tone: "error" | "success";
   text: string;
+};
+
+type LoginFormProps = {
+  initialError?: string;
 };
 
 const EyeIcon = () => (
@@ -24,11 +30,13 @@ const EyeOffIcon = () => (
   </svg>
 );
 
-export default function LoginForm() {
+export default function LoginForm({ initialError }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState<Message | null>(null);
+  const [message, setMessage] = useState<Message | null>(
+    initialError ? { tone: "error", text: initialError } : null
+  );
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -46,62 +54,67 @@ export default function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {message?.tone === "error" && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-          <p className="text-sm text-red-700">{message.text}</p>
+    <div className="space-y-4">
+      <OAuthButtons mode="login" />
+      <OAuthDivider />
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {message?.tone === "error" && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3" role="alert">
+            <p className="text-sm text-red-700">{message.text}</p>
+          </div>
+        )}
+
+        <Input
+          id="email"
+          label="이메일"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          required
+          autoComplete="email"
+          disabled={isPending}
+        />
+
+        <div className="space-y-1">
+          <div className="relative">
+            <Input
+              id="password"
+              label="비밀번호"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="비밀번호를 입력하세요"
+              required
+              autoComplete="current-password"
+              disabled={isPending}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-[2.1rem] text-slate-400 hover:text-slate-600"
+              tabIndex={-1}
+              aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
+
+          <div className="text-right">
+            <Link
+              href="/forgot-password"
+              className="text-xs text-slate-500 hover:text-amber-600"
+            >
+              비밀번호를 잊으셨나요?
+            </Link>
+          </div>
         </div>
-      )}
 
-      <Input
-        id="email"
-        label="이메일"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        required
-        autoComplete="email"
-        disabled={isPending}
-      />
-
-      <div className="space-y-1">
-        <div className="relative">
-          <Input
-            id="password"
-            label="비밀번호"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="비밀번호를 입력하세요"
-            required
-            autoComplete="current-password"
-            disabled={isPending}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((prev) => !prev)}
-            className="absolute right-3 top-[2.1rem] text-slate-400 hover:text-slate-600"
-            tabIndex={-1}
-            aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
-          >
-            {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-          </button>
-        </div>
-
-        <div className="text-right">
-          <Link
-            href="/forgot-password"
-            className="text-xs text-slate-500 hover:text-amber-600"
-          >
-            비밀번호를 잊으셨나요?
-          </Link>
-        </div>
-      </div>
-
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "로그인 중..." : "로그인"}
-      </Button>
-    </form>
+        <Button type="submit" className="w-full" disabled={isPending}>
+          {isPending ? "로그인 중..." : "로그인"}
+        </Button>
+      </form>
+    </div>
   );
 }

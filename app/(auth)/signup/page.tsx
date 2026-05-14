@@ -11,7 +11,7 @@ export default async function SignupPage() {
 
         <div className="mt-8 space-y-1 text-center">
           <h1 className="text-2xl font-bold text-slate-900">회원가입</h1>
-          <p className="text-sm text-slate-500">이메일과 비밀번호로 계정을 만드세요.</p>
+          <p className="text-sm text-slate-500">소셜 계정 또는 이메일로 시작하세요.</p>
         </div>
 
         <Card>

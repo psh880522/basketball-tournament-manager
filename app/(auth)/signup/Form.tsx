@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import OAuthButtons from "@/components/auth/OAuthButtons";
+import OAuthDivider from "@/components/auth/OAuthDivider";
 import { signUpWithPassword } from "./actions";
 
 type Message = {
@@ -162,145 +164,150 @@ export default function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {message?.tone === "error" && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-          <p className="text-sm text-red-700">{message.text}</p>
+    <div className="space-y-4">
+      <OAuthButtons mode="signup" />
+      <OAuthDivider label="또는 이메일로 시작하기" />
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {message?.tone === "error" && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3" role="alert">
+            <p className="text-sm text-red-700">{message.text}</p>
+          </div>
+        )}
+
+        <Input
+          id="email"
+          label="이메일"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          required
+          autoComplete="email"
+          disabled={isPending}
+        />
+
+        <Input
+          id="password"
+          label="비밀번호"
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="비밀번호를 입력하세요"
+          required
+          autoComplete="new-password"
+          disabled={isPending}
+          hint="6자 이상 입력하세요."
+          className="pr-10"
+          rightElement={
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="text-slate-400 hover:text-slate-600"
+              tabIndex={-1}
+              aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          }
+        />
+
+        <Input
+          id="passwordConfirm"
+          label="비밀번호 확인"
+          type={showPasswordConfirm ? "text" : "password"}
+          value={passwordConfirm}
+          onChange={(e) => setPasswordConfirm(e.target.value)}
+          placeholder="비밀번호를 다시 입력하세요"
+          required
+          autoComplete="new-password"
+          disabled={isPending}
+          className="pr-10"
+          rightElement={
+            <button
+              type="button"
+              onClick={() => setShowPasswordConfirm((prev) => !prev)}
+              className="text-slate-400 hover:text-slate-600"
+              tabIndex={-1}
+              aria-label={showPasswordConfirm ? "비밀번호 숨기기" : "비밀번호 표시"}
+            >
+              {showPasswordConfirm ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          }
+        />
+
+        {/* 약관 동의 영역 */}
+        <div className="space-y-2 rounded-lg border border-slate-200 bg-white px-4 py-3">
+          {/* 전체 동의 */}
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={agreeAll}
+              onChange={handleAgreeAll}
+              disabled={isPending}
+              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+            />
+            <span className="text-sm font-semibold text-slate-800">전체 동의</span>
+          </label>
+
+          <hr className="border-slate-200" />
+
+          {/* 서비스 이용약관 (필수) */}
+          <label className="flex cursor-pointer items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={agreeService}
+                onChange={(e) => setAgreeService(e.target.checked)}
+                disabled={isPending}
+                className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+              />
+              <span className="text-sm text-slate-700">
+                <span className="font-medium text-amber-600">[필수]</span> 서비스 이용약관 동의
+              </span>
+            </div>
+            <Link href="/policy/service" target="_blank" className="shrink-0 text-xs text-slate-400 underline hover:text-slate-600">전문 보기</Link>
+          </label>
+
+          {/* 개인정보처리방침 (필수) */}
+          <label className="flex cursor-pointer items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={agreePrivacy}
+                onChange={(e) => setAgreePrivacy(e.target.checked)}
+                disabled={isPending}
+                className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+              />
+              <span className="text-sm text-slate-700">
+                <span className="font-medium text-amber-600">[필수]</span> 개인정보처리방침 동의
+              </span>
+            </div>
+            <Link href="/policy/privacy" target="_blank" className="shrink-0 text-xs text-slate-400 underline hover:text-slate-600">전문 보기</Link>
+          </label>
+
+          {/* 마케팅 동의 (선택) */}
+          <label className="flex cursor-pointer items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={agreeMarketing}
+                onChange={(e) => setAgreeMarketing(e.target.checked)}
+                disabled={isPending}
+                className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+              />
+              <span className="text-sm text-slate-700">
+                <span className="text-slate-400">[선택]</span> 마케팅 정보 수신 동의
+              </span>
+            </div>
+            <Link href="/policy/marketing" target="_blank" className="shrink-0 text-xs text-slate-400 underline hover:text-slate-600">전문 보기</Link>
+          </label>
         </div>
-      )}
 
-      <Input
-        id="email"
-        label="이메일"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        required
-        autoComplete="email"
-        disabled={isPending}
-      />
-
-      <Input
-        id="password"
-        label="비밀번호"
-        type={showPassword ? "text" : "password"}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="비밀번호를 입력하세요"
-        required
-        autoComplete="new-password"
-        disabled={isPending}
-        hint="6자 이상 입력하세요."
-        className="pr-10"
-        rightElement={
-          <button
-            type="button"
-            onClick={() => setShowPassword((prev) => !prev)}
-            className="text-slate-400 hover:text-slate-600"
-            tabIndex={-1}
-            aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
-          >
-            {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-          </button>
-        }
-      />
-
-      <Input
-        id="passwordConfirm"
-        label="비밀번호 확인"
-        type={showPasswordConfirm ? "text" : "password"}
-        value={passwordConfirm}
-        onChange={(e) => setPasswordConfirm(e.target.value)}
-        placeholder="비밀번호를 다시 입력하세요"
-        required
-        autoComplete="new-password"
-        disabled={isPending}
-        className="pr-10"
-        rightElement={
-          <button
-            type="button"
-            onClick={() => setShowPasswordConfirm((prev) => !prev)}
-            className="text-slate-400 hover:text-slate-600"
-            tabIndex={-1}
-            aria-label={showPasswordConfirm ? "비밀번호 숨기기" : "비밀번호 표시"}
-          >
-            {showPasswordConfirm ? <EyeOffIcon /> : <EyeIcon />}
-          </button>
-        }
-      />
-
-      {/* 약관 동의 영역 */}
-      <div className="space-y-2 rounded-lg border border-slate-200 bg-white px-4 py-3">
-        {/* 전체 동의 */}
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={agreeAll}
-            onChange={handleAgreeAll}
-            disabled={isPending}
-            className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-          />
-          <span className="text-sm font-semibold text-slate-800">전체 동의</span>
-        </label>
-
-        <hr className="border-slate-200" />
-
-        {/* 서비스 이용약관 (필수) */}
-        <label className="flex cursor-pointer items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={agreeService}
-              onChange={(e) => setAgreeService(e.target.checked)}
-              disabled={isPending}
-              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-            />
-            <span className="text-sm text-slate-700">
-              <span className="font-medium text-amber-600">[필수]</span> 서비스 이용약관 동의
-            </span>
-          </div>
-          <span className="text-xs text-slate-400 underline">전문 보기</span>
-        </label>
-
-        {/* 개인정보처리방침 (필수) */}
-        <label className="flex cursor-pointer items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={agreePrivacy}
-              onChange={(e) => setAgreePrivacy(e.target.checked)}
-              disabled={isPending}
-              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-            />
-            <span className="text-sm text-slate-700">
-              <span className="font-medium text-amber-600">[필수]</span> 개인정보처리방침 동의
-            </span>
-          </div>
-          <span className="text-xs text-slate-400 underline">전문 보기</span>
-        </label>
-
-        {/* 마케팅 동의 (선택) */}
-        <label className="flex cursor-pointer items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={agreeMarketing}
-              onChange={(e) => setAgreeMarketing(e.target.checked)}
-              disabled={isPending}
-              className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-            />
-            <span className="text-sm text-slate-700">
-              <span className="text-slate-400">[선택]</span> 마케팅 정보 수신 동의
-            </span>
-          </div>
-          <span className="text-xs text-slate-400 underline">전문 보기</span>
-        </label>
-      </div>
-
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "가입 중..." : "회원가입"}
-      </Button>
-    </form>
+        <Button type="submit" className="w-full" disabled={isPending}>
+          {isPending ? "가입 중..." : "회원가입"}
+        </Button>
+      </form>
+    </div>
   );
 }
