@@ -23,6 +23,10 @@ export async function createTournamentAction(
   // 2. 필드 추출
   const name = (formData.get("name") as string)?.trim();
   const location = (formData.get("location") as string)?.trim() || null;
+  const rawLat = (formData.get("location_lat") as string) ?? "";
+  const rawLng = (formData.get("location_lng") as string) ?? "";
+  const location_lat = rawLat ? (isNaN(parseFloat(rawLat)) ? null : parseFloat(rawLat)) : null;
+  const location_lng = rawLng ? (isNaN(parseFloat(rawLng)) ? null : parseFloat(rawLng)) : null;
   const start_date = formData.get("start_date") as string;
   const end_date = formData.get("end_date") as string;
   const timeValue = formData.get("start_time") as string; // "HH:mm"
@@ -70,6 +74,8 @@ export async function createTournamentAction(
     .insert({
       name,
       location,
+      location_lat,
+      location_lng,
       start_date,
       end_date,
       description,

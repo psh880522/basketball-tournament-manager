@@ -8,6 +8,7 @@ import "react-day-picker/style.css";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FieldHint from "@/components/ui/FieldHint";
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import { type TournamentEditRow } from "@/lib/api/tournaments";
 import { updateTournamentAction } from "../actions";
 
@@ -27,6 +28,8 @@ export default function BasicInfoTab({ tournament }: BasicInfoTabProps) {
   const router = useRouter();
   const [name, setName] = useState(tournament.name ?? "");
   const [location, setLocation] = useState(tournament.location ?? "");
+  const [locationLat, setLocationLat] = useState<number | null>(tournament.location_lat ?? null);
+  const [locationLng, setLocationLng] = useState<number | null>(tournament.location_lng ?? null);
   const [dateRange, setDateRange] = useState<DateRange>(() => ({
     from: tournament.start_date ? new Date(tournament.start_date + "T00:00:00") : undefined,
     to: tournament.end_date ? new Date(tournament.end_date + "T00:00:00") : undefined,
@@ -72,6 +75,8 @@ export default function BasicInfoTab({ tournament }: BasicInfoTabProps) {
         tournamentId: tournament.id,
         name: name.trim(),
         location: location.trim() ? location.trim() : null,
+        location_lat: locationLat,
+        location_lng: locationLng,
         start_date: toDateStr(dateRange.from),
         end_date: toDateStr(dateRange.to ?? dateRange.from),
         schedule_start_at: startTime
@@ -104,10 +109,25 @@ export default function BasicInfoTab({ tournament }: BasicInfoTabProps) {
 
         <div className="space-y-1">
           <label className="text-sm font-medium">장소</label>
-          <input
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          <LocationAutocomplete
             value={location}
-            onChange={(event) => setLocation(event.target.value)}
+            onChange={(text) => {
+              setLocation(text);
+              setLocationLat(null);
+              setLocationLng(null);
+            }}
+            onSelect={(place) => {
+              const addr = place.road_address_name || place.address_name;
+              setLocation(addr ? `${place.place_name}(${addr})` : place.place_name);
+              setLocationLat(parseFloat(place.y));
+              setLocationLng(parseFloat(place.x));
+            }}
+            onCoordsResolve={(lat, lng) => {
+              setLocationLat(lat);
+              setLocationLng(lng);
+            }}
+            hasCoords={locationLat !== null && locationLng !== null}
+            placeholder="장소명 또는 주소 입력"
           />
         </div>
 

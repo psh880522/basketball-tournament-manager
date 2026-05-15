@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, Check, Copy, ExternalLink, MapPin } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -46,6 +46,14 @@ export default function TournamentStickyPanel({
   const [selectedId, setSelectedId] = useState(
     divisions.length === 1 ? divisions[0].id : ""
   );
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAddress = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, []);
 
   const statusConfig = getTournamentStatusDisplay(tournament.status, tournament.start_date ?? null);
 
@@ -98,10 +106,49 @@ export default function TournamentStickyPanel({
               <CalendarDays size={12} className="shrink-0 text-slate-400" />
               <dd>{tournament.start_date ?? "TBD"} – {tournament.end_date ?? "TBD"}</dd>
             </div>
-            <div className="flex items-center gap-1.5">
-              <MapPin size={12} className="shrink-0 text-slate-400" />
-              <dd>{tournament.location ?? "미정"}</dd>
-            </div>
+            {(() => {
+              const loc = tournament.location;
+              const addrMatch = loc?.match(/\(([^)]+)\)$/);
+              const searchQuery = addrMatch ? addrMatch[1] : (loc ?? "");
+              return (
+                <div className="flex items-start gap-1.5">
+                  <MapPin size={12} className="mt-0.5 shrink-0 text-slate-400" />
+                  <div className="space-y-1">
+                    <dd>{loc ?? "미정"}</dd>
+                    {loc && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={`https://map.naver.com/v5/search/${encodeURIComponent(searchQuery)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 text-[11px] text-[#03C75A] hover:underline"
+                        >
+                          네이버지도 <ExternalLink size={10} />
+                        </a>
+                        {tournament.location_lat !== null && tournament.location_lng !== null && (
+                          <a
+                            href={`https://map.kakao.com/link/map/${encodeURIComponent(searchQuery)},${tournament.location_lat},${tournament.location_lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 text-[11px] text-[#FAE100] [text-shadow:0_0_1px_#555] hover:underline"
+                          >
+                            카카오맵 <ExternalLink size={10} />
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyAddress(searchQuery)}
+                          className="inline-flex items-center gap-0.5 text-[11px] text-slate-400 hover:text-slate-600"
+                        >
+                          {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                          {copied ? "복사됨" : "주소 복사"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </dl>
         </div>
 

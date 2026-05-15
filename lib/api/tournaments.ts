@@ -18,6 +18,8 @@ export type TournamentEditRow = {
   id: string;
   name: string;
   location: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   start_date: string | null;
   end_date: string | null;
   status: TournamentStatus;
@@ -30,6 +32,8 @@ export type PublicTournamentRow = {
   id: string;
   name: string;
   location: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   start_date: string | null;
   end_date: string | null;
   status: TournamentStatus;
@@ -40,6 +44,8 @@ export type PublicTournamentRow = {
 type TournamentUpdatePayload = {
   name: string;
   location: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   start_date: string;
   end_date: string;
   schedule_start_at: string | null;
@@ -118,7 +124,7 @@ export async function getTournamentForEdit(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status,schedule_start_at,description,poster_url")
+    .select("id,name,location,location_lat,location_lng,start_date,end_date,status,schedule_start_at,description,poster_url")
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -191,6 +197,8 @@ export async function updateTournament(
     .update({
       name: payload.name,
       location: payload.location,
+      location_lat: payload.location_lat,
+      location_lng: payload.location_lng,
       start_date: payload.start_date,
       end_date: payload.end_date,
       schedule_start_at: payload.schedule_start_at,
@@ -309,7 +317,7 @@ export async function getOpenTournaments(): Promise<
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status,description,poster_url")
+    .select("id,name,location,location_lat,location_lng,start_date,end_date,status,description,poster_url")
     .eq("status", "open")
     .is("deleted_at", null)
     .order("start_date", { ascending: true });
@@ -327,7 +335,7 @@ export async function getInProgressTournaments(): Promise<
   const today = new Date().toISOString().split("T")[0];
   const { data: closedTournaments, error: closedError } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status,description,poster_url")
+    .select("id,name,location,location_lat,location_lng,start_date,end_date,status,description,poster_url")
     .eq("status", "closed")
     .lte("start_date", today)
     .is("deleted_at", null)
@@ -405,7 +413,7 @@ export async function getMyParticipatedTournaments(): Promise<
   const { data: apps, error: appsError } = await supabase
     .from("tournament_team_applications")
     .select(
-      "tournament_id, team_id, tournaments(id, name, location, start_date, end_date, status, description, poster_url, deleted_at)"
+      "tournament_id, team_id, tournaments(id, name, location, location_lat, location_lng, start_date, end_date, status, description, poster_url, deleted_at)"
     )
     .in("team_id", teamIds)
     .eq("status", "confirmed");
@@ -428,6 +436,8 @@ export async function getMyParticipatedTournaments(): Promise<
       id: tid,
       name: t.name as string,
       location: (t.location as string | null) ?? null,
+      location_lat: (t.location_lat as number | null) ?? null,
+      location_lng: (t.location_lng as number | null) ?? null,
       start_date: (t.start_date as string | null) ?? null,
       end_date: (t.end_date as string | null) ?? null,
       status: t.status as TournamentStatus,
@@ -536,7 +546,7 @@ export async function getPublicTournamentById(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id,name,location,start_date,end_date,status,description,poster_url")
+    .select("id,name,location,location_lat,location_lng,start_date,end_date,status,description,poster_url")
     .eq("id", tournamentId)
     .is("deleted_at", null)
     .maybeSingle();

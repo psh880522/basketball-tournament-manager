@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FieldHint from "@/components/ui/FieldHint";
 import StepIndicator from "@/components/ui/StepIndicator";
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import {
   TOURNAMENT_SIZE_LABELS,
   TOURNAMENT_SIZE_OPTIONS,
@@ -103,6 +104,8 @@ export default function NewTournamentForm() {
   const [message, setMessage] = useState<Message | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [posterPreview, setPosterPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,6 +230,8 @@ export default function NewTournamentForm() {
       const formData = new FormData();
       formData.set("name", form.name);
       formData.set("location", form.location);
+      if (locationLat !== null) formData.set("location_lat", String(locationLat));
+      if (locationLng !== null) formData.set("location_lng", String(locationLng));
       formData.set("start_date", toDateStr(dateRange?.from));
       formData.set("end_date", toDateStr(dateRange?.to ?? dateRange?.from));
       formData.set("start_time", form.start_time);
@@ -334,12 +339,25 @@ export default function NewTournamentForm() {
               <label htmlFor="location" className="text-sm font-medium">
                 장소
               </label>
-              <input
-                id="location"
+              <LocationAutocomplete
                 value={form.location}
-                onChange={(e) => handleChange("location", e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                placeholder="예: 서울 체육관"
+                onChange={(text) => {
+                  handleChange("location", text);
+                  setLocationLat(null);
+                  setLocationLng(null);
+                }}
+                onSelect={(place) => {
+                  const addr = place.road_address_name || place.address_name;
+                  handleChange("location", addr ? `${place.place_name}(${addr})` : place.place_name);
+                  setLocationLat(parseFloat(place.y));
+                  setLocationLng(parseFloat(place.x));
+                }}
+                onCoordsResolve={(lat, lng) => {
+                  setLocationLat(lat);
+                  setLocationLng(lng);
+                }}
+                hasCoords={locationLat !== null && locationLng !== null}
+                placeholder="장소명 또는 주소 입력"
               />
             </div>
 

@@ -22,6 +22,8 @@ type UpdateTournamentInput = {
   tournamentId: string;
   name: string;
   location: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   start_date: string;
   end_date: string;
   schedule_start_at: string | null;
@@ -45,6 +47,8 @@ export async function updateTournamentAction(
   const result = await updateTournament(input.tournamentId, {
     name: input.name,
     location: input.location,
+    location_lat: input.location_lat,
+    location_lng: input.location_lng,
     start_date: input.start_date,
     end_date: input.end_date,
     schedule_start_at: input.schedule_start_at,
