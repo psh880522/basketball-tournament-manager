@@ -101,11 +101,9 @@ function StepCard({
           </span>
         </div>
       </div>
-      {STEP_DESCRIPTIONS[step.label] ? (
-        <p className="text-xs text-gray-500">
-          {STEP_DESCRIPTIONS[step.label]}
-        </p>
-      ) : null}
+      <p className="flex-1 text-xs text-gray-500">
+        {STEP_DESCRIPTIONS[step.label] ?? ""}
+      </p>
       {step.actions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {step.actions.map((action) =>

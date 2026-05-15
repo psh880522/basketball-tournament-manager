@@ -5,6 +5,7 @@ export type TournamentProgressState =
   | "TEAM_APPROVAL"
   | "MATCH_GENERATION"
   | "SCHEDULE"
+  | "ATTENDANCE_CHECK"
   | "RESULT"
   | "TOURNAMENT_FINISHED";
 
@@ -226,7 +227,7 @@ const resolveState = (summary: ProgressSummary): TournamentProgressState => {
     return "SCHEDULE";
   }
 
-  return "RESULT";
+  return "ATTENDANCE_CHECK";
 };
 
 const resolveNextAction = (
@@ -264,6 +265,15 @@ const resolveNextAction = (
         : summary.courtsCount === 0
         ? "코트를 먼저 추가하세요"
         : null,
+    };
+  }
+
+  if (state === "ATTENDANCE_CHECK") {
+    return {
+      label: "출석 체크하기",
+      url: `/admin/tournaments/${tournamentId}/attendance`,
+      disabled: false,
+      reason: null,
     };
   }
 

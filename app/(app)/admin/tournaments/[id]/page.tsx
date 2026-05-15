@@ -244,9 +244,33 @@ const buildSteps = (
     ],
   });
 
-  // 4. 결과
+  // 4. 출석 체크
+  const attendanceActive =
+    scheduledMatches === totalMatches && totalMatches > 0;
+  const attendanceEnabled =
+    !isFinished && scheduledMatches === totalMatches && totalMatches > 0;
+  const attendanceReason = isFinished
+    ? "종료된 대회"
+    : totalMatches === 0 || scheduledMatches < totalMatches
+    ? "먼저 스케줄을 완료하세요"
+    : undefined;
+  steps.push({
+    label: "출석 체크",
+    status: attendanceActive ? "active" : "pending",
+    actions: [
+      {
+        label: "출석 체크",
+        href: `/admin/tournaments/${tournamentId}/attendance`,
+        enabled: attendanceEnabled,
+        reason: attendanceReason,
+        variant: "primary",
+      },
+    ],
+  });
+
+  // 5. 결과
   const resultsDone = totalMatches > 0 && completedMatches === totalMatches;
-  const resultsActive = totalMatches > 0 && completedMatches < totalMatches;
+  const resultsActive = completedMatches > 0 && completedMatches < totalMatches;
   const allMatchesDone = totalMatches > 0 && completedMatches === totalMatches;
   steps.push({
     label: "결과",
