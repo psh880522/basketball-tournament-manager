@@ -4,7 +4,7 @@ import type { ApiResult } from "@/lib/types/api";
 type DivisionGroupRow = {
     id: string;
     name: string;
-    groups: { id: string; name: string; order: number }[] | null;
+    groups: { id: string; name: string; order: number; type: string }[] | null;
 };
 
 type GroupSummaryRow = {
@@ -18,7 +18,7 @@ type GroupTeamRow = {
     teams: { id: string; team_name: string } | null;
 };
 
-type StandingRow = {
+export type StandingRow = {
     id: string;
     group_id: string;
     team_id: string;
@@ -81,7 +81,7 @@ export async function getDivisionsWithGroups(
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
         .from("divisions")
-        .select("id,name,groups(id,name,order)")
+        .select("id,name,groups(id,name,order,type)")
         .eq("tournament_id", tournamentId);
 
     return {

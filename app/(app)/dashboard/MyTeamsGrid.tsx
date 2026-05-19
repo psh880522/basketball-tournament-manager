@@ -19,7 +19,7 @@ export default function MyTeamsGrid({ teams }: MyTeamsGridProps) {
 
   return (
     <section id="my-teams" className="space-y-3">
-      <h2 className="text-lg font-semibold text-slate-800">내 팀들</h2>
+      <h2 className="text-lg font-semibold text-slate-800">내 팀</h2>
       <Wrapper className={wrapperClass}>
         {teams.map((team) => {
           const isCaptain = team.roleInTeam === "captain";

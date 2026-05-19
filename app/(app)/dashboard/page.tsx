@@ -181,7 +181,7 @@ export default async function DashboardPage() {
 function DashboardHeader({ name }: { name: string }) {
   return (
     <header className="space-y-0.5">
-      <h1 className="text-2xl font-semibold text-slate-800">내 허브</h1>
+      <h1 className="text-2xl font-semibold text-slate-800">대시보드</h1>
       <p className="text-sm text-slate-500">안녕하세요, {name}님</p>
     </header>
   );

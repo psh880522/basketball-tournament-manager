@@ -76,7 +76,7 @@ export default function EmptyDashboard(props: EmptyDashboardProps) {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-slate-800">내 팀들</h2>
+        <h2 className="text-lg font-semibold text-slate-800">내 팀</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {props.teams.map((team) => (
             <Card key={team.team_id} className="flex flex-col gap-4">

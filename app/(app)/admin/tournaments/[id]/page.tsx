@@ -289,7 +289,7 @@ const buildSteps = (
       },
       {
         label: "결과 보기",
-        href: `/tournament/${tournamentId}`,
+        href: `/tournament/${tournamentId}/result`,
         enabled: true,
         reason: undefined,
         variant: "secondary",

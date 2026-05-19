@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 type Props = { children?: ReactNode; className?: string };
 
@@ -26,9 +26,12 @@ function Body({ children }: { children: ReactNode }) {
   return <tbody>{children}</tbody>;
 }
 
-function Row({ children, className }: Props) {
+function Row({ children, className, style }: Props & { style?: CSSProperties }) {
   return (
-    <tr className={`border-t border-[#f0f0f0] hover:bg-[#f8f8f8] ${className ?? ""}`.trim()}>
+    <tr
+      className={`border-t border-[#f0f0f0] hover:bg-[#f8f8f8] ${className ?? ""}`.trim()}
+      style={style}
+    >
       {children}
     </tr>
   );
