@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { CalendarDays, MapPin } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -256,9 +257,17 @@ export default function TournamentList({
                       <Badge className="bg-rose-100 text-rose-700">삭제됨</Badge>
                     ) : null}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    {formatRange(tournament)}
-                    {tournament.location ? ` • ${tournament.location}` : ""}
+                  <div className="flex flex-col gap-1 text-sm text-gray-600">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                      <span>{formatRange(tournament)}</span>
+                    </div>
+                    {tournament.location && (
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        <span>{tournament.location}</span>
+                      </div>
+                    )}
                   </div>
                   {isFinished ? (
                     <p className="text-xs text-gray-500">

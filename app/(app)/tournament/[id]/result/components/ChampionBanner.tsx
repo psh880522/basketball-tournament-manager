@@ -11,7 +11,6 @@ type ChampionEntry = {
 type Props = {
   champions: ChampionEntry[];
   hasMultipleDivisions: boolean;
-  isOrganizer: boolean;
 };
 
 const RANKS = [
@@ -46,12 +45,10 @@ function DivisionResult({ entry }: { entry: ChampionEntry }) {
 export default function ChampionBanner({
   champions,
   hasMultipleDivisions,
-  isOrganizer,
 }: Props) {
   const allUnconfirmed = champions.every((c) => !c.first);
 
   if (allUnconfirmed) {
-    if (!isOrganizer) return null;
     return (
       <Card variant="muted">
         <div className="flex items-center gap-2 text-gray-500">

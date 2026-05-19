@@ -7,7 +7,7 @@ import {
   isUserRole,
   isOperationRole,
 } from "@/src/lib/auth/roles";
-import { getInProgressTournaments, getOpenTournaments } from "@/lib/api/tournaments";
+import { getInProgressTournaments, getOpenTournaments, getFinishedTournaments } from "@/lib/api/tournaments";
 import Badge from "@/components/ui/Badge";
 import { getTournamentStatusDisplay } from "@/lib/utils/tournament";
 import Button from "@/components/ui/Button";
@@ -189,6 +189,68 @@ async function InProgressTournamentsList() {
   );
 }
 
+async function FinishedTournamentsList() {
+  const { data, error } = await getFinishedTournaments();
+
+  if (error) {
+    return (
+      <div className="min-h-[180px] flex items-center">
+        <p className="text-sm text-red-600">종료 대회 정보를 불러오지 못했습니다.</p>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="min-h-[180px] flex items-center">
+        <p className="text-sm text-gray-600">종료된 대회가 없습니다.</p>
+      </div>
+    );
+  }
+
+  return (
+    <DragScroll className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {data.map((tournament) => (
+        <div
+          key={tournament.id}
+          className="w-72 shrink-0 flex flex-col bg-white rounded-xl border-l-4 border-gray-300 shadow-md p-5 gap-2 opacity-80"
+        >
+          {(() => {
+            const d = getTournamentStatusDisplay(tournament.status, tournament.start_date);
+            return (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-lg">🏅</span>
+                <Badge variant={d.variant} className="text-xs font-bold uppercase tracking-wider">
+                  {d.label}
+                </Badge>
+              </div>
+            );
+          })()}
+          <h3 className="font-space-grotesk text-xl font-bold text-gray-700 leading-tight">
+            {tournament.name}
+          </h3>
+          <div className="space-y-1">
+            <p className="text-xs text-gray-400 uppercase tracking-widest">
+              {formatDateRange(tournament.start_date, tournament.end_date)}
+            </p>
+            <p className="text-xs text-gray-400 uppercase tracking-widest">
+              {tournament.location || "TBD"}
+            </p>
+          </div>
+          <div className="mt-auto flex flex-wrap gap-2 pt-1">
+            <Link href={`/tournament/${tournament.id}`}>
+              <Button variant="secondary">대회 보기</Button>
+            </Link>
+            <Link href={`/tournament/${tournament.id}/result`}>
+              <Button variant="ghost">결과 보기</Button>
+            </Link>
+          </div>
+        </div>
+      ))}
+    </DragScroll>
+  );
+}
+
 export default async function HomePage() {
   const userResult = await getUserWithRole();
   const isLoggedIn = userResult.status === "ready";
@@ -314,6 +376,30 @@ export default async function HomePage() {
             }
           >
             <InProgressTournamentsList />
+          </Suspense>
+        </section>
+
+        {/* 종료됨 */}
+        <section id="finished-tournaments" className="space-y-5">
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="font-space-grotesk text-[1.7rem] font-black italic uppercase tracking-tight text-gray-500 md:text-[2rem]">
+              종료됨
+            </h2>
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5">
+              <span className="h-2 w-2 rounded-full bg-gray-400" />
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">종료</span>
+            </div>
+          </div>
+          <Suspense
+            fallback={
+              <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="w-72 shrink-0 h-44 rounded-xl bg-gray-200 animate-pulse" />
+                ))}
+              </div>
+            }
+          >
+            <FinishedTournamentsList />
           </Suspense>
         </section>
       </div>

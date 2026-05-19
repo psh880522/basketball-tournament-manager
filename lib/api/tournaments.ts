@@ -374,6 +374,72 @@ export async function getInProgressTournaments(): Promise<
   };
 }
 
+export async function getFinishedTournaments(): Promise<
+  ApiResult<PublicTournamentRow[]>
+> {
+  const supabase = await createSupabaseServerClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  // status = 'finished' 대회
+  const { data: finishedTournaments, error: finishedError } = await supabase
+    .from("tournaments")
+    .select("id,name,location,location_lat,location_lng,start_date,end_date,status,description,poster_url")
+    .eq("status", "finished")
+    .is("deleted_at", null)
+    .order("end_date", { ascending: false });
+
+  if (finishedError) return { data: null, error: finishedError.message };
+
+  // status = 'closed' + start_date <= today 이지만 모든 경기가 완료된 대회
+  const { data: closedTournaments, error: closedError } = await supabase
+    .from("tournaments")
+    .select("id,name,location,location_lat,location_lng,start_date,end_date,status,description,poster_url")
+    .eq("status", "closed")
+    .lte("start_date", today)
+    .is("deleted_at", null)
+    .order("end_date", { ascending: false });
+
+  if (closedError) return { data: null, error: closedError.message };
+
+  const closedList = closedTournaments ?? [];
+  let allMatchesCompletedList: PublicTournamentRow[] = [];
+
+  if (closedList.length > 0) {
+    const closedIds = closedList.map((t) => t.id);
+    const { data: incompleteMatches, error: matchesError } = await supabase
+      .from("matches")
+      .select("tournament_id")
+      .in("tournament_id", closedIds)
+      .neq("status", "completed");
+
+    if (matchesError) return { data: null, error: matchesError.message };
+
+    const activeIds = new Set(
+      (incompleteMatches as { tournament_id: string }[] | null)?.map(
+        (row) => row.tournament_id
+      ) ?? []
+    );
+
+    allMatchesCompletedList = closedList.filter((t) => !activeIds.has(t.id));
+  }
+
+  const finishedList = finishedTournaments ?? [];
+  const finishedIds = new Set(finishedList.map((t) => t.id));
+  const merged = [
+    ...finishedList,
+    ...allMatchesCompletedList.filter((t) => !finishedIds.has(t.id)),
+  ];
+
+  merged.sort((a, b) => {
+    if (!a.end_date && !b.end_date) return 0;
+    if (!a.end_date) return 1;
+    if (!b.end_date) return -1;
+    return b.end_date.localeCompare(a.end_date);
+  });
+
+  return { data: merged, error: null };
+}
+
 export type MyParticipatedTournamentRow = PublicTournamentRow & {
   team_name: string;
 };

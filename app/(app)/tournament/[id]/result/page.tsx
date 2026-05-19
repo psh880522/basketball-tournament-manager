@@ -167,7 +167,6 @@ async function ResultContent({ tournamentId }: { tournamentId: string }) {
           <ChampionBanner
             champions={champions}
             hasMultipleDivisions={hasMultipleDivisions}
-            isOrganizer={isOrganizer}
           />
         )}
 
